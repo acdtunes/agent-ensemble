@@ -15,24 +15,12 @@ Exit codes:
 
 from __future__ import annotations
 
-import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import NamedTuple
 
 import yaml
-
-
-class StepState(NamedTuple):
-    step_id: str
-    name: str
-    layer: int
-    status: str  # pending | claimed | in_progress | review | approved | failed
-    teammate_id: str | None
-    started_at: str | None
-    completed_at: str | None
-    review_attempts: int
 
 
 VALID_STATUSES = {"pending", "claimed", "in_progress", "review", "approved", "failed"}
@@ -101,8 +89,8 @@ def cmd_init(args: list[str]) -> int:
 
     state = {
         "schema_version": "1.0",
-        "created_at": datetime.utcnow().isoformat() + "Z",
-        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
         "plan_path": str(plan_path),
         "current_layer": 1,
         "summary": {
@@ -193,7 +181,7 @@ def cmd_update(args: list[str]) -> int:
 
     step = state["steps"][step_id]
     old_status = step["status"]
-    now = datetime.utcnow().isoformat() + "Z"
+    now = datetime.now(timezone.utc).isoformat()
 
     # Conflict gate: block in_progress transition when files overlap with active steps
     if status == "in_progress":

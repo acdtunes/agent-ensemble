@@ -12,9 +12,7 @@ Exit codes:
 
 from __future__ import annotations
 
-import json
 import sys
-from collections import defaultdict
 from pathlib import Path
 from typing import NamedTuple
 
@@ -93,17 +91,9 @@ def topological_layers(steps: list[Step], graph: dict[str, set[str]]) -> list[li
         layer = [step_map[sid] for sid in ready]
         layers.append(layer)
 
-        # Remove from remaining and update in_degree
+        # Remove from remaining and decrease in_degree for dependents
         for sid in ready:
             remaining.remove(sid)
-            # Decrease in_degree for steps that depended on this
-            for other_sid in remaining:
-                if sid in graph.get(other_sid, set()):
-                    # This logic is inverted - we need reverse edges
-                    pass
-
-        # Actually: decrease in_degree for dependents
-        for sid in ready:
             for other_sid, deps in graph.items():
                 if sid in deps:
                     in_degree[other_sid] -= 1
