@@ -88,17 +88,25 @@ describe('createFileWatcher', () => {
   });
 
   it('should clean up watcher resources on close', async () => {
-    const watcher = createFileWatcher(filePath, () => {});
+    const changes: string[] = [];
+    const watcher = createFileWatcher(filePath, (content) => {
+      changes.push(content);
+    });
     await watcher.ready;
+
+    // Verify the callback works before closing
+    await writeFile(filePath, 'before-close');
+    await delay(300);
+    expect(changes.length).toBeGreaterThanOrEqual(1);
+
+    const countBeforeClose = changes.length;
     await watcher.close();
 
     // After close, writing should not trigger callbacks
-    const changes: string[] = [];
-    // Re-create with fresh callback to verify old watcher is dead
     await writeFile(filePath, 'after-close');
-    await delay(200);
+    await delay(300);
 
-    expect(changes).toHaveLength(0);
+    expect(changes.length).toBe(countBeforeClose);
   });
 });
 
