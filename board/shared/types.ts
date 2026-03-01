@@ -110,3 +110,62 @@ export type WSMessage =
 export type ParseError =
   | { readonly type: 'invalid_yaml'; readonly message: string }
   | { readonly type: 'invalid_schema'; readonly message: string };
+
+// --- Multi-project types ---
+
+export type ProjectId = string & { readonly __brand: 'ProjectId' };
+
+const PROJECT_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+
+export const createProjectId = (raw: string): Result<ProjectId, string> =>
+  PROJECT_ID_PATTERN.test(raw)
+    ? ok(raw as ProjectId)
+    : err(`Invalid project ID: '${raw}'. Must be a lowercase slug (a-z, 0-9, hyphens, no leading/trailing hyphens).`);
+
+export interface ProjectSummary {
+  readonly projectId: ProjectId;
+  readonly name: string;
+  readonly totalSteps: number;
+  readonly completed: number;
+  readonly failed: number;
+  readonly inProgress: number;
+  readonly currentLayer: number;
+  readonly updatedAt: string;
+}
+
+export const deriveProjectSummary = (
+  projectId: ProjectId,
+  state: DeliveryState,
+): ProjectSummary => ({
+  projectId,
+  name: projectId as string,
+  totalSteps: state.summary.total_steps,
+  completed: state.summary.completed,
+  failed: state.summary.failed,
+  inProgress: state.summary.in_progress,
+  currentLayer: state.current_layer,
+  updatedAt: state.updated_at,
+});
+
+export interface ProjectEntry {
+  readonly projectId: ProjectId;
+  readonly state: DeliveryState;
+  readonly plan: ExecutionPlan;
+}
+
+export interface ProjectConfig {
+  readonly projectId: ProjectId;
+  readonly statePath: string;
+  readonly planPath: string;
+}
+
+// --- Multi-project WebSocket protocol ---
+
+export type ClientWSMessage =
+  | { readonly type: 'subscribe'; readonly projectId: ProjectId }
+  | { readonly type: 'unsubscribe'; readonly projectId: ProjectId };
+
+export type ServerWSMessage =
+  | { readonly type: 'init'; readonly projectId: ProjectId; readonly state: DeliveryState; readonly plan: ExecutionPlan }
+  | { readonly type: 'update'; readonly projectId: ProjectId; readonly state: DeliveryState; readonly transitions: readonly StateTransition[] }
+  | { readonly type: 'project_list'; readonly projects: readonly ProjectSummary[] };
