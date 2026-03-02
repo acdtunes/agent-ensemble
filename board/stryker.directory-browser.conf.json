@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker/master/packages/core/schema/stryker-core.schema.json",
+  "mutate": [
+    "server/browse.ts"
+  ],
+  "testRunner": "vitest",
+  "checkers": [],
+  "vitest": {
+    "configFile": "vite.config.ts",
+    "dir": "server/__tests__/"
+  },
+  "coverageAnalysis": "all",
+  "reporters": ["clear-text", "json"],
+  "jsonReporter": {
+    "fileName": "docs/feature/directory-browser/mutation/mutation-report.json"
+  },
+  "thresholds": {
+    "high": 90,
+    "low": 80,
+    "break": 80
+  },
+  "concurrency": 4,
+  "timeoutMS": 30000
+}

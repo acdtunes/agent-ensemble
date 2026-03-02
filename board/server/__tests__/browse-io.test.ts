@@ -11,8 +11,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, mkdir, writeFile, rm, chmod, symlink } from 'node:fs/promises';
 import { tmpdir, homedir } from 'node:os';
 import * as path from 'node:path';
-
-const BROWSE_MODULE_PATH = ['..', '..', 'server', 'browse'].join('/');
+import { listDirectories, defaultPath } from '../browse.js';
 
 // =================================================================
 // Acceptance: listDirectories reads real filesystem and returns filtered entries
@@ -33,8 +32,6 @@ describe('listDirectories: reads filesystem and returns filtered directory entri
   });
 
   it('returns sorted non-hidden directories from a valid path', async () => {
-    const { listDirectories } = await import(/* @vite-ignore */ BROWSE_MODULE_PATH);
-
     const result = await listDirectories(tempDir);
 
     expect(result.ok).toBe(true);
@@ -47,7 +44,6 @@ describe('listDirectories: reads filesystem and returns filtered directory entri
   });
 
   it('succeeds even when directory contains a broken symlink', async () => {
-    const { listDirectories } = await import(/* @vite-ignore */ BROWSE_MODULE_PATH);
     // Create a symlink pointing to a non-existent target (broken symlink)
     await symlink(
       path.join(tempDir, 'nonexistent-target'),
@@ -67,7 +63,6 @@ describe('listDirectories: reads filesystem and returns filtered directory entri
   });
 
   it('returns empty array for directory with no visible subdirectories', async () => {
-    const { listDirectories } = await import(/* @vite-ignore */ BROWSE_MODULE_PATH);
     const emptyDir = await mkdtemp(path.join(tmpdir(), 'browse-io-empty-'));
 
     try {
@@ -88,8 +83,6 @@ describe('listDirectories: reads filesystem and returns filtered directory entri
 // =================================================================
 describe('listDirectories: maps filesystem errors to BrowseError', () => {
   it('returns not_found for non-existent directory', async () => {
-    const { listDirectories } = await import(/* @vite-ignore */ BROWSE_MODULE_PATH);
-
     const result = await listDirectories('/tmp/definitely-does-not-exist-browse-io-test');
 
     expect(result.ok).toBe(false);
@@ -102,7 +95,6 @@ describe('listDirectories: maps filesystem errors to BrowseError', () => {
     // Skip if running as root (chmod won't restrict root)
     if (process.getuid?.() === 0) return;
 
-    const { listDirectories } = await import(/* @vite-ignore */ BROWSE_MODULE_PATH);
     const restrictedDir = await mkdtemp(path.join(tmpdir(), 'browse-io-noaccess-'));
 
     try {
@@ -120,7 +112,6 @@ describe('listDirectories: maps filesystem errors to BrowseError', () => {
   });
 
   it('returns read_failed for a file path instead of directory', async () => {
-    const { listDirectories } = await import(/* @vite-ignore */ BROWSE_MODULE_PATH);
     const tempFile = path.join(tmpdir(), 'browse-io-test-file-' + Date.now());
     await writeFile(tempFile, 'not a directory');
 
@@ -141,17 +132,13 @@ describe('listDirectories: maps filesystem errors to BrowseError', () => {
 // defaultPath: returns home directory
 // =================================================================
 describe('defaultPath: returns home directory value', () => {
-  it('returns the same value as os.homedir()', async () => {
-    const { defaultPath } = await import(/* @vite-ignore */ BROWSE_MODULE_PATH);
-
+  it('returns the same value as os.homedir()', () => {
     const result = defaultPath();
 
     expect(result).toBe(homedir());
   });
 
-  it('returns an absolute path', async () => {
-    const { defaultPath } = await import(/* @vite-ignore */ BROWSE_MODULE_PATH);
-
+  it('returns an absolute path', () => {
     const result = defaultPath();
 
     expect(path.isAbsolute(result)).toBe(true);
