@@ -44,5 +44,82 @@ events:
   s: EXECUTED
   sid: 01-02
   t: '2026-03-02T18:57:56Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 01-02
+  t: '2026-03-02T18:58:26Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 01-03
+  t: '2026-03-02T19:03:50Z'
+- d: PASS
+  p: RED_ACCEPTANCE
+  s: EXECUTED
+  sid: 01-03
+  t: '2026-03-02T19:03:51Z'
+- d: PASS
+  p: RED_UNIT
+  s: EXECUTED
+  sid: 01-03
+  t: '2026-03-02T19:03:53Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 01-03
+  t: '2026-03-02T19:03:53Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 01-03
+  t: '2026-03-02T19:03:54Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 01-04
+  t: '2026-03-02T19:06:06Z'
+- d: PASS
+  p: RED_ACCEPTANCE
+  s: EXECUTED
+  sid: 01-04
+  t: '2026-03-02T19:06:57Z'
+- d: PASS
+  p: RED_UNIT
+  s: EXECUTED
+  sid: 01-04
+  t: '2026-03-02T19:06:57Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 01-04
+  t: '2026-03-02T19:07:54Z'
+- d: PASS
+  p: COMMIT
+  s: EXECUTED
+  sid: 01-04
+  t: '2026-03-02T19:08:18Z'
+- d: PASS
+  p: PREPARE
+  s: EXECUTED
+  sid: 01-05
+  t: '2026-03-02T19:22:36Z'
+- d: 'NOT_APPLICABLE: composition root wiring step - browse endpoint already tested
+    at HTTP layer in doc-http pattern; integration test would duplicate existing E2E
+    coverage'
+  p: RED_ACCEPTANCE
+  s: SKIPPED
+  sid: 01-05
+  t: '2026-03-02T19:22:44Z'
+- d: PASS
+  p: RED_UNIT
+  s: EXECUTED
+  sid: 01-05
+  t: '2026-03-02T19:23:15Z'
+- d: PASS
+  p: GREEN
+  s: EXECUTED
+  sid: 01-05
+  t: '2026-03-02T19:24:19Z'
 project_id: directory-browser
 schema_version: '3.0'

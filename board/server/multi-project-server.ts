@@ -14,6 +14,7 @@ import {
   type SubscriptionServer,
   type HttpServer,
   type DocHttpDeps,
+  type BrowseHttpDeps,
 } from './index.js';
 import {
   createProjectDiscovery,
@@ -23,6 +24,7 @@ import {
 } from './discovery.js';
 import { scanDocsDir } from './doc-tree.js';
 import { readDocContent } from './doc-content.js';
+import { listDirectories, defaultPath } from './browse.js';
 import { discoverFeaturesFs } from './feature-discovery.js';
 import { ok, err } from '../shared/types.js';
 
@@ -173,6 +175,12 @@ export const createMultiProjectServer = (
     readDocContent,
   };
 
+  // Browse endpoint deps — wired with real listDirectories and defaultPath
+  const browseDeps: BrowseHttpDeps = {
+    listDirectories,
+    defaultPath,
+  };
+
   // Projects manifest state
   const manifestPath = join(config.projectsRoot, '.nw-board-projects.json');
   let projectsManifest: ProjectsManifest = { projects: [] };
@@ -248,6 +256,7 @@ export const createMultiProjectServer = (
     getProject: (id) => registry.get(id),
     listProjectSummaries: listProjectSummariesWithFeatures,
     docs: docDeps,
+    browse: browseDeps,
     addProject,
     removeProject,
     discoverFeatures,
