@@ -34,26 +34,26 @@ export const LayerLane = ({ layer, stepStates, blockedStepIds, onCardClick }: La
   const progress = computeProgress(stepStates);
 
   return (
-    <div data-testid={`layer-${layer.layer}`} className="mb-4 rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-2">
-        <span className="font-medium text-gray-800">Layer {layer.layer}</span>
-        <span className="text-sm text-gray-500">
+    <div data-testid={`layer-${layer.layer}`} className="mb-4 rounded-lg border border-gray-800 bg-gray-900/60 shadow-sm">
+      <div className="flex items-center gap-3 border-b border-gray-800 px-4 py-2">
+        <span className="font-medium text-gray-200">Layer {layer.layer}</span>
+        <span className="text-sm text-gray-400">
           {layer.steps.length} {layer.parallel ? 'parallel' : 'sequential'}
         </span>
         {layer.use_worktrees && (
-          <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-600">worktree</span>
+          <span className="rounded-full bg-indigo-950/50 px-1.5 py-0.5 text-xs font-medium text-indigo-400">worktree</span>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200">
+          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-700">
             <div
-              className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all duration-300"
               style={{ width: `${progress.total > 0 ? (progress.completed / progress.total) * 100 : 0}%` }}
             />
           </div>
-          <span className="text-sm text-gray-500">{progress.completed}/{progress.total}</span>
+          <span className="text-sm text-gray-400">{progress.completed}/{progress.total}</span>
         </div>
       </div>
-      <div className="grid grid-cols-4 divide-x divide-gray-200">
+      <div className="grid grid-cols-4 divide-x divide-gray-800">
         {DISPLAY_COLUMNS.map(column => {
           const colors = getStatusColor(column);
           return (
@@ -61,7 +61,7 @@ export const LayerLane = ({ layer, stepStates, blockedStepIds, onCardClick }: La
               <div className={`mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide ${colors.text}`}>
                 <span className={`inline-block h-2 w-2 rounded-full ${colors.border} border-2`} />
                 {getStatusLabel(column)}
-                <span className="ml-1 rounded-full bg-white px-1.5 py-0.5 text-xs font-normal text-gray-500 shadow-sm">
+                <span className="ml-1 rounded-full bg-gray-800 px-1.5 py-0.5 text-xs font-normal text-gray-400 shadow-sm">
                   {grouped[column].length}
                 </span>
               </div>

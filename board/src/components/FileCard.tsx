@@ -4,7 +4,7 @@ import { getCardAnimationClasses } from '../utils/animationClasses';
 import { getTeammateColor } from '../utils/teammateColors';
 
 const PersonIcon = () => (
-  <svg className="h-3 w-3 text-gray-400" viewBox="0 0 16 16" fill="currentColor">
+  <svg className="h-3 w-3 text-gray-500" viewBox="0 0 16 16" fill="currentColor">
     <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM12.735 14c.618 0 1.093-.561.872-1.139a6.002 6.002 0 0 0-11.215 0c-.22.578.254 1.139.872 1.139h9.47Z" />
   </svg>
 );
@@ -26,14 +26,14 @@ export const FileCard = ({ card, onCardClick }: FileCardProps) => {
   return (
     <div
       data-testid="file-card"
-      className={`rounded border-l-2 bg-white p-2 text-sm shadow-sm ${colors.border} ${animationClasses}${isClickable ? ' cursor-pointer' : ''}`}
+      className={`rounded border-l-2 bg-gray-900/80 backdrop-blur-sm p-2 text-sm shadow-sm ${colors.border} ${animationClasses}${isClickable ? ' cursor-pointer' : ''}`}
       onClick={isClickable ? () => onCardClick(card.stepId) : undefined}
     >
       <div className="flex items-center justify-between">
-        <span className="font-medium text-gray-800">{card.stepName}</span>
+        <span className="font-medium text-gray-100">{card.stepName}</span>
         <span className="font-mono text-xs text-gray-400">{card.stepId}</span>
       </div>
-      <div className="text-xs text-gray-500">
+      <div className="text-xs text-gray-400">
         {card.filename}
       </div>
       {card.teammateId !== null && (
@@ -46,13 +46,13 @@ export const FileCard = ({ card, onCardClick }: FileCardProps) => {
       )}
       <div className="mt-1 flex flex-wrap gap-1">
         {card.worktree && (
-          <Badge bg="bg-indigo-50" text="text-indigo-600">worktree</Badge>
+          <Badge bg="bg-indigo-950/50" text="text-indigo-400">worktree</Badge>
         )}
-        {card.retryCount > 0 && (
-          <Badge bg="bg-orange-50" text="text-orange-600">{card.retryCount} retries</Badge>
+        {card.reviewCount > 0 && (
+          <Badge bg="bg-orange-950/50" text="text-orange-400">{card.reviewCount} {card.reviewCount === 1 ? 'review' : 'reviews'}</Badge>
         )}
         {card.isBlocked && (
-          <Badge bg="bg-red-50" text="text-red-600">blocked</Badge>
+          <Badge bg="bg-red-950/50" text="text-red-400">blocked</Badge>
         )}
       </div>
     </div>

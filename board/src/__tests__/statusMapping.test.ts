@@ -102,10 +102,10 @@ describe('expandStepToFileCards', () => {
     expect(card.displayColumn).toBe('in_progress');
   });
 
-  it('includes retryCount from review_attempts', () => {
+  it('maps review_attempts to reviewCount', () => {
     const step = makeStep({ review_attempts: 3 });
     const [card] = expandStepToFileCards(step, false);
-    expect(card.retryCount).toBe(3);
+    expect(card.reviewCount).toBe(3);
   });
 
   it('sets worktree flag from step', () => {
@@ -124,9 +124,11 @@ describe('expandStepToFileCards', () => {
     expect(expandStepToFileCards(step, true)[0].isBlocked).toBe(true);
   });
 
-  it('returns empty array when files_to_modify is empty', () => {
+  it('falls back to step name when files_to_modify is empty', () => {
     const step = makeStep({ files_to_modify: [] });
-    expect(expandStepToFileCards(step, false)).toEqual([]);
+    const cards = expandStepToFileCards(step, false);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].filename).toBe(step.name);
   });
 
   it('maps teammate_id to teammateId on each card', () => {

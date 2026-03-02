@@ -32,20 +32,25 @@ export interface FileCardData {
   readonly stepId: string;
   readonly stepName: string;
   readonly displayColumn: DisplayColumn;
-  readonly retryCount: number;
+  readonly reviewCount: number;
   readonly worktree: boolean;
   readonly isBlocked: boolean;
   readonly teammateId: string | null;
 }
 
-export const expandStepToFileCards = (step: StepState, isBlocked: boolean): readonly FileCardData[] =>
-  step.files_to_modify.map((filename) => ({
+export const expandStepToFileCards = (step: StepState, isBlocked: boolean): readonly FileCardData[] => {
+  const files = step.files_to_modify.length > 0
+    ? step.files_to_modify
+    : [step.name];
+
+  return files.map((filename) => ({
     filename,
     stepId: step.step_id,
     stepName: step.name,
     displayColumn: mapStatusToDisplayColumn(step.status),
-    retryCount: step.review_attempts,
+    reviewCount: step.review_attempts,
     worktree: step.worktree ?? false,
     isBlocked,
     teammateId: step.teammate_id,
   }));
+};
