@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useDeliveryState, type ConnectionStatus } from './hooks/useDeliveryState';
 import { useProjectList } from './hooks/useProjectList';
+import { useDocTree } from './hooks/useDocTree';
 import { useRouter } from './hooks/useRouter';
 import { ProgressHeader } from './components/ProgressHeader';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -9,6 +10,7 @@ import { buildPlanStepLookup } from './utils/stepDetailUtils';
 import { TeamPanel } from './components/TeamPanel';
 import { ActivityFeed } from './components/ActivityFeed';
 import { OverviewDashboard } from './components/OverviewDashboard';
+import { DocViewer } from './components/DocViewer';
 import type { DeliveryState, ExecutionPlan, StateTransition, ProjectId } from '../shared/types';
 
 // --- Pure functions ---
@@ -33,17 +35,17 @@ const CONNECTION_COLORS: Readonly<Record<ConnectionStatus, string>> = {
 // --- Components ---
 
 const ConnectionIndicator = ({ status }: { readonly status: ConnectionStatus }) => (
-  <div className="flex items-center gap-2 text-sm text-gray-500">
+  <div className="flex items-center gap-2 text-sm text-gray-400">
     <span className={`inline-block h-2 w-2 rounded-full ${CONNECTION_COLORS[status]}`} />
     {CONNECTION_LABELS[status]}
   </div>
 );
 
 const Placeholder = ({ error }: { readonly error: string | null }) => (
-  <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+  <div className="flex flex-col items-center justify-center py-20 text-gray-400">
     <p className="text-lg">Waiting for server…</p>
     {error !== null && (
-      <p className="mt-2 text-sm text-red-500">{error}</p>
+      <p className="mt-2 text-sm text-red-400">{error}</p>
     )}
   </div>
 );
@@ -57,8 +59,8 @@ const PageShell = ({
   readonly connectionStatus: ConnectionStatus;
   readonly children: React.ReactNode;
 }) => (
-  <div className="min-h-screen bg-gray-50 text-gray-900">
-    <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4 shadow-sm lg:px-6">
+  <div className="min-h-screen bg-gray-950 text-gray-100">
+    <header className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-800 bg-gray-900/80 px-4 py-4 shadow-sm backdrop-blur-sm lg:px-6">
       {headerContent}
       <ConnectionIndicator status={connectionStatus} />
     </header>
@@ -102,11 +104,11 @@ const BoardContent = ({ state, plan, transitions }: BoardContentProps) => {
         </div>
         <div className="space-y-6">
           <section aria-label="Teammates">
-            <h2 className="mb-3 text-lg font-medium text-gray-700">Teammates</h2>
+            <h2 className="mb-3 text-lg font-medium text-gray-300">Teammates</h2>
             <TeamPanel teammates={state.teammates} steps={state.steps} />
           </section>
           <section aria-label="Activity">
-            <h2 className="mb-3 text-lg font-medium text-gray-700">Activity</h2>
+            <h2 className="mb-3 text-lg font-medium text-gray-300">Activity</h2>
             <ActivityFeed transitions={transitions} />
           </section>
         </div>
@@ -131,6 +133,42 @@ const WS_URL = computeWsUrl(
     : { protocol: 'ws:', host: 'localhost:3000' },
 );
 
+const ProjectTabs = ({
+  projectId,
+  activeTab,
+}: {
+  readonly projectId: string;
+  readonly activeTab: 'board' | 'docs';
+}) => (
+  <div className="flex items-center gap-3">
+    <a href="#/" className="text-sm text-gray-400 hover:text-gray-200">Overview</a>
+    <span className="text-gray-600">/</span>
+    <h1 className="text-xl font-semibold text-gray-100">NW Teams Board</h1>
+    <nav className="ml-4 flex gap-1">
+      <a
+        href={`#/projects/${projectId}/board`}
+        className={`px-3 py-1 text-sm rounded-t ${
+          activeTab === 'board'
+            ? 'text-gray-100 border-b-2 border-blue-500'
+            : 'text-gray-400 hover:text-gray-200'
+        }`}
+      >
+        Board
+      </a>
+      <a
+        href={`#/projects/${projectId}/docs`}
+        className={`px-3 py-1 text-sm rounded-t ${
+          activeTab === 'docs'
+            ? 'text-gray-100 border-b-2 border-blue-500'
+            : 'text-gray-400 hover:text-gray-200'
+        }`}
+      >
+        Docs
+      </a>
+    </nav>
+  </div>
+);
+
 const BoardView = ({ projectId }: { readonly projectId: ProjectId }) => {
   const { state, plan, transitions, connectionStatus, error } = useDeliveryState(WS_URL, projectId);
 
@@ -139,13 +177,7 @@ const BoardView = ({ projectId }: { readonly projectId: ProjectId }) => {
   return (
     <PageShell
       connectionStatus={connectionStatus}
-      headerContent={
-        <div className="flex items-center gap-3">
-          <a href="#/" className="text-sm text-gray-500 hover:text-gray-800">Overview</a>
-          <span className="text-gray-300">/</span>
-          <h1 className="text-xl font-semibold">NW Teams Board</h1>
-        </div>
-      }
+      headerContent={<ProjectTabs projectId={projectId} activeTab="board" />}
     >
       {hasData
         ? <BoardContent state={state} plan={plan} transitions={transitions} />
@@ -153,6 +185,10 @@ const BoardView = ({ projectId }: { readonly projectId: ProjectId }) => {
       }
     </PageShell>
   );
+};
+
+const navigateToBoard = (projectId: string): void => {
+  window.location.hash = `#/projects/${projectId}/board`;
 };
 
 const navigateToProject = (projectId: string): void => {
@@ -165,19 +201,60 @@ const OverviewView = () => {
   return (
     <PageShell
       connectionStatus={connectionStatus}
-      headerContent={<h1 className="text-xl font-semibold">NW Teams Board</h1>}
+      headerContent={<h1 className="text-xl font-semibold text-gray-100">NW Teams Board</h1>}
     >
       <OverviewDashboard projects={projects} onNavigate={navigateToProject} />
     </PageShell>
   );
 };
 
+const DocsView = ({ projectId }: { readonly projectId: ProjectId }) => {
+  const { connectionStatus } = useProjectList(WS_URL);
+  const { tree, error } = useDocTree(projectId);
+
+  const handleNavigateToBoard = useCallback(() => {
+    navigateToBoard(projectId);
+  }, [projectId]);
+
+  const fetchContent = useCallback(
+    async (path: string): Promise<string> => {
+      const response = await fetch(`/api/projects/${projectId}/docs/content?path=${encodeURIComponent(path)}`);
+      if (!response.ok) return '';
+      return response.text();
+    },
+    [projectId],
+  );
+
+  return (
+    <PageShell
+      connectionStatus={connectionStatus}
+      headerContent={<ProjectTabs projectId={projectId} activeTab="docs" />}
+    >
+      <DocViewer
+        projectId={projectId}
+        tree={tree}
+        fetchContent={fetchContent}
+        onNavigateToBoard={handleNavigateToBoard}
+        error={error ?? undefined}
+      />
+    </PageShell>
+  );
+};
+
 // --- App ---
+
+const renderRoute = (route: ReturnType<typeof useRouter>): React.ReactNode => {
+  switch (route.view) {
+    case 'board':
+      return <BoardView projectId={route.projectId as ProjectId} />;
+    case 'docs':
+      return <DocsView projectId={route.projectId as ProjectId} />;
+    case 'overview':
+      return <OverviewView />;
+  }
+};
 
 export const App = () => {
   const route = useRouter();
-
-  return route.view === 'board'
-    ? <BoardView projectId={route.projectId as ProjectId} />
-    : <OverviewView />;
+  return <>{renderRoute(route)}</>;
 };
