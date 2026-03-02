@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import express from 'express';
 import { createServer as createNodeHttpServer } from 'node:http';
+import * as path from 'node:path';
 import type {
   DeliveryState,
   ExecutionPlan,
@@ -18,9 +19,12 @@ import type {
   AddProjectError,
   RemoveProjectError,
   FeatureId,
+  BrowseEntry,
+  BrowseError,
 } from '../shared/types.js';
 import { createProjectId, createFeatureId, deriveProjectSummary } from '../shared/types.js';
 import { validateDocPath } from './doc-content.js';
+import { validateBrowsePath } from './browse.js';
 import { buildDocTree } from './doc-tree.js';
 import { resolveFeatureExecutionLog, resolveFeatureRoadmap } from './feature-path-resolver.js';
 import { parseStateYaml, parsePlanYaml } from './parser.js';
@@ -211,10 +215,16 @@ export interface FeatureArtifactDeps {
   readonly readFile: (path: string) => Promise<Result<string, string>>;
 }
 
+export interface BrowseHttpDeps {
+  readonly listDirectories: (validatedPath: string) => Promise<Result<BrowseEntry[], BrowseError>>;
+  readonly defaultPath: () => string;
+}
+
 export interface MultiProjectHttpDeps {
   readonly listProjectSummaries: () => readonly ProjectSummary[];
   readonly getProject: (projectId: ProjectId) => Result<ProjectEntry, unknown>;
   readonly docs?: DocHttpDeps;
+  readonly browse?: BrowseHttpDeps;
   readonly addProject?: (path: string) => Promise<Result<ProjectSummary, AddProjectError>>;
   readonly removeProject?: (projectId: ProjectId) => Promise<Result<void, RemoveProjectError>>;
   readonly discoverFeatures?: (projectId: ProjectId) => Promise<readonly FeatureSummary[]>;
@@ -412,6 +422,49 @@ export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.A
       }
 
       res.json(parseResult.value);
+    });
+  }
+
+  // --- Directory browser endpoint (registered when browse deps are provided) ---
+
+  if (deps.browse) {
+    const { browse } = deps;
+
+    app.get('/api/browse', async (req, res) => {
+      const rawPath = typeof req.query.path === 'string' && req.query.path
+        ? req.query.path
+        : browse.defaultPath();
+
+      const pathResult = validateBrowsePath(rawPath);
+      if (!pathResult.ok) {
+        res.status(400).json({ error: pathResult.error.message });
+        return;
+      }
+
+      const validatedPath = pathResult.value;
+      const listResult = await browse.listDirectories(validatedPath);
+      if (!listResult.ok) {
+        switch (listResult.error.type) {
+          case 'invalid_path':
+            res.status(400).json({ error: listResult.error.message });
+            return;
+          case 'permission_denied':
+            res.status(403).json({ error: `Permission denied: ${listResult.error.path}` });
+            return;
+          case 'not_found':
+            res.status(404).json({ error: `Directory not found: ${listResult.error.path}` });
+            return;
+          case 'read_failed':
+            res.status(500).json({ error: listResult.error.message });
+            return;
+        }
+      }
+
+      const parent = validatedPath === path.dirname(validatedPath)
+        ? null
+        : path.dirname(validatedPath);
+
+      res.json({ path: validatedPath, parent, entries: listResult.value });
     });
   }
 
