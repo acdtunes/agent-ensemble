@@ -91,6 +91,16 @@ export const listDirectories = async (
 };
 
 /**
+ * Compute the parent directory, returning null for filesystem roots.
+ *
+ * Pure function — no filesystem access.
+ */
+export const computeParentPath = (dirPath: string): string | null => {
+  const parent = path.dirname(dirPath);
+  return parent === dirPath ? null : parent;
+};
+
+/**
  * Return the default browse path (user's home directory).
  */
 export const defaultPath = (): string => homedir();

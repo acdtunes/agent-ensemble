@@ -231,3 +231,26 @@ describe('filterDirectoryEntries: filters and sorts directory entries', () => {
     expect(result).toEqual([]);
   });
 });
+
+// =================================================================
+// computeParentPath: computes parent directory or null for root
+// =================================================================
+describe('computeParentPath: computes parent or null for filesystem root', () => {
+  it('returns parent directory for a nested path', async () => {
+    const { computeParentPath } = await import(/* @vite-ignore */ BROWSE_MODULE_PATH);
+
+    expect(computeParentPath('/home/user/projects')).toBe('/home/user');
+  });
+
+  it('returns null for filesystem root', async () => {
+    const { computeParentPath } = await import(/* @vite-ignore */ BROWSE_MODULE_PATH);
+
+    expect(computeParentPath('/')).toBeNull();
+  });
+
+  it('returns parent for a single-level path', async () => {
+    const { computeParentPath } = await import(/* @vite-ignore */ BROWSE_MODULE_PATH);
+
+    expect(computeParentPath('/home')).toBe('/');
+  });
+});

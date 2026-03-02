@@ -1,7 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import express from 'express';
 import { createServer as createNodeHttpServer } from 'node:http';
-import * as path from 'node:path';
 import type {
   DeliveryState,
   ExecutionPlan,
@@ -24,7 +23,7 @@ import type {
 } from '../shared/types.js';
 import { createProjectId, createFeatureId, deriveProjectSummary } from '../shared/types.js';
 import { validateDocPath } from './doc-content.js';
-import { validateBrowsePath } from './browse.js';
+import { validateBrowsePath, computeParentPath } from './browse.js';
 import { buildDocTree } from './doc-tree.js';
 import { resolveFeatureExecutionLog, resolveFeatureRoadmap } from './feature-path-resolver.js';
 import { parseStateYaml, parsePlanYaml } from './parser.js';
@@ -460,11 +459,7 @@ export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.A
         }
       }
 
-      const parent = validatedPath === path.dirname(validatedPath)
-        ? null
-        : path.dirname(validatedPath);
-
-      res.json({ path: validatedPath, parent, entries: listResult.value });
+      res.json({ path: validatedPath, parent: computeParentPath(validatedPath), entries: listResult.value });
     });
   }
 
