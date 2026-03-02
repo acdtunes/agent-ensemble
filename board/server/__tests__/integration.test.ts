@@ -82,7 +82,7 @@ steps:
 teammates: {}
 `;
 
-const makeProjectId_ = (raw: string): ProjectId => {
+const forceProjectId = (raw: string): ProjectId => {
   const result = createProjectId(raw);
   if (!result.ok) throw new Error(result.error);
   return result.value;
@@ -250,8 +250,8 @@ describe('Multi-project end-to-end integration', () => {
     ]);
 
     // Subscribe each to different project
-    clientAlpha.send({ type: 'subscribe', projectId: makeProjectId_('project-alpha') });
-    clientBeta.send({ type: 'subscribe', projectId: makeProjectId_('project-beta') });
+    clientAlpha.send({ type: 'subscribe', projectId: forceProjectId('project-alpha') });
+    clientBeta.send({ type: 'subscribe', projectId: forceProjectId('project-beta') });
 
     // Wait for init messages
     await Promise.all([

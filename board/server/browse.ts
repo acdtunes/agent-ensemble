@@ -13,7 +13,7 @@ import { ok, err } from '../shared/types.js';
 export const validateBrowsePath = (
   browsePath: string,
 ): Result<string, BrowseError> => {
-  if (!browsePath || browsePath.length === 0) {
+  if (!browsePath) {
     return err({ type: 'invalid_path', message: 'Browse path is required' });
   }
 
