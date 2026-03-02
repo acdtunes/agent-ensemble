@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { readdir, stat } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import type { Result, BrowseEntry, BrowseError, DirEntry } from '../shared/types.js';
 import { ok, err } from '../shared/types.js';
@@ -63,20 +63,19 @@ export const filterDirectoryEntries = (
  * Read directory entries from the filesystem and return filtered browse entries.
  *
  * Effect function — performs filesystem IO.
- * Uses readdir + stat to build DirEntry array, then composes with filterDirectoryEntries.
+ * Uses readdir({ withFileTypes: true }) to get Dirent objects directly,
+ * avoiding separate stat calls that would fail on broken symlinks.
  */
 export const listDirectories = async (
   dirPath: string,
 ): Promise<Result<BrowseEntry[], BrowseError>> => {
   try {
-    const names = await readdir(dirPath);
-    const entries: DirEntry[] = await Promise.all(
-      names.map(async (name) => {
-        const fullPath = path.join(dirPath, name);
-        const stats = await stat(fullPath);
-        return { name, path: fullPath, isDirectory: stats.isDirectory() };
-      }),
-    );
+    const dirents = await readdir(dirPath, { withFileTypes: true });
+    const entries: DirEntry[] = dirents.map((dirent) => ({
+      name: dirent.name,
+      path: path.join(dirPath, dirent.name),
+      isDirectory: dirent.isDirectory(),
+    }));
     return ok(filterDirectoryEntries(entries));
   } catch (error: unknown) {
     const nodeError = error as NodeJS.ErrnoException;

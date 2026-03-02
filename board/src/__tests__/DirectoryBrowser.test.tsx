@@ -7,6 +7,7 @@ import type { UseDirectoryBrowserResult } from '../hooks/useDirectoryBrowser';
 
 const defaultHookResult: UseDirectoryBrowserResult = {
   currentPath: '/home/user',
+  parent: '/',
   entries: [],
   loading: false,
   error: null,
@@ -98,12 +99,37 @@ describe('DirectoryBrowser', () => {
       mockHookReturn = {
         ...mockHookReturn,
         currentPath: '/home/user/projects',
+        parent: '/home/user',
       };
 
       render(<DirectoryBrowser onSelect={vi.fn()} onCancel={vi.fn()} />);
 
       fireEvent.click(screen.getByRole('button', { name: /up/i }));
       expect(mockHookReturn.navigateUp).toHaveBeenCalledOnce();
+    });
+
+    it('is disabled when parent is null (at filesystem root)', () => {
+      mockHookReturn = {
+        ...mockHookReturn,
+        currentPath: '/',
+        parent: null,
+      };
+
+      render(<DirectoryBrowser onSelect={vi.fn()} onCancel={vi.fn()} />);
+
+      expect(screen.getByRole('button', { name: /up/i })).toBeDisabled();
+    });
+
+    it('is enabled when parent is not null', () => {
+      mockHookReturn = {
+        ...mockHookReturn,
+        currentPath: '/home/user',
+        parent: '/',
+      };
+
+      render(<DirectoryBrowser onSelect={vi.fn()} onCancel={vi.fn()} />);
+
+      expect(screen.getByRole('button', { name: /up/i })).not.toBeDisabled();
     });
   });
 

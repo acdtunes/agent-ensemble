@@ -7,7 +7,7 @@ interface DirectoryBrowserProps {
 }
 
 export const DirectoryBrowser = ({ onSelect, onCancel }: DirectoryBrowserProps) => {
-  const { currentPath, entries, loading, error, navigateTo, navigateUp } = useDirectoryBrowser();
+  const { currentPath, parent, entries, loading, error, navigateTo, navigateUp } = useDirectoryBrowser();
 
   useEffect(() => {
     navigateTo();
@@ -45,8 +45,9 @@ export const DirectoryBrowser = ({ onSelect, onCancel }: DirectoryBrowserProps) 
       <div className="mt-3 flex justify-end gap-2">
         <button
           type="button"
+          disabled={parent === null}
           onClick={() => navigateUp()}
-          className="rounded px-3 py-1 text-sm text-gray-400 hover:text-gray-200"
+          className="rounded px-3 py-1 text-sm text-gray-400 hover:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Up
         </button>

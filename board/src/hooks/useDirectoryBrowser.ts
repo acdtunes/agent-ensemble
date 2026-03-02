@@ -5,6 +5,7 @@ import type { BrowseEntry, BrowseResponse } from '../../shared/types';
 
 export interface UseDirectoryBrowserResult {
   readonly currentPath: string | null;
+  readonly parent: string | null;
   readonly entries: readonly BrowseEntry[];
   readonly loading: boolean;
   readonly error: string | null;
@@ -72,5 +73,5 @@ export const useDirectoryBrowser = (): UseDirectoryBrowserResult => {
     await navigateTo();
   }, [navigateTo]);
 
-  return { currentPath, entries, loading, error, navigateTo, navigateUp, reset };
+  return { currentPath, parent, entries, loading, error, navigateTo, navigateUp, reset };
 };

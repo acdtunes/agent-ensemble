@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, mkdir, writeFile, rm, chmod } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, chmod, symlink } from 'node:fs/promises';
 import { tmpdir, homedir } from 'node:os';
 import * as path from 'node:path';
 
@@ -39,6 +39,26 @@ describe('listDirectories: reads filesystem and returns filtered directory entri
 
     expect(result.ok).toBe(true);
     if (result.ok) {
+      expect(result.value).toEqual([
+        { name: 'alpha', path: path.join(tempDir, 'alpha') },
+        { name: 'zebra', path: path.join(tempDir, 'zebra') },
+      ]);
+    }
+  });
+
+  it('succeeds even when directory contains a broken symlink', async () => {
+    const { listDirectories } = await import(/* @vite-ignore */ BROWSE_MODULE_PATH);
+    // Create a symlink pointing to a non-existent target (broken symlink)
+    await symlink(
+      path.join(tempDir, 'nonexistent-target'),
+      path.join(tempDir, 'broken-link'),
+    );
+
+    const result = await listDirectories(tempDir);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // Broken symlink should be silently skipped; valid dirs remain
       expect(result.value).toEqual([
         { name: 'alpha', path: path.join(tempDir, 'alpha') },
         { name: 'zebra', path: path.join(tempDir, 'zebra') },
