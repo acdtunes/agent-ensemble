@@ -10,9 +10,16 @@ export interface UseDocTreeResult {
   readonly refetch: () => void;
 }
 
+// --- Pure helpers ---
+
+const buildTreeUrl = (projectId: string, featureId?: string): string =>
+  featureId !== undefined
+    ? `/api/projects/${projectId}/features/${featureId}/docs/tree`
+    : `/api/projects/${projectId}/docs/tree`;
+
 // --- Hook ---
 
-export const useDocTree = (projectId: string): UseDocTreeResult => {
+export const useDocTree = (projectId: string, featureId?: string): UseDocTreeResult => {
   const [tree, setTree] = useState<DocTree | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +28,7 @@ export const useDocTree = (projectId: string): UseDocTreeResult => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/projects/${projectId}/docs/tree`);
+      const response = await fetch(buildTreeUrl(projectId, featureId));
       if (!response.ok) {
         setTree(null);
         setError(
@@ -39,7 +46,7 @@ export const useDocTree = (projectId: string): UseDocTreeResult => {
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, featureId]);
 
   useEffect(() => {
     fetchTree();

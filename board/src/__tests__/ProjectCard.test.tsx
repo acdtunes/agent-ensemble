@@ -1,10 +1,30 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { ProjectCard, computeCompletionPercentage } from '../components/ProjectCard';
-import type { ProjectSummary, ProjectId } from '../../shared/types';
+import {
+  ProjectCard,
+  computeCompletionPercentage,
+  classifyFeatureStatus,
+  aggregateFeatureStatuses,
+  formatFeatureCount,
+} from '../components/ProjectCard';
+import type { ProjectSummary, ProjectId, FeatureSummary, FeatureId } from '../../shared/types';
 
 afterEach(cleanup);
+
+const makeFeature = (overrides: Partial<FeatureSummary> = {}): FeatureSummary => ({
+  featureId: 'feat-1' as FeatureId,
+  name: 'Feature 1',
+  hasRoadmap: false,
+  hasExecutionLog: false,
+  totalSteps: 10,
+  completed: 0,
+  failed: 0,
+  inProgress: 0,
+  currentLayer: 1,
+  updatedAt: '2026-02-28T12:00:00Z',
+  ...overrides,
+});
 
 const baseProject: ProjectSummary = {
   projectId: 'auth-feature' as ProjectId,
@@ -15,6 +35,8 @@ const baseProject: ProjectSummary = {
   inProgress: 2,
   currentLayer: 2,
   updatedAt: '2026-02-28T12:00:00Z',
+  featureCount: 0,
+  features: [],
 };
 
 describe('ProjectCard', () => {
@@ -79,6 +101,64 @@ describe('ProjectCard', () => {
     render(<ProjectCard project={project} onNavigate={() => {}} />);
     expect(screen.getByText(/100%/)).toBeInTheDocument();
   });
+
+  it('displays "No features" when featureCount is 0', () => {
+    render(<ProjectCard project={baseProject} onNavigate={() => {}} />);
+    expect(screen.getByText('No features')).toBeInTheDocument();
+  });
+
+  it('displays feature count with plural when multiple features', () => {
+    const project: ProjectSummary = {
+      ...baseProject,
+      featureCount: 4,
+      features: [
+        makeFeature({ featureId: 'f1' as FeatureId, completed: 10, totalSteps: 10 }),
+        makeFeature({ featureId: 'f2' as FeatureId, inProgress: 3 }),
+        makeFeature({ featureId: 'f3' as FeatureId, failed: 1 }),
+        makeFeature({ featureId: 'f4' as FeatureId }),
+      ],
+    };
+    render(<ProjectCard project={project} onNavigate={() => {}} />);
+    expect(screen.getByText('4 features')).toBeInTheDocument();
+  });
+
+  it('displays singular "1 feature" when featureCount is 1', () => {
+    const project: ProjectSummary = {
+      ...baseProject,
+      featureCount: 1,
+      features: [makeFeature({ completed: 10, totalSteps: 10 })],
+    };
+    render(<ProjectCard project={project} onNavigate={() => {}} />);
+    expect(screen.getByText('1 feature')).toBeInTheDocument();
+  });
+
+  it('shows aggregated feature status counts', () => {
+    const project: ProjectSummary = {
+      ...baseProject,
+      featureCount: 4,
+      features: [
+        makeFeature({ featureId: 'f1' as FeatureId, completed: 10, totalSteps: 10 }),
+        makeFeature({ featureId: 'f2' as FeatureId, completed: 10, totalSteps: 10 }),
+        makeFeature({ featureId: 'f3' as FeatureId, inProgress: 3 }),
+        makeFeature({ featureId: 'f4' as FeatureId, failed: 1 }),
+      ],
+    };
+    render(<ProjectCard project={project} onNavigate={() => {}} />);
+    expect(screen.getByText(/2 done/)).toBeInTheDocument();
+    expect(screen.getByText(/1 active/)).toBeInTheDocument();
+    expect(screen.getByText(/1 failing/)).toBeInTheDocument();
+  });
+
+  it('hides feature status counts when zero', () => {
+    const project: ProjectSummary = {
+      ...baseProject,
+      featureCount: 1,
+      features: [makeFeature({ featureId: 'f1' as FeatureId })],
+    };
+    render(<ProjectCard project={project} onNavigate={() => {}} />);
+    expect(screen.queryByText(/done/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/failing/)).not.toBeInTheDocument();
+  });
 });
 
 describe('computeCompletionPercentage', () => {
@@ -96,5 +176,66 @@ describe('computeCompletionPercentage', () => {
 
   it('rounds correctly', () => {
     expect(computeCompletionPercentage(1, 3)).toBe(33);
+  });
+});
+
+describe('classifyFeatureStatus', () => {
+  it('returns completed when all steps are done', () => {
+    expect(classifyFeatureStatus(makeFeature({ completed: 10, totalSteps: 10 }))).toBe('completed');
+  });
+
+  it('returns failed when any step has failed', () => {
+    expect(classifyFeatureStatus(makeFeature({ failed: 1, inProgress: 2 }))).toBe('failed');
+  });
+
+  it('returns in-progress when steps are active and none failed', () => {
+    expect(classifyFeatureStatus(makeFeature({ inProgress: 3 }))).toBe('in-progress');
+  });
+
+  it('returns pending when no steps completed, active, or failed', () => {
+    expect(classifyFeatureStatus(makeFeature())).toBe('pending');
+  });
+
+  it('returns pending when totalSteps is 0', () => {
+    expect(classifyFeatureStatus(makeFeature({ totalSteps: 0, completed: 0 }))).toBe('pending');
+  });
+
+  it('returns failed over in-progress when both present', () => {
+    expect(classifyFeatureStatus(makeFeature({ failed: 1, inProgress: 2, completed: 3, totalSteps: 10 }))).toBe('failed');
+  });
+});
+
+describe('aggregateFeatureStatuses', () => {
+  it('returns zero counts for empty features array', () => {
+    expect(aggregateFeatureStatuses([])).toEqual({ completed: 0, inProgress: 0, failed: 0 });
+  });
+
+  it('counts features by classified status', () => {
+    const features = [
+      makeFeature({ featureId: 'f1' as FeatureId, completed: 10, totalSteps: 10 }),
+      makeFeature({ featureId: 'f2' as FeatureId, completed: 5, totalSteps: 5 }),
+      makeFeature({ featureId: 'f3' as FeatureId, inProgress: 3 }),
+      makeFeature({ featureId: 'f4' as FeatureId, failed: 1 }),
+    ];
+    expect(aggregateFeatureStatuses(features)).toEqual({ completed: 2, inProgress: 1, failed: 1 });
+  });
+
+  it('does not count pending features in any status', () => {
+    const features = [makeFeature({ featureId: 'f1' as FeatureId })];
+    expect(aggregateFeatureStatuses(features)).toEqual({ completed: 0, inProgress: 0, failed: 0 });
+  });
+});
+
+describe('formatFeatureCount', () => {
+  it('returns "No features" for 0', () => {
+    expect(formatFeatureCount(0)).toBe('No features');
+  });
+
+  it('returns "1 feature" for 1', () => {
+    expect(formatFeatureCount(1)).toBe('1 feature');
+  });
+
+  it('returns "N features" for N > 1', () => {
+    expect(formatFeatureCount(4)).toBe('4 features');
   });
 });

@@ -1,6 +1,9 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useDeliveryState, type ConnectionStatus } from './hooks/useDeliveryState';
 import { useProjectList } from './hooks/useProjectList';
+import { useFeatureList } from './hooks/useFeatureList';
+import { useAddProject } from './hooks/useAddProject';
+import { useRemoveProject } from './hooks/useRemoveProject';
 import { useDocTree } from './hooks/useDocTree';
 import { useRouter } from './hooks/useRouter';
 import { ProgressHeader } from './components/ProgressHeader';
@@ -10,6 +13,8 @@ import { buildPlanStepLookup } from './utils/stepDetailUtils';
 import { TeamPanel } from './components/TeamPanel';
 import { ActivityFeed } from './components/ActivityFeed';
 import { OverviewDashboard } from './components/OverviewDashboard';
+import { AddProjectDialog } from './components/AddProjectDialog';
+import { ProjectFeatureView } from './components/ProjectFeatureView';
 import { DocViewer } from './components/DocViewer';
 import type { DeliveryState, ExecutionPlan, StateTransition, ProjectId } from '../shared/types';
 
@@ -192,18 +197,87 @@ const navigateToBoard = (projectId: string): void => {
 };
 
 const navigateToProject = (projectId: string): void => {
-  window.location.hash = `#/projects/${projectId}/board`;
+  window.location.hash = `#/projects/${projectId}`;
 };
 
-const OverviewView = () => {
+const navigateToOverview = (): void => {
+  window.location.hash = '#/';
+};
+
+const navigateToFeatureBoard = (projectId: string) => (featureId: string): void => {
+  window.location.hash = `#/projects/${projectId}/features/${featureId}/board`;
+};
+
+const navigateToFeatureDocs = (projectId: string) => (featureId: string): void => {
+  window.location.hash = `#/projects/${projectId}/features/${featureId}/docs`;
+};
+
+const ProjectView = ({ projectId }: { readonly projectId: string }) => {
   const { projects, connectionStatus } = useProjectList(WS_URL);
+  const { features } = useFeatureList(projectId);
 
   return (
     <PageShell
       connectionStatus={connectionStatus}
       headerContent={<h1 className="text-xl font-semibold text-gray-100">NW Teams Board</h1>}
     >
-      <OverviewDashboard projects={projects} onNavigate={navigateToProject} />
+      <ProjectFeatureView
+        projectId={projectId}
+        features={features}
+        onNavigateOverview={navigateToOverview}
+        onNavigateFeatureBoard={navigateToFeatureBoard(projectId)}
+        onNavigateFeatureDocs={navigateToFeatureDocs(projectId)}
+      />
+    </PageShell>
+  );
+};
+
+const OverviewView = () => {
+  const { projects, connectionStatus } = useProjectList(WS_URL);
+  const { addProject, submitting: addSubmitting, error: addError } = useAddProject();
+  const { removeProject } = useRemoveProject();
+  const [showAddDialog, setShowAddDialog] = useState(false);
+
+  const handleAddProject = useCallback(() => {
+    setShowAddDialog(true);
+  }, []);
+
+  const handleSubmitAdd = useCallback(async (projectPath: string) => {
+    const result = await addProject(projectPath);
+    if (result.ok) {
+      setShowAddDialog(false);
+    }
+  }, [addProject]);
+
+  const handleCancelAdd = useCallback(() => {
+    setShowAddDialog(false);
+  }, []);
+
+  const handleRemoveProject = useCallback(async (projectId: string) => {
+    await removeProject(projectId);
+  }, [removeProject]);
+
+  return (
+    <PageShell
+      connectionStatus={connectionStatus}
+      headerContent={<h1 className="text-xl font-semibold text-gray-100">NW Teams Board</h1>}
+    >
+      {showAddDialog && (
+        <div className="mb-4">
+          <AddProjectDialog
+            onSubmit={handleSubmitAdd}
+            onCancel={handleCancelAdd}
+            submitting={addSubmitting}
+            error={addError}
+          />
+        </div>
+      )}
+      <OverviewDashboard
+        projects={projects}
+        onNavigate={navigateToProject}
+        onAddProject={handleAddProject}
+        onRemoveProject={handleRemoveProject}
+      />
     </PageShell>
   );
 };
@@ -248,6 +322,12 @@ const renderRoute = (route: ReturnType<typeof useRouter>): React.ReactNode => {
     case 'board':
       return <BoardView projectId={route.projectId as ProjectId} />;
     case 'docs':
+      return <DocsView projectId={route.projectId as ProjectId} />;
+    case 'project':
+      return <ProjectView projectId={route.projectId} />;
+    case 'feature-board':
+      return <BoardView projectId={route.projectId as ProjectId} />;
+    case 'feature-docs':
       return <DocsView projectId={route.projectId as ProjectId} />;
     case 'overview':
       return <OverviewView />;
