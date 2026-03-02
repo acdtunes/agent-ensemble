@@ -1,0 +1,85 @@
+import { describe, it, expect, afterEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { FileCard } from '../components/FileCard';
+import type { FileCardData } from '../utils/statusMapping';
+
+afterEach(cleanup);
+
+const baseCard: FileCardData = {
+  filename: 'server/index.ts',
+  stepId: '01-04',
+  stepName: 'refactor-server',
+  displayColumn: 'in_progress',
+  retryCount: 0,
+  worktree: false,
+  isBlocked: false,
+  teammateId: null,
+};
+
+describe('FileCard', () => {
+  it('displays step name as primary title with prominent font weight', () => {
+    render(<FileCard card={baseCard} />);
+    const title = screen.getByText('refactor-server');
+    expect(title).toBeInTheDocument();
+    expect(title.className).toMatch(/font-(medium|semibold|bold)/);
+  });
+
+  it('displays filename as muted subtitle below title', () => {
+    render(<FileCard card={baseCard} />);
+    const subtitle = screen.getByText('server/index.ts');
+    expect(subtitle).toBeInTheDocument();
+    expect(subtitle.className).toMatch(/text-(xs|sm)/);
+    expect(subtitle.className).toMatch(/text-gray/);
+  });
+
+  it('displays step ID in top-right corner with monospace font', () => {
+    render(<FileCard card={baseCard} />);
+    const stepId = screen.getByText('01-04');
+    expect(stepId).toBeInTheDocument();
+    expect(stepId.className).toMatch(/font-mono/);
+  });
+
+  it('shows retry badge with count when retryCount > 0', () => {
+    const card = { ...baseCard, retryCount: 3 };
+    render(<FileCard card={card} />);
+    expect(screen.getByText('3 retries')).toBeInTheDocument();
+  });
+
+  it('hides retry badge when retryCount is 0', () => {
+    render(<FileCard card={baseCard} />);
+    expect(screen.queryByText(/retries/i)).not.toBeInTheDocument();
+  });
+
+  it('shows worktree badge when worktree is true', () => {
+    const card = { ...baseCard, worktree: true };
+    render(<FileCard card={card} />);
+    expect(screen.getByText('worktree')).toBeInTheDocument();
+  });
+
+  it('hides worktree badge when worktree is false', () => {
+    render(<FileCard card={baseCard} />);
+    expect(screen.queryByText(/worktree/i)).not.toBeInTheDocument();
+  });
+
+  it('shows blocked badge when isBlocked is true', () => {
+    const card = { ...baseCard, isBlocked: true };
+    render(<FileCard card={card} />);
+    expect(screen.getByText('blocked')).toBeInTheDocument();
+  });
+
+  it('hides blocked badge when isBlocked is false', () => {
+    render(<FileCard card={baseCard} />);
+    expect(screen.queryByText(/blocked/i)).not.toBeInTheDocument();
+  });
+
+  it('has data-testid file-card on root element', () => {
+    render(<FileCard card={baseCard} />);
+    expect(screen.getByTestId('file-card')).toBeInTheDocument();
+  });
+
+  it('applies animation classes from displayColumn', () => {
+    render(<FileCard card={{ ...baseCard, displayColumn: 'in_progress' }} />);
+    expect(screen.getByTestId('file-card')).toHaveClass('animate-pulse-glow');
+  });
+});
