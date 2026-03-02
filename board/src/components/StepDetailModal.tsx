@@ -37,6 +37,15 @@ const resolveConflictName = (
   lookup: ReadonlyMap<string, PlanStep>,
 ): string => lookup.get(conflictId)?.name ?? conflictId;
 
+// --- Section helper ---
+
+const DetailSection = ({ title, children }: { readonly title: string; readonly children: React.ReactNode }) => (
+  <div className="mb-3">
+    <h3 className="mb-1 text-xs font-medium uppercase text-gray-500">{title}</h3>
+    {children}
+  </div>
+);
+
 // --- Component ---
 
 interface StepDetailModalProps {
@@ -119,30 +128,27 @@ export const StepDetailModal = ({
 
         {/* Teammate */}
         {stepState.teammate_id !== null && (
-          <div className="mb-3">
-            <h3 className="mb-1 text-xs font-medium uppercase text-gray-500">Teammate</h3>
+          <DetailSection title="Teammate">
             <span className={`text-sm font-medium ${getTeammateColor(stepState.teammate_id)}`}>
               {stepState.teammate_id}
             </span>
-          </div>
+          </DetailSection>
         )}
 
         {/* Files */}
         {stepState.files_to_modify.length > 0 && (
-          <div className="mb-3">
-            <h3 className="mb-1 text-xs font-medium uppercase text-gray-500">Files</h3>
+          <DetailSection title="Files">
             <ul className="space-y-0.5">
               {stepState.files_to_modify.map((file) => (
                 <li key={file} className="font-mono text-sm text-gray-600">{file}</li>
               ))}
             </ul>
-          </div>
+          </DetailSection>
         )}
 
         {/* Conflicts */}
         {conflicts.length > 0 && (
-          <div className="mb-3">
-            <h3 className="mb-1 text-xs font-medium uppercase text-gray-500">Conflicts</h3>
+          <DetailSection title="Conflicts">
             <ul className="space-y-0.5">
               {conflicts.map((conflictId) => (
                 <li key={conflictId} className="text-sm text-gray-600">
@@ -150,26 +156,24 @@ export const StepDetailModal = ({
                 </li>
               ))}
             </ul>
-          </div>
+          </DetailSection>
         )}
 
         {/* Timing and review attempts */}
         {stepState.started_at !== null && (
-          <div className="mb-3">
-            <h3 className="mb-1 text-xs font-medium uppercase text-gray-500">Timing</h3>
+          <DetailSection title="Timing">
             <p className="text-sm text-gray-600">
               {`Started: ${formatTimestamp(stepState.started_at)}`}
               {stepState.completed_at !== null && ` — Completed: ${formatTimestamp(stepState.completed_at)}`}
               {duration !== null && ` (${duration})`}
               {stepState.review_attempts > 0 && ` · ${stepState.review_attempts} review attempts`}
             </p>
-          </div>
+          </DetailSection>
         )}
         {stepState.started_at === null && stepState.review_attempts > 0 && (
-          <div className="mb-3">
-            <h3 className="mb-1 text-xs font-medium uppercase text-gray-500">Review Attempts</h3>
+          <DetailSection title="Review Attempts">
             <span className="text-sm text-gray-600">{stepState.review_attempts}</span>
-          </div>
+          </DetailSection>
         )}
 
         {/* Worktree */}

@@ -47,6 +47,26 @@ const Placeholder = ({ error }: { readonly error: string | null }) => (
   </div>
 );
 
+const PageShell = ({
+  headerContent,
+  connectionStatus,
+  children,
+}: {
+  readonly headerContent: React.ReactNode;
+  readonly connectionStatus: ConnectionStatus;
+  readonly children: React.ReactNode;
+}) => (
+  <div className="min-h-screen bg-gray-50 text-gray-900">
+    <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4 shadow-sm lg:px-6">
+      {headerContent}
+      <ConnectionIndicator status={connectionStatus} />
+    </header>
+    <main className="p-4 lg:p-6">
+      {children}
+    </main>
+  </div>
+);
+
 interface BoardContentProps {
   readonly state: DeliveryState;
   readonly plan: ExecutionPlan;
@@ -116,22 +136,21 @@ const BoardView = ({ projectId }: { readonly projectId: ProjectId }) => {
   const hasData = state !== null && plan !== null;
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4 shadow-sm lg:px-6">
+    <PageShell
+      connectionStatus={connectionStatus}
+      headerContent={
         <div className="flex items-center gap-3">
           <a href="#/" className="text-sm text-gray-500 hover:text-gray-800">Overview</a>
           <span className="text-gray-300">/</span>
           <h1 className="text-xl font-semibold">NW Teams Board</h1>
         </div>
-        <ConnectionIndicator status={connectionStatus} />
-      </header>
-      <main className="p-4 lg:p-6">
-        {hasData
-          ? <BoardContent state={state} plan={plan} transitions={transitions} />
-          : <Placeholder error={error} />
-        }
-      </main>
-    </div>
+      }
+    >
+      {hasData
+        ? <BoardContent state={state} plan={plan} transitions={transitions} />
+        : <Placeholder error={error} />
+      }
+    </PageShell>
   );
 };
 
@@ -143,15 +162,12 @@ const OverviewView = () => {
   const { projects, connectionStatus } = useProjectList(WS_URL);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4 shadow-sm lg:px-6">
-        <h1 className="text-xl font-semibold">NW Teams Board</h1>
-        <ConnectionIndicator status={connectionStatus} />
-      </header>
-      <main className="p-4 lg:p-6">
-        <OverviewDashboard projects={projects} onNavigate={navigateToProject} />
-      </main>
-    </div>
+    <PageShell
+      connectionStatus={connectionStatus}
+      headerContent={<h1 className="text-xl font-semibold">NW Teams Board</h1>}
+    >
+      <OverviewDashboard projects={projects} onNavigate={navigateToProject} />
+    </PageShell>
   );
 };
 
