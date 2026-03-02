@@ -15,6 +15,8 @@ const createProject = (overrides: Partial<ProjectSummary> & { projectId: string;
   inProgress: 2,
   currentLayer: 2,
   updatedAt: '2026-02-28T12:00:00Z',
+  featureCount: 0,
+  features: [],
   ...overrides,
 });
 
@@ -26,43 +28,77 @@ const testProjects: readonly ProjectSummary[] = [
 
 describe('OverviewDashboard acceptance', () => {
   it('renders one card per registered project', () => {
-    render(<OverviewDashboard projects={testProjects} onNavigate={() => {}} />);
+    render(<OverviewDashboard projects={testProjects} onNavigate={() => {}} onAddProject={() => {}} onRemoveProject={() => {}} />);
     expect(screen.getByText('auth-feature')).toBeInTheDocument();
     expect(screen.getByText('payment-api')).toBeInTheDocument();
     expect(screen.getByText('dashboard-ui')).toBeInTheDocument();
   });
 
   it('shows completion percentage on each card', () => {
-    render(<OverviewDashboard projects={testProjects} onNavigate={() => {}} />);
+    render(<OverviewDashboard projects={testProjects} onNavigate={() => {}} onAddProject={() => {}} onRemoveProject={() => {}} />);
     const percentages = screen.getAllByText(/50%/);
     expect(percentages).toHaveLength(2); // 4/8 and 6/12
     expect(screen.getByText(/100%/)).toBeInTheDocument(); // 5/5
   });
 
   it('shows current layer number on each card', () => {
-    render(<OverviewDashboard projects={testProjects} onNavigate={() => {}} />);
+    render(<OverviewDashboard projects={testProjects} onNavigate={() => {}} onAddProject={() => {}} onRemoveProject={() => {}} />);
     expect(screen.getByText(/Layer 2/)).toBeInTheDocument();
     expect(screen.getByText(/Layer 3/)).toBeInTheDocument();
   });
 
   it('navigates to project board on card click', () => {
     const onNavigate = vi.fn();
-    render(<OverviewDashboard projects={testProjects} onNavigate={onNavigate} />);
+    render(<OverviewDashboard projects={testProjects} onNavigate={onNavigate} onAddProject={() => {}} onRemoveProject={() => {}} />);
     fireEvent.click(screen.getByText('auth-feature'));
     expect(onNavigate).toHaveBeenCalledWith('auth-feature');
   });
 
-  it('renders empty state when no projects', () => {
-    render(<OverviewDashboard projects={[]} onNavigate={() => {}} />);
+  it('renders empty state with add project guidance when no projects', () => {
+    render(<OverviewDashboard projects={[]} onNavigate={() => {}} onAddProject={() => {}} onRemoveProject={() => {}} />);
     expect(screen.getByText(/no projects/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add project/i })).toBeInTheDocument();
   });
 
   it('renders cards in a grid layout', () => {
     const { container } = render(
-      <OverviewDashboard projects={testProjects} onNavigate={() => {}} />,
+      <OverviewDashboard projects={testProjects} onNavigate={() => {}} onAddProject={() => {}} onRemoveProject={() => {}} />,
     );
     const grid = container.querySelector('[data-testid="project-grid"]');
     expect(grid).toBeInTheDocument();
     expect(grid!.children.length).toBe(3);
+  });
+
+  it('shows Add Project button when projects exist', () => {
+    render(
+      <OverviewDashboard projects={testProjects} onNavigate={() => {}} onAddProject={() => {}} onRemoveProject={() => {}} />,
+    );
+    expect(screen.getByRole('button', { name: /add project/i })).toBeInTheDocument();
+  });
+
+  it('calls onAddProject when Add Project button clicked', () => {
+    const onAddProject = vi.fn();
+    render(
+      <OverviewDashboard projects={testProjects} onNavigate={() => {}} onAddProject={onAddProject} onRemoveProject={() => {}} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /add project/i }));
+    expect(onAddProject).toHaveBeenCalledOnce();
+  });
+
+  it('renders remove button on each project card', () => {
+    render(
+      <OverviewDashboard projects={testProjects} onNavigate={() => {}} onAddProject={() => {}} onRemoveProject={() => {}} />,
+    );
+    const removeButtons = screen.getAllByRole('button', { name: /^Remove /i });
+    expect(removeButtons).toHaveLength(3);
+  });
+
+  it('calls onRemoveProject with projectId when remove clicked', () => {
+    const onRemoveProject = vi.fn();
+    render(
+      <OverviewDashboard projects={testProjects} onNavigate={() => {}} onAddProject={() => {}} onRemoveProject={onRemoveProject} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Remove auth-feature' }));
+    expect(onRemoveProject).toHaveBeenCalledWith('auth-feature');
   });
 });

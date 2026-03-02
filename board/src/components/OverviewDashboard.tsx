@@ -4,32 +4,53 @@ import { ProjectCard } from './ProjectCard';
 interface OverviewDashboardProps {
   readonly projects: readonly ProjectSummary[];
   readonly onNavigate: (projectId: string) => void;
+  readonly onAddProject: () => void;
+  readonly onRemoveProject: (projectId: string) => void;
 }
 
-const EmptyState = () => (
+const EmptyState = ({ onAddProject }: { readonly onAddProject: () => void }) => (
   <div className="flex flex-col items-center justify-center py-20 text-gray-400">
     <p className="text-lg">No projects registered</p>
-    <p className="mt-2 text-sm">Projects will appear here when added to the server.</p>
+    <p className="mt-2 text-sm">Add a project to get started with NW Teams Board.</p>
+    <button
+      type="button"
+      onClick={onAddProject}
+      className="mt-4 rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-500"
+    >
+      Add Project
+    </button>
   </div>
 );
 
-export const OverviewDashboard = ({ projects, onNavigate }: OverviewDashboardProps) => {
+export const OverviewDashboard = ({ projects, onNavigate, onAddProject, onRemoveProject }: OverviewDashboardProps) => {
   if (projects.length === 0) {
-    return <EmptyState />;
+    return <EmptyState onAddProject={onAddProject} />;
   }
 
   return (
-    <div
-      data-testid="project-grid"
-      className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-    >
-      {projects.map(project => (
-        <ProjectCard
-          key={project.projectId}
-          project={project}
-          onNavigate={onNavigate}
-        />
-      ))}
+    <div>
+      <div className="mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={onAddProject}
+          className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-500"
+        >
+          Add Project
+        </button>
+      </div>
+      <div
+        data-testid="project-grid"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        {projects.map(project => (
+          <ProjectCard
+            key={project.projectId}
+            project={project}
+            onNavigate={onNavigate}
+            onRemove={() => onRemoveProject(project.projectId)}
+          />
+        ))}
+      </div>
     </div>
   );
 };
