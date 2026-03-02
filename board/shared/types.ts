@@ -257,6 +257,25 @@ export type RemoveProjectError =
   | { readonly type: 'not_found'; readonly projectId: ProjectId }
   | { readonly type: 'removal_failed'; readonly message: string };
 
+// --- Directory browser types ---
+
+export interface BrowseEntry {
+  readonly name: string;
+  readonly path: string;
+}
+
+export type BrowseError =
+  | { readonly type: 'invalid_path'; readonly message: string }
+  | { readonly type: 'not_found'; readonly path: string }
+  | { readonly type: 'permission_denied'; readonly path: string }
+  | { readonly type: 'read_failed'; readonly message: string };
+
+export interface BrowseResponse {
+  readonly path: string;
+  readonly parent: string | null;
+  readonly entries: readonly BrowseEntry[];
+}
+
 export type ServerWSMessage =
   | { readonly type: 'init'; readonly projectId: ProjectId; readonly state: DeliveryState; readonly plan: ExecutionPlan }
   | { readonly type: 'update'; readonly projectId: ProjectId; readonly state: DeliveryState; readonly transitions: readonly StateTransition[] }
