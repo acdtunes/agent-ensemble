@@ -25,6 +25,7 @@ class Step(NamedTuple):
     files_to_modify: list[str]
     blocked_by: list[str]
     phase_id: str
+    description: str = ""
 
 
 class ParallelGroup(NamedTuple):
@@ -43,8 +44,9 @@ def extract_steps(roadmap: dict) -> list[Step]:
             step_id = step.get("step_id", step.get("id", ""))
             name = step.get("name", "")
             files = step.get("files_to_modify", [])
-            blocked_by = step.get("blocked_by", [])
-            steps.append(Step(step_id, name, files, blocked_by, phase_id))
+            blocked_by = step.get("blocked_by", step.get("dependencies", []))
+            description = step.get("description", "")
+            steps.append(Step(step_id, name, files, blocked_by, phase_id, description))
     return steps
 
 
@@ -149,25 +151,25 @@ def print_analysis(groups: list[ParallelGroup]) -> None:
         print()
 
 
-def generate_plan(groups: list[ParallelGroup]) -> dict:
-    """Generate execution plan as structured data."""
-    # Build a global map of step_id -> files for cross-layer conflict detection
-    all_steps: list[Step] = []
-    for group in groups:
-        all_steps.extend(group.steps)
-
-    # Pre-compute per-step conflicts_with across ALL steps (not just same layer)
-    step_conflicts: dict[str, list[str]] = {s.step_id: [] for s in all_steps}
-    for i, step_a in enumerate(all_steps):
+def compute_cross_step_conflicts(steps: list[Step]) -> dict[str, list[str]]:
+    """Map each step_id to step_ids that modify overlapping files."""
+    conflicts: dict[str, list[str]] = {step.step_id: [] for step in steps}
+    for i, step_a in enumerate(steps):
         files_a = set(step_a.files_to_modify)
         if not files_a:
             continue
-        for step_b in all_steps[i + 1:]:
-            files_b = set(step_b.files_to_modify)
-            overlap = files_a & files_b
+        for step_b in steps[i + 1:]:
+            overlap = files_a & set(step_b.files_to_modify)
             if overlap:
-                step_conflicts[step_a.step_id].append(step_b.step_id)
-                step_conflicts[step_b.step_id].append(step_a.step_id)
+                conflicts[step_a.step_id].append(step_b.step_id)
+                conflicts[step_b.step_id].append(step_a.step_id)
+    return conflicts
+
+
+def generate_plan(groups: list[ParallelGroup]) -> dict:
+    """Generate execution plan as structured data."""
+    all_steps = [step for group in groups for step in group.steps]
+    step_conflicts = compute_cross_step_conflicts(all_steps)
 
     plan = {
         "schema_version": "1.0",
@@ -187,14 +189,16 @@ def generate_plan(groups: list[ParallelGroup]) -> dict:
             "use_worktrees": group.has_file_conflicts,
             "steps": [],
         }
-        for s in group.steps:
+        for step in group.steps:
             step_data: dict = {
-                "step_id": s.step_id,
-                "name": s.name,
-                "files_to_modify": s.files_to_modify,
+                "step_id": step.step_id,
+                "name": step.name,
+                "files_to_modify": step.files_to_modify,
             }
-            if step_conflicts[s.step_id]:
-                step_data["conflicts_with"] = sorted(step_conflicts[s.step_id])
+            if step.description:
+                step_data["description"] = step.description
+            if step_conflicts[step.step_id]:
+                step_data["conflicts_with"] = sorted(step_conflicts[step.step_id])
             layer["steps"].append(step_data)
 
         if group.conflicting_pairs:

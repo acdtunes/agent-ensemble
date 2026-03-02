@@ -38,6 +38,11 @@ const isValidStepStatus = (value: unknown): boolean =>
 const isNullableString = (value: unknown): value is string | null =>
   value === null || typeof value === 'string';
 
+const validateOptionalStringArray = (value: unknown): string[] | undefined =>
+  value === undefined || value === null
+    ? []
+    : isStringArray(value) ? value : undefined;
+
 // --- State YAML validation ---
 
 const validateStateSummary = (raw: unknown): Result<DeliveryState['summary'], ParseError> => {
@@ -179,20 +184,22 @@ const validatePlanStep = (raw: unknown, index: number): Result<PlanStep, ParseEr
   if (typeof raw.name !== 'string') return err({ type: 'invalid_schema', message: `step[${index}].name must be a string` });
   if (!isStringArray(raw.files_to_modify)) return err({ type: 'invalid_schema', message: `step[${index}].files_to_modify must be a string array` });
 
-  const conflictsWith = raw.conflicts_with;
-  const normalizedConflicts = conflictsWith === undefined || conflictsWith === null
-    ? []
-    : isStringArray(conflictsWith) ? conflictsWith : undefined;
+  const description = raw.description;
+  if (description !== undefined && typeof description !== 'string') {
+    return err({ type: 'invalid_schema', message: `step[${index}].description must be a string` });
+  }
 
-  if (normalizedConflicts === undefined) {
+  const conflictsWith = validateOptionalStringArray(raw.conflicts_with);
+  if (conflictsWith === undefined) {
     return err({ type: 'invalid_schema', message: `step[${index}].conflicts_with must be a string array` });
   }
 
   return ok({
     step_id: raw.step_id,
     name: raw.name,
+    ...(description !== undefined ? { description } : {}),
     files_to_modify: raw.files_to_modify,
-    conflicts_with: normalizedConflicts,
+    conflicts_with: conflictsWith,
   });
 };
 
