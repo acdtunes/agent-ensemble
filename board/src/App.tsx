@@ -16,6 +16,7 @@ import { OverviewDashboard } from './components/OverviewDashboard';
 import { AddProjectDialog } from './components/AddProjectDialog';
 import { ProjectFeatureView } from './components/ProjectFeatureView';
 import { DocViewer } from './components/DocViewer';
+import { FeatureDocsView } from './components/FeatureDocsView';
 import type { DeliveryState, ExecutionPlan, StateTransition, ProjectId } from '../shared/types';
 
 // --- Pure functions ---
@@ -315,6 +316,29 @@ const DocsView = ({ projectId }: { readonly projectId: ProjectId }) => {
   );
 };
 
+const FeatureDocsRouteView = ({ projectId, featureId }: { readonly projectId: string; readonly featureId: string }) => {
+  const { connectionStatus } = useProjectList(WS_URL);
+  const { features } = useFeatureList(projectId);
+  const { tree, error } = useDocTree(projectId, featureId);
+
+  return (
+    <PageShell
+      connectionStatus={connectionStatus}
+      headerContent={<h1 className="text-xl font-semibold text-gray-100">NW Teams Board</h1>}
+    >
+      <FeatureDocsView
+        projectId={projectId}
+        featureId={featureId}
+        tree={tree}
+        features={features}
+        error={error ?? undefined}
+        onNavigateOverview={navigateToOverview}
+        onNavigateProject={() => navigateToProject(projectId)}
+      />
+    </PageShell>
+  );
+};
+
 // --- App ---
 
 const renderRoute = (route: ReturnType<typeof useRouter>): React.ReactNode => {
@@ -328,7 +352,7 @@ const renderRoute = (route: ReturnType<typeof useRouter>): React.ReactNode => {
     case 'feature-board':
       return <BoardView projectId={route.projectId as ProjectId} />;
     case 'feature-docs':
-      return <DocsView projectId={route.projectId as ProjectId} />;
+      return <FeatureDocsRouteView projectId={route.projectId} featureId={route.featureId} />;
     case 'overview':
       return <OverviewView />;
   }
