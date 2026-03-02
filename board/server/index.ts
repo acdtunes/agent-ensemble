@@ -22,6 +22,8 @@ import type {
 import { createProjectId, createFeatureId, deriveProjectSummary } from '../shared/types.js';
 import { validateDocPath } from './doc-content.js';
 import { buildDocTree } from './doc-tree.js';
+import { resolveFeatureExecutionLog, resolveFeatureRoadmap } from './feature-path-resolver.js';
+import { parseStateYaml, parsePlanYaml } from './parser.js';
 
 // --- Client message parsing (pure function) ---
 
@@ -204,6 +206,11 @@ export interface DocHttpDeps {
   readonly readDocContent: (validatedPath: string) => Promise<Result<string, DocContentError>>;
 }
 
+export interface FeatureArtifactDeps {
+  readonly getProjectPath: (projectId: ProjectId) => string | undefined;
+  readonly readFile: (path: string) => Promise<Result<string, string>>;
+}
+
 export interface MultiProjectHttpDeps {
   readonly listProjectSummaries: () => readonly ProjectSummary[];
   readonly getProject: (projectId: ProjectId) => Result<ProjectEntry, unknown>;
@@ -211,6 +218,7 @@ export interface MultiProjectHttpDeps {
   readonly addProject?: (path: string) => Promise<Result<ProjectSummary, AddProjectError>>;
   readonly removeProject?: (projectId: ProjectId) => Promise<Result<void, RemoveProjectError>>;
   readonly discoverFeatures?: (projectId: ProjectId) => Promise<readonly FeatureSummary[]>;
+  readonly featureArtifacts?: FeatureArtifactDeps;
 }
 
 export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.Application => {
@@ -322,6 +330,88 @@ export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.A
 
       const features = await discoverFeatures(idResult.value);
       res.json(features);
+    });
+  }
+
+  // --- Feature artifact endpoints (state + plan per feature) ---
+
+  if (deps.featureArtifacts) {
+    const { getProjectPath, readFile } = deps.featureArtifacts;
+
+    app.get('/api/projects/:id/features/:featureId/state', async (req, res) => {
+      const idResult = createProjectId(req.params.id);
+      if (!idResult.ok) {
+        res.status(400).json({ error: idResult.error });
+        return;
+      }
+
+      const featureIdResult = createFeatureId(req.params.featureId);
+      if (!featureIdResult.ok) {
+        res.status(400).json({ error: featureIdResult.error });
+        return;
+      }
+
+      const projectPath = getProjectPath(idResult.value);
+      if (!projectPath) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
+
+      const filePath = resolveFeatureExecutionLog(projectPath, featureIdResult.value);
+      const fileResult = await readFile(filePath);
+      if (!fileResult.ok) {
+        res.status(404).json({ error: 'Feature execution log not found' });
+        return;
+      }
+
+      const parseResult = parseStateYaml(fileResult.value);
+      if (!parseResult.ok) {
+        res.status(422).json({
+          error: 'Malformed execution log',
+          diagnostic: { type: parseResult.error.type, message: parseResult.error.message },
+        });
+        return;
+      }
+
+      res.json(parseResult.value);
+    });
+
+    app.get('/api/projects/:id/features/:featureId/plan', async (req, res) => {
+      const idResult = createProjectId(req.params.id);
+      if (!idResult.ok) {
+        res.status(400).json({ error: idResult.error });
+        return;
+      }
+
+      const featureIdResult = createFeatureId(req.params.featureId);
+      if (!featureIdResult.ok) {
+        res.status(400).json({ error: featureIdResult.error });
+        return;
+      }
+
+      const projectPath = getProjectPath(idResult.value);
+      if (!projectPath) {
+        res.status(404).json({ error: 'Project not found' });
+        return;
+      }
+
+      const filePath = resolveFeatureRoadmap(projectPath, featureIdResult.value);
+      const fileResult = await readFile(filePath);
+      if (!fileResult.ok) {
+        res.status(404).json({ error: 'Feature roadmap not found' });
+        return;
+      }
+
+      const parseResult = parsePlanYaml(fileResult.value);
+      if (!parseResult.ok) {
+        res.status(422).json({
+          error: 'Malformed roadmap',
+          diagnostic: { type: parseResult.error.type, message: parseResult.error.message },
+        });
+        return;
+      }
+
+      res.json(parseResult.value);
     });
   }
 
