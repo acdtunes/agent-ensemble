@@ -40,7 +40,7 @@ export const ProjectFeatureView = ({
       ) : (
         <div
           data-testid="feature-grid"
-          className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          className="grid grid-cols-1 gap-3 lg:grid-cols-4 xl:grid-cols-6"
         >
           {features.map(feature => (
             <FeatureCard

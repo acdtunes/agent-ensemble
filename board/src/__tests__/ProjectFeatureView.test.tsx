@@ -118,4 +118,24 @@ describe('ProjectFeatureView', () => {
     );
     expect(screen.getByText(/no features/i)).toBeInTheDocument();
   });
+
+  describe('grid responsive breakpoints', () => {
+    it('applies correct grid column classes for high-density layout', () => {
+      const { container } = render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={testFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+      const grid = container.querySelector('[data-testid="feature-grid"]');
+      expect(grid).toBeInTheDocument();
+      // Verify responsive grid classes: 1 col mobile, 4 cols at lg (1024px), 6 cols at xl (1280px)
+      expect(grid).toHaveClass('grid-cols-1');
+      expect(grid).toHaveClass('lg:grid-cols-4');
+      expect(grid).toHaveClass('xl:grid-cols-6');
+    });
+  });
 });
