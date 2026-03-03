@@ -93,18 +93,21 @@ export interface MultiProjectServer {
   readonly close: () => Promise<void>;
 }
 
+// --- Synchronous file read adapter ---
+
+const readFileSyncResult = (path: string): Result<string, string> => {
+  try {
+    return ok(readFileSync(path, 'utf-8'));
+  } catch {
+    return err(`Failed to read: ${path}`);
+  }
+};
+
 // --- Wiring: composition root ---
 
 export const createMultiProjectServer = (
   config: MultiProjectServerConfig,
 ): MultiProjectServer => {
-  const readFile = (path: string) => {
-    try {
-      return ok(readFileSync(path, 'utf-8'));
-    } catch {
-      return err(`Failed to read: ${path}`);
-    }
-  };
 
   const toConfigFromDiscovery = (projectId: ProjectId): ProjectConfig => ({
     projectId,
@@ -136,7 +139,7 @@ export const createMultiProjectServer = (
 
   const registry: ProjectRegistry = createProjectRegistry({
     createWatcher: createFileWatcher,
-    readFile,
+    readFile: readFileSyncResult,
     parseRoadmap,
     roadmapToDeliveryState,
     roadmapToExecutionPlan,

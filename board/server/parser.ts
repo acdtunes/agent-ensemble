@@ -39,15 +39,11 @@ interface DesEvent {
   readonly t: string;
 }
 
-export const parseDesExecutionLog = (raw: unknown): Result<DeliveryState, ParseError> => {
-  if (!isRecord(raw)) return err({ type: 'invalid_schema', message: 'root must be an object' });
+type StepInfo = { readonly status: StepState['status']; readonly updated_at: string };
 
-  const events = raw.events;
-  if (!Array.isArray(events)) return err({ type: 'invalid_schema', message: 'events must be an array' });
-
-  // Derive step states from events (last event per step wins)
-  const stepMap = new Map<string, { status: StepState['status']; updated_at: string }>();
-  for (const event of events as DesEvent[]) {
+const deriveStepStatesFromEvents = (events: readonly DesEvent[]): Map<string, StepInfo> => {
+  const stepMap = new Map<string, StepInfo>();
+  for (const event of events) {
     const sid = String(event.sid ?? '');
     const phase = String(event.p ?? '');
     const status = String(event.s ?? '');
@@ -63,7 +59,12 @@ export const parseDesExecutionLog = (raw: unknown): Result<DeliveryState, ParseE
       }
     }
   }
+  return stepMap;
+};
 
+const aggregateStepStates = (
+  stepMap: ReadonlyMap<string, StepInfo>,
+): { steps: Record<string, StepState>; completed: number; failed: number; inProgress: number; latestTimestamp: string } => {
   const steps: Record<string, StepState> = {};
   let completed = 0;
   let failed = 0;
@@ -78,6 +79,17 @@ export const parseDesExecutionLog = (raw: unknown): Result<DeliveryState, ParseE
     if (info.updated_at > latestTimestamp) latestTimestamp = info.updated_at;
   }
 
+  return { steps, completed, failed, inProgress, latestTimestamp };
+};
+
+export const parseDesExecutionLog = (raw: unknown): Result<DeliveryState, ParseError> => {
+  if (!isRecord(raw)) return err({ type: 'invalid_schema', message: 'root must be an object' });
+
+  const events = raw.events;
+  if (!Array.isArray(events)) return err({ type: 'invalid_schema', message: 'events must be an array' });
+
+  const stepMap = deriveStepStatesFromEvents(events as DesEvent[]);
+  const { steps, completed, failed, inProgress, latestTimestamp } = aggregateStepStates(stepMap);
   const firstTimestamp = events.length > 0 ? String((events[0] as DesEvent).t ?? '') : '';
 
   return ok({
