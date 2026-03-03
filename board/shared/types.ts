@@ -20,6 +20,53 @@ export const STEP_STATUSES = [
 
 export type StepStatus = (typeof STEP_STATUSES)[number];
 
+// --- Unified Roadmap types ---
+
+export interface RoadmapStep {
+  readonly id: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly files_to_modify: readonly string[];
+  readonly dependencies: readonly string[];
+  readonly criteria: readonly string[];
+  readonly status: StepStatus;
+  readonly teammate_id: string | null;
+  readonly started_at: string | null;
+  readonly completed_at: string | null;
+  readonly review_attempts: number;
+}
+
+export interface RoadmapPhase {
+  readonly id: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly steps: readonly RoadmapStep[];
+}
+
+export interface RoadmapMeta {
+  readonly project_id?: string;
+  readonly created_at?: string;
+  readonly total_steps?: number;
+  readonly phases?: number;
+  readonly status?: string;
+  readonly reviewer?: string;
+  readonly approved_at?: string;
+}
+
+export interface Roadmap {
+  readonly roadmap: RoadmapMeta;
+  readonly phases: readonly RoadmapPhase[];
+}
+
+export interface RoadmapSummary {
+  readonly total_steps: number;
+  readonly total_phases: number;
+  readonly completed: number;
+  readonly failed: number;
+  readonly in_progress: number;
+  readonly pending: number;
+}
+
 // --- State YAML schema types ---
 
 export interface StateSummary {
@@ -201,6 +248,7 @@ export interface ProjectConfig {
   readonly projectPath: string;
   readonly statePath: string;
   readonly planPath: string;
+  readonly roadmapPath?: string;
   readonly docsRoot?: string;
 }
 

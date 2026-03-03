@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync, access as fsAccess } from 'node:fs/promises';
 import { join, basename } from 'node:path';
-import type { ProjectId, ProjectConfig, ProjectSummary, FeatureSummary, AddProjectError, RemoveProjectError, Result } from '../shared/types.js';
+import type { ProjectId, ProjectConfig, ProjectSummary, FeatureSummary, FeatureId, AddProjectError, RemoveProjectError, Result } from '../shared/types.js';
 import { createProjectId, deriveProjectSummary } from '../shared/types.js';
-import { parseStateYaml, parsePlanYaml } from './parser.js';
+import { parseRoadmap, roadmapToDeliveryState, roadmapToExecutionPlan } from './parser.js';
 import { createFileWatcher } from './watcher.js';
 import { createProjectRegistry, type ProjectRegistry } from './registry.js';
 import { computeTransitions } from './differ.js';
@@ -39,12 +39,21 @@ interface ProjectsManifest {
   readonly projects: readonly ProjectRegistration[];
 }
 
+const deduplicateProjects = (projects: readonly ProjectRegistration[]): readonly ProjectRegistration[] => {
+  const seen = new Set<string>();
+  return projects.filter((p) => {
+    if (seen.has(p.projectId)) return false;
+    seen.add(p.projectId);
+    return true;
+  });
+};
+
 const loadProjectsManifest = async (filePath: string): Promise<ProjectsManifest> => {
   try {
     const raw = await readFileAsync(filePath, 'utf-8');
     const data = JSON.parse(raw);
     if (data && Array.isArray(data.projects)) {
-      return data as ProjectsManifest;
+      return { projects: deduplicateProjects(data.projects) };
     }
   } catch {
     // File doesn't exist or is invalid — start fresh
@@ -62,6 +71,7 @@ const toConfigFromPath = (projectId: ProjectId, projectPath: string): ProjectCon
   projectPath,
   statePath: join(projectPath, 'state.yaml'),
   planPath: join(projectPath, 'plan.yaml'),
+  roadmapPath: join(projectPath, 'roadmap.yaml'),
   docsRoot: join(projectPath, 'docs'),
 });
 
@@ -101,6 +111,7 @@ export const createMultiProjectServer = (
     projectPath: join(config.projectsRoot, projectId as string),
     statePath: join(config.projectsRoot, projectId as string, 'state.yaml'),
     planPath: join(config.projectsRoot, projectId as string, 'plan.yaml'),
+    roadmapPath: join(config.projectsRoot, projectId as string, 'roadmap.yaml'),
     docsRoot: join(config.projectsRoot, projectId as string, 'docs'),
   });
 
@@ -126,14 +137,18 @@ export const createMultiProjectServer = (
   const registry: ProjectRegistry = createProjectRegistry({
     createWatcher: createFileWatcher,
     readFile,
-    parseState: parseStateYaml,
-    parsePlan: parsePlanYaml,
+    parseRoadmap,
+    roadmapToDeliveryState,
+    roadmapToExecutionPlan,
     onStateChange: (projectId, previousState, newState) => {
       if (!subscriptionServer) return;
       const transitions = computeTransitions(previousState, newState, new Date().toISOString());
       subscriptionServer.notifyProjectUpdate(projectId, newState, transitions);
     },
   });
+
+  // Manifest-registered project IDs — discovery must not remove these
+  const manifestIds = new Set<ProjectId>();
 
   // Discovery → Registry bridge
   const registryActions: RegistryActions = {
@@ -143,12 +158,18 @@ export const createMultiProjectServer = (
       refreshFeatures(projectId).then(() => subscriptionServer?.notifyProjectListChange());
     },
     remove: (projectId: ProjectId) => {
+      if (manifestIds.has(projectId)) return; // Never remove manifest-registered projects
       pathMap.delete(projectId);
       featuresCache.delete(projectId);
       registry.remove(projectId);
       subscriptionServer?.notifyProjectListChange();
     },
-    knownIds: () => new Set(registry.list()),
+    knownIds: () => {
+      // Only report discovery-managed IDs so discovery doesn't try to remove manifest projects
+      const allIds = new Set(registry.list());
+      for (const id of manifestIds) allIds.delete(id);
+      return allIds;
+    },
   };
 
   const discovery: ProjectDiscovery = createProjectDiscovery(
@@ -167,9 +188,14 @@ export const createMultiProjectServer = (
   // Doc endpoint deps — wired with real scanDocsDir and readDocContent
   const docDeps: DocHttpDeps = {
     getDocsRoot: (projectId) => {
-      const result = registry.get(projectId);
-      if (!result.ok) return undefined;
-      return join(config.projectsRoot, projectId as string, 'docs');
+      const projectPath = pathMap.get(projectId);
+      if (!projectPath) return undefined;
+      return join(projectPath, 'docs');
+    },
+    getFeatureDocsRoot: (projectId: ProjectId, featureId: FeatureId) => {
+      const projectPath = pathMap.get(projectId);
+      if (!projectPath) return undefined;
+      return join(projectPath, 'docs', 'feature', featureId as string);
     },
     scanDocsDir,
     readDocContent,
@@ -193,24 +219,22 @@ export const createMultiProjectServer = (
       return err({ type: 'invalid_path', message: idResult.error });
     }
 
+    // Verify the directory exists
     try {
-      await fsAccess(join(projectPath, 'state.yaml'));
+      await fsAccess(projectPath);
     } catch {
-      return err({ type: 'invalid_path', message: `No state.yaml found at ${projectPath}` });
+      return err({ type: 'invalid_path', message: `Directory not found: ${projectPath}` });
     }
 
     pathMap.set(idResult.value, projectPath);
+    manifestIds.add(idResult.value);
+
     const projectConfig = toConfigFromPath(idResult.value, projectPath);
     const addResult = registry.add(projectConfig);
     if (!addResult.ok) {
       pathMap.delete(idResult.value);
-      if (addResult.error.type === 'project_exists') {
-        return err({ type: 'duplicate', projectId: idResult.value });
-      }
-      if (addResult.error.type === 'load_failed') {
-        return err({ type: 'invalid_path', message: addResult.error.message });
-      }
-      return err({ type: 'registration_failed', message: 'Failed to register project' });
+      manifestIds.delete(idResult.value);
+      return err({ type: 'duplicate', projectId: idResult.value });
     }
 
     await refreshFeatures(idResult.value);
@@ -222,6 +246,7 @@ export const createMultiProjectServer = (
 
     subscriptionServer?.notifyProjectListChange();
     const features = featuresCache.get(idResult.value) ?? [];
+
     return ok(deriveProjectSummary(idResult.value, addResult.value.state, features));
   };
 
@@ -233,6 +258,7 @@ export const createMultiProjectServer = (
 
     pathMap.delete(projectId);
     featuresCache.delete(projectId);
+    manifestIds.delete(projectId);
 
     projectsManifest = {
       projects: projectsManifest.projects.filter((p) => p.projectId !== (projectId as string)),
@@ -260,6 +286,17 @@ export const createMultiProjectServer = (
     addProject,
     removeProject,
     discoverFeatures,
+    featureArtifacts: {
+      getProjectPath: (projectId) => pathMap.get(projectId),
+      readFile: async (path) => {
+        try {
+          const content = await readFileAsync(path, 'utf-8');
+          return ok(content);
+        } catch {
+          return err(`Failed to read: ${path}`);
+        }
+      },
+    },
   });
   const httpServer: HttpServer = createHttpServer(httpApp, config.httpPort);
 
@@ -272,10 +309,14 @@ export const createMultiProjectServer = (
     for (const reg of projectsManifest.projects) {
       const idResult = createProjectId(reg.projectId);
       if (idResult.ok) {
+        manifestIds.add(idResult.value);
         pathMap.set(idResult.value, reg.path);
         registry.add(toConfigFromPath(idResult.value, reg.path));
       }
     }
+
+    // Persist deduplicated manifest
+    await saveProjectsManifest(manifestPath, projectsManifest);
 
     await discovery.poll();
     discovery.start();

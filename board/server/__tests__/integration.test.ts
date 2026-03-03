@@ -13,73 +13,41 @@ import { createMultiProjectServer, type MultiProjectServer } from '../multi-proj
 
 // --- Fixtures ---
 
-const STATE_YAML = `
-schema_version: "1.0"
-created_at: "2026-03-01T00:00:00Z"
-updated_at: "2026-03-01T00:00:00Z"
-plan_path: ".nw-teams/plan.yaml"
-current_layer: 1
-summary:
+const ROADMAP_YAML = `
+roadmap:
+  project_id: test
+  created_at: "2026-03-01T00:00:00Z"
   total_steps: 1
-  total_layers: 1
-  completed: 0
-  failed: 0
-  in_progress: 0
-steps:
-  "01-01":
-    step_id: "01-01"
-    name: "Test step"
-    layer: 1
-    status: "pending"
-    teammate_id: null
-    started_at: null
-    completed_at: null
-    review_attempts: 0
-    files_to_modify: []
-teammates: {}
-`;
-
-const PLAN_YAML = `
-schema_version: "1.0"
-summary:
-  total_steps: 1
-  total_layers: 1
-  max_parallelism: 1
-  requires_worktrees: false
-layers:
-  - layer: 1
-    parallel: false
-    use_worktrees: false
+  phases: 1
+phases:
+  - id: "01"
+    name: "Phase 1"
     steps:
-      - step_id: "01-01"
+      - id: "01-01"
         name: "Test step"
         files_to_modify: []
+        dependencies: []
+        criteria: []
+        status: "pending"
 `;
 
-const makeUpdatedStateYaml = (status: string): string => `
-schema_version: "1.0"
-created_at: "2026-03-01T00:00:00Z"
-updated_at: "2026-03-01T01:00:00Z"
-plan_path: ".nw-teams/plan.yaml"
-current_layer: 1
-summary:
+const makeUpdatedRoadmapYaml = (status: string): string => `
+roadmap:
+  project_id: test
+  created_at: "2026-03-01T00:00:00Z"
   total_steps: 1
-  total_layers: 1
-  completed: ${status === 'approved' ? 1 : 0}
-  failed: 0
-  in_progress: ${status === 'in_progress' ? 1 : 0}
-steps:
-  "01-01":
-    step_id: "01-01"
-    name: "Test step"
-    layer: 1
-    status: "${status}"
-    teammate_id: null
-    started_at: null
-    completed_at: null
-    review_attempts: 0
-    files_to_modify: []
-teammates: {}
+  phases: 1
+phases:
+  - id: "01"
+    name: "Phase 1"
+    steps:
+      - id: "01-01"
+        name: "Test step"
+        files_to_modify: []
+        dependencies: []
+        criteria: []
+        status: "${status}"
+        started_at: "2026-03-01T01:00:00Z"
 `;
 
 const forceProjectId = (raw: string): ProjectId => {
@@ -134,8 +102,7 @@ const connectTestClient = (port: number): Promise<TestClient> =>
 const addProjectDir = async (rootDir: string, name: string): Promise<void> => {
   const projectDir = join(rootDir, name);
   await mkdir(projectDir, { recursive: true });
-  await writeFile(join(projectDir, 'state.yaml'), STATE_YAML.trim());
-  await writeFile(join(projectDir, 'plan.yaml'), PLAN_YAML.trim());
+  await writeFile(join(projectDir, 'roadmap.yaml'), ROADMAP_YAML.trim());
 };
 
 const delay = (ms: number): Promise<void> =>
@@ -191,7 +158,7 @@ describe('Multi-project end-to-end integration', () => {
     expect(ids).toEqual(['project-alpha', 'project-beta']);
   });
 
-  it('should surface a new project within poll interval when state.yaml is added', async () => {
+  it('should surface a new project within poll interval when roadmap.yaml is added', async () => {
     // Given: server starts with one project
     await addProjectDir(rootDir, 'project-alpha');
 
@@ -259,9 +226,9 @@ describe('Multi-project end-to-end integration', () => {
       clientBeta.waitForMessage(2),
     ]);
 
-    // When: project-alpha's state.yaml is updated
-    const alphaStatePath = join(rootDir, 'project-alpha', 'state.yaml');
-    await writeFile(alphaStatePath, makeUpdatedStateYaml('in_progress'));
+    // When: project-alpha's roadmap.yaml is updated
+    const alphaRoadmapPath = join(rootDir, 'project-alpha', 'roadmap.yaml');
+    await writeFile(alphaRoadmapPath, makeUpdatedRoadmapYaml('in_progress'));
 
     // Then: only clientAlpha receives the update (watcher debounce + propagation)
     await clientAlpha.waitForMessage(3, 3000);
@@ -303,7 +270,6 @@ describe('Multi-project end-to-end integration', () => {
     expect(stateResponse.status).toBe(200);
     const state = await stateResponse.json();
     expect(state.schema_version).toBe('1.0');
-    expect(state.current_layer).toBe(1);
 
     expect(planResponse.status).toBe(200);
     const plan = await planResponse.json();
