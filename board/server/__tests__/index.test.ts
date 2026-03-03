@@ -1,10 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import type {
-  DeliveryState,
-  ExecutionPlan,
+  Roadmap,
   ProjectId,
   ProjectEntry,
   ProjectSummary,
+  AddProjectError,
+  RemoveProjectError,
   Result,
 } from '../../shared/types.js';
 import { ok, err, deriveProjectSummary } from '../../shared/types.js';
@@ -19,44 +20,14 @@ import {
 
 const makeProjectId = (id: string): ProjectId => id as ProjectId;
 
-const makePlan = (): ExecutionPlan => ({
-  schema_version: '1.0',
-  summary: { total_steps: 1, total_layers: 1, max_parallelism: 1, requires_worktrees: false },
-  layers: [{
-    layer: 1,
-    parallel: false,
-    use_worktrees: false,
-    steps: [{ step_id: '01-01', name: 'Test step', files_to_modify: [] }],
-  }],
-});
-
-const makeState = (): DeliveryState => ({
-  schema_version: '1.0',
-  created_at: '2026-03-01T00:00:00Z',
-  updated_at: '2026-03-01T00:00:00Z',
-  plan_path: '.nw-teams/plan.yaml',
-  current_layer: 1,
-  summary: { total_steps: 1, total_layers: 1, completed: 0, failed: 0, in_progress: 0 },
-  steps: {
-    '01-01': {
-      step_id: '01-01',
-      name: 'Test step',
-      layer: 1,
-      status: 'pending',
-      teammate_id: null,
-      started_at: null,
-      completed_at: null,
-      review_attempts: 0,
-      files_to_modify: [],
-    },
-  },
-  teammates: {},
+const makeRoadmap = (): Roadmap => ({
+  roadmap: {},
+  phases: [],
 });
 
 const makeEntry = (id: string): ProjectEntry => ({
   projectId: makeProjectId(id),
-  state: makeState(),
-  plan: makePlan(),
+  roadmap: makeRoadmap(),
 });
 
 // --- Deps factory using in-memory store ---
@@ -72,7 +43,7 @@ const createTestDeps = (entries: ProjectEntry[] = []): MultiProjectHttpDeps => {
       return entry ? ok(entry) : err(`Not found: ${projectId}`);
     },
     listProjectSummaries: (): readonly ProjectSummary[] =>
-      [...store.values()].map((e) => deriveProjectSummary(e.projectId, e.state)),
+      [...store.values()].map((e) => deriveProjectSummary(e.projectId, e.roadmap)),
   };
 };
 
@@ -89,6 +60,29 @@ const createFeatureArtifactDeps = (
     readFile: async (path: string): Promise<Result<string, string>> =>
       fileContents[path] ?? err(`File not found: ${path}`),
   },
+});
+
+// --- Project ops deps factory ---
+
+const makeSummary = (id: string): ProjectSummary => ({
+  projectId: makeProjectId(id),
+  name: id,
+  totalSteps: 1,
+  completed: 0,
+  failed: 0,
+  inProgress: 0,
+  currentLayer: 0,
+  updatedAt: '',
+  featureCount: 0,
+  features: [],
+});
+
+const createTestDepsWithProjectOps = (ops: {
+  addProject?: (path: string) => Promise<Result<ProjectSummary, AddProjectError>>;
+  removeProject?: (projectId: ProjectId) => Promise<Result<void, RemoveProjectError>>;
+}): MultiProjectHttpDeps => ({
+  ...createTestDeps([]),
+  ...ops,
 });
 
 // --- Tests ---
@@ -131,73 +125,6 @@ describe('Multi-project HTTP endpoints', () => {
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body).toEqual([]);
-    });
-  });
-
-  describe('GET /api/projects/:id/state', () => {
-    it('should return state for known project', async () => {
-      const entry = makeEntry('known');
-      const deps = createTestDeps([entry]);
-      const app = createMultiProjectHttpApp(deps);
-      server = createHttpServer(app, 0);
-      await server.ready;
-
-      const response = await fetch(`http://localhost:${server.port}/api/projects/known/state`);
-
-      expect(response.status).toBe(200);
-      const body = await response.json();
-      expect(body).toEqual(entry.state);
-    });
-
-    it('should return 404 for unknown projectId', async () => {
-      const deps = createTestDeps([]);
-      const app = createMultiProjectHttpApp(deps);
-      server = createHttpServer(app, 0);
-      await server.ready;
-
-      const response = await fetch(`http://localhost:${server.port}/api/projects/unknown/state`);
-
-      expect(response.status).toBe(404);
-      const body = await response.json();
-      expect(body.error).toMatch(/not found/i);
-    });
-
-    it('should return 400 for invalid project ID format', async () => {
-      const deps = createTestDeps([]);
-      const app = createMultiProjectHttpApp(deps);
-      server = createHttpServer(app, 0);
-      await server.ready;
-
-      const response = await fetch(`http://localhost:${server.port}/api/projects/INVALID_ID/state`);
-
-      expect(response.status).toBe(400);
-    });
-  });
-
-  describe('GET /api/projects/:id/plan', () => {
-    it('should return plan for known project', async () => {
-      const entry = makeEntry('known');
-      const deps = createTestDeps([entry]);
-      const app = createMultiProjectHttpApp(deps);
-      server = createHttpServer(app, 0);
-      await server.ready;
-
-      const response = await fetch(`http://localhost:${server.port}/api/projects/known/plan`);
-
-      expect(response.status).toBe(200);
-      const body = await response.json();
-      expect(body).toEqual(entry.plan);
-    });
-
-    it('should return 404 for unknown projectId', async () => {
-      const deps = createTestDeps([]);
-      const app = createMultiProjectHttpApp(deps);
-      server = createHttpServer(app, 0);
-      await server.ready;
-
-      const response = await fetch(`http://localhost:${server.port}/api/projects/unknown/plan`);
-
-      expect(response.status).toBe(404);
     });
   });
 
@@ -298,6 +225,159 @@ describe('Multi-project HTTP endpoints', () => {
       expect(response.status).toBe(422);
       const body = await response.json();
       expect(body.error).toMatch(/malformed/i);
+    });
+  });
+
+  describe('Removed endpoints', () => {
+    it('should return 404 for removed /state endpoint', async () => {
+      const deps = createTestDeps([makeEntry('alpha')]);
+      const app = createMultiProjectHttpApp(deps);
+      server = createHttpServer(app, 0);
+      await server.ready;
+
+      const response = await fetch(`http://localhost:${server.port}/api/projects/alpha/state`);
+
+      expect(response.status).toBe(404);
+    });
+
+    it('should return 404 for removed /plan endpoint', async () => {
+      const deps = createTestDeps([makeEntry('alpha')]);
+      const app = createMultiProjectHttpApp(deps);
+      server = createHttpServer(app, 0);
+      await server.ready;
+
+      const response = await fetch(`http://localhost:${server.port}/api/projects/alpha/plan`);
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/projects', () => {
+    it('should return 201 with ProjectSummary for valid path', async () => {
+      const summary = makeSummary('alpha');
+      const deps = createTestDepsWithProjectOps({
+        addProject: async () => ok(summary),
+      });
+      const app = createMultiProjectHttpApp(deps);
+      server = createHttpServer(app, 0);
+      await server.ready;
+
+      const response = await fetch(`http://localhost:${server.port}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: '/valid/path/alpha' }),
+      });
+
+      expect(response.status).toBe(201);
+      const body = await response.json();
+      expect(body.projectId).toBe('alpha');
+      expect(body.totalSteps).toBe(1);
+    });
+
+    it('should return 400 when path is missing from body', async () => {
+      const deps = createTestDepsWithProjectOps({
+        addProject: async () => ok(makeSummary('alpha')),
+      });
+      const app = createMultiProjectHttpApp(deps);
+      server = createHttpServer(app, 0);
+      await server.ready;
+
+      const response = await fetch(`http://localhost:${server.port}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error).toMatch(/path/i);
+    });
+
+    it('should return 400 for invalid project path', async () => {
+      const deps = createTestDepsWithProjectOps({
+        addProject: async () => err({ type: 'invalid_path' as const, message: 'No state.yaml found' }),
+      });
+      const app = createMultiProjectHttpApp(deps);
+      server = createHttpServer(app, 0);
+      await server.ready;
+
+      const response = await fetch(`http://localhost:${server.port}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: '/nonexistent/path' }),
+      });
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error).toMatch(/state\.yaml/i);
+    });
+
+    it('should return 409 for duplicate project', async () => {
+      const deps = createTestDepsWithProjectOps({
+        addProject: async () => err({ type: 'duplicate' as const, projectId: makeProjectId('alpha') }),
+      });
+      const app = createMultiProjectHttpApp(deps);
+      server = createHttpServer(app, 0);
+      await server.ready;
+
+      const response = await fetch(`http://localhost:${server.port}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: '/valid/path/alpha' }),
+      });
+
+      expect(response.status).toBe(409);
+      const body = await response.json();
+      expect(body.error).toMatch(/already exists/i);
+    });
+  });
+
+  describe('DELETE /api/projects/:id', () => {
+    it('should return 204 when project is removed', async () => {
+      const deps = createTestDepsWithProjectOps({
+        removeProject: async () => ok(undefined as void),
+      });
+      const app = createMultiProjectHttpApp(deps);
+      server = createHttpServer(app, 0);
+      await server.ready;
+
+      const response = await fetch(`http://localhost:${server.port}/api/projects/alpha`, {
+        method: 'DELETE',
+      });
+
+      expect(response.status).toBe(204);
+    });
+
+    it('should return 404 when project does not exist', async () => {
+      const deps = createTestDepsWithProjectOps({
+        removeProject: async () => err({ type: 'not_found' as const, projectId: makeProjectId('alpha') }),
+      });
+      const app = createMultiProjectHttpApp(deps);
+      server = createHttpServer(app, 0);
+      await server.ready;
+
+      const response = await fetch(`http://localhost:${server.port}/api/projects/alpha`, {
+        method: 'DELETE',
+      });
+
+      expect(response.status).toBe(404);
+      const body = await response.json();
+      expect(body.error).toMatch(/not found/i);
+    });
+
+    it('should return 400 for invalid project ID format on delete', async () => {
+      const deps = createTestDepsWithProjectOps({
+        removeProject: async () => ok(undefined as void),
+      });
+      const app = createMultiProjectHttpApp(deps);
+      server = createHttpServer(app, 0);
+      await server.ready;
+
+      const response = await fetch(`http://localhost:${server.port}/api/projects/INVALID!`, {
+        method: 'DELETE',
+      });
+
+      expect(response.status).toBe(400);
     });
   });
 
