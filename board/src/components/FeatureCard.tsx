@@ -1,15 +1,19 @@
-import type { FeatureSummary } from '../../shared/types';
-import { computeCompletionPercentage } from './ProjectCard';
+import type { FeatureSummary } from "../../shared/types";
+import { computeCompletionPercentage } from "./ProjectCard";
 
 // --- Pure functions ---
 
-export type FeatureDisplayState = 'completed' | 'active' | 'planned';
+export type FeatureDisplayState = "completed" | "active" | "planned";
 
-export const classifyFeatureDisplayState = (feature: FeatureSummary): FeatureDisplayState | null => {
+export const classifyFeatureDisplayState = (
+  feature: FeatureSummary,
+): FeatureDisplayState | null => {
   if (!feature.hasRoadmap) return null;
-  if (feature.totalSteps > 0 && feature.completed === feature.totalSteps) return 'completed';
-  if (feature.inProgress > 0 || feature.completed > 0 || feature.failed > 0) return 'active';
-  return 'planned';
+  if (feature.totalSteps > 0 && feature.completed === feature.totalSteps)
+    return "completed";
+  if (feature.inProgress > 0 || feature.completed > 0 || feature.failed > 0)
+    return "active";
+  return "planned";
 };
 
 export const formatProgressLabel = (completed: number, total: number): string =>
@@ -23,27 +27,36 @@ interface FeatureCardProps {
 }
 
 const STATE_LABELS: Record<FeatureDisplayState, string> = {
-  'completed': 'Completed',
-  'active': 'Active',
-  'planned': 'Planned',
+  completed: "Completed",
+  active: "Active",
+  planned: "Planned",
 };
 
 export const FeatureCard = ({ feature, onClick }: FeatureCardProps) => {
   const displayState = classifyFeatureDisplayState(feature);
-  const percentage = computeCompletionPercentage(feature.completed, feature.totalSteps);
+  const percentage = computeCompletionPercentage(
+    feature.completed,
+    feature.totalSteps,
+  );
 
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={onClick}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onClick?.(); }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onClick?.();
+      }}
       className="cursor-pointer rounded-lg border border-gray-800 bg-gray-900/80 p-3 shadow-sm transition-colors hover:border-gray-600 hover:bg-gray-900"
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-100">{feature.name}</h3>
+        <h3 className="truncate text-sm font-semibold text-gray-100">
+          {feature.name}
+        </h3>
         {displayState !== null && (
-          <span className="text-xs font-medium text-gray-400">{STATE_LABELS[displayState]}</span>
+          <span className="text-xs font-medium text-gray-400">
+            {STATE_LABELS[displayState]}
+          </span>
         )}
       </div>
 
@@ -68,12 +81,12 @@ export const FeatureCard = ({ feature, onClick }: FeatureCardProps) => {
 
           <div className="mt-1.5 flex flex-wrap gap-2 text-xs">
             {feature.inProgress > 0 && (
-              <span className="rounded-full bg-blue-950/50 px-1.5 py-0.5 font-medium text-blue-400">
+              <span className="whitespace-nowrap rounded-full bg-blue-950/50 px-1.5 py-0.5 font-medium text-blue-400">
                 {feature.inProgress} in progress
               </span>
             )}
             {feature.failed > 0 && (
-              <span className="rounded-full bg-red-950/50 px-1.5 py-0.5 font-medium text-red-400">
+              <span className="whitespace-nowrap rounded-full bg-red-950/50 px-1.5 py-0.5 font-medium text-red-400">
                 {feature.failed} failed
               </span>
             )}
