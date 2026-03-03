@@ -1,0 +1,125 @@
+"""Tests for parallel_groups CLI module."""
+
+import pytest
+
+from nw_teams.cli.parallel_groups import (
+    Step,
+    extract_steps,
+    identify_parallel_groups,
+)
+
+
+# --- Unit: extract_steps reads description ---
+
+
+def test_extract_steps_reads_description_from_yaml():
+    roadmap = {
+        "phases": [
+            {
+                "phase_id": "01",
+                "steps": [
+                    {
+                        "step_id": "01-01",
+                        "name": "Do thing",
+                        "description": "Detailed explanation",
+                        "files_to_modify": ["src/thing.py"],
+                        "blocked_by": [],
+                    },
+                ],
+            },
+        ],
+    }
+
+    steps = extract_steps(roadmap)
+
+    assert steps[0].description == "Detailed explanation"
+
+
+def test_extract_steps_defaults_description_when_missing():
+    roadmap = {
+        "phases": [
+            {
+                "phase_id": "01",
+                "steps": [
+                    {
+                        "step_id": "01-01",
+                        "name": "Do thing",
+                        "files_to_modify": ["src/thing.py"],
+                        "blocked_by": [],
+                    },
+                ],
+            },
+        ],
+    }
+
+    steps = extract_steps(roadmap)
+
+    assert steps[0].description == ""
+
+
+# --- Backward compatibility ---
+
+
+def test_step_without_description_defaults_to_empty():
+    step = Step("01-01", "Name", ["f.py"], [], "01")
+    assert step.description == ""
+
+
+# --- Validation: files_to_modify must not be empty ---
+
+
+def test_extract_steps_rejects_empty_files_to_modify():
+    roadmap = {
+        "phases": [
+            {
+                "phase_id": "01",
+                "steps": [
+                    {
+                        "step_id": "01-01",
+                        "name": "Missing files",
+                        "files_to_modify": [],
+                        "blocked_by": [],
+                    },
+                ],
+            },
+        ],
+    }
+
+    with pytest.raises(ValueError, match="empty files_to_modify"):
+        extract_steps(roadmap)
+
+
+# --- Parallel groups analysis ---
+
+
+def test_identify_parallel_groups_builds_layers():
+    roadmap = {
+        "phases": [
+            {
+                "phase_id": "01",
+                "steps": [
+                    {
+                        "step_id": "01-01",
+                        "name": "First",
+                        "files_to_modify": ["a.py"],
+                        "blocked_by": [],
+                    },
+                    {
+                        "step_id": "01-02",
+                        "name": "Second",
+                        "files_to_modify": ["b.py"],
+                        "blocked_by": ["01-01"],
+                    },
+                ],
+            },
+        ],
+    }
+
+    steps = extract_steps(roadmap)
+    groups = identify_parallel_groups(steps)
+
+    assert len(groups) == 2
+    assert len(groups[0].steps) == 1
+    assert groups[0].steps[0].step_id == "01-01"
+    assert len(groups[1].steps) == 1
+    assert groups[1].steps[0].step_id == "01-02"

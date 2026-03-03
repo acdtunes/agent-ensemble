@@ -7,7 +7,7 @@
  *
  * Driving ports exercised:
  *   - Component props: FileCard, ProgressHeader, KanbanBoard, StepDetailModal
- *   - Pure functions: computePhaseIndicator, getTeammateColor, expandStepToFileCards, parsePlanYaml
+ *   - Pure functions: computePhaseIndicator, getTeammateColor, expandStepToFileCards
  */
 
 import type {
@@ -131,50 +131,10 @@ export const createFileCardData = (
   overrides: Partial<FileCardData> & Pick<FileCardData, 'filename' | 'stepId' | 'stepName'>,
 ): FileCardData => ({
   displayColumn: 'in_progress',
-  retryCount: 0,
+  reviewCount: 0,
   worktree: false,
   isBlocked: false,
   teammateId: null,
   ...overrides,
 });
 
-// --- Plan YAML string builders for parser tests ---
-
-export const buildPlanYaml = (steps: readonly {
-  step_id: string;
-  name: string;
-  description?: string;
-  files_to_modify: readonly string[];
-  conflicts_with?: readonly string[];
-}[]): string => {
-  const stepLines = steps.map(s => {
-    let yaml = `  - step_id: '${s.step_id}'\n    name: '${s.name}'\n`;
-    if (s.description !== undefined) {
-      yaml += `    description: '${s.description}'\n`;
-    }
-    yaml += `    files_to_modify:\n`;
-    for (const f of s.files_to_modify) {
-      yaml += `    - '${f}'\n`;
-    }
-    if (s.conflicts_with && s.conflicts_with.length > 0) {
-      yaml += `    conflicts_with:\n`;
-      for (const c of s.conflicts_with) {
-        yaml += `    - '${c}'\n`;
-      }
-    }
-    return yaml;
-  }).join('');
-
-  return `schema_version: '1.0'
-summary:
-  total_steps: ${steps.length}
-  total_layers: 1
-  max_parallelism: ${steps.length}
-  requires_worktrees: false
-layers:
-- layer: 1
-  parallel: true
-  use_worktrees: false
-  steps:
-${stepLines}`;
-};

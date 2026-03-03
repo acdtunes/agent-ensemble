@@ -2,7 +2,6 @@
 
 Usage:
     python -m nw_teams.cli.parallel_groups analyze ROADMAP_PATH
-    python -m nw_teams.cli.parallel_groups plan ROADMAP_PATH --output PLAN_PATH
 
 Exit codes:
     0 = Success
@@ -36,14 +35,22 @@ class ParallelGroup(NamedTuple):
 
 
 def extract_steps(roadmap: dict) -> list[Step]:
-    """Extract steps from roadmap.yaml."""
+    """Extract steps from roadmap.yaml.
+
+    Raises ValueError if any step has empty files_to_modify.
+    """
     steps = []
     for phase in roadmap.get("phases", []):
         phase_id = phase.get("phase_id", phase.get("id", ""))
         for step in phase.get("steps", []):
             step_id = step.get("step_id", step.get("id", ""))
             name = step.get("name", "")
-            files = step.get("files_to_modify", [])
+            files = step.get("files_to_modify", step.get("implementation_scope", []))
+            if not files:
+                raise ValueError(
+                    f"Step {step_id} ({name}) has empty files_to_modify. "
+                    f"Every step must declare at least one file."
+                )
             blocked_by = step.get("blocked_by", step.get("dependencies", []))
             description = step.get("description", "")
             steps.append(Step(step_id, name, files, blocked_by, phase_id, description))
@@ -151,66 +158,6 @@ def print_analysis(groups: list[ParallelGroup]) -> None:
         print()
 
 
-def compute_cross_step_conflicts(steps: list[Step]) -> dict[str, list[str]]:
-    """Map each step_id to step_ids that modify overlapping files."""
-    conflicts: dict[str, list[str]] = {step.step_id: [] for step in steps}
-    for i, step_a in enumerate(steps):
-        files_a = set(step_a.files_to_modify)
-        if not files_a:
-            continue
-        for step_b in steps[i + 1:]:
-            overlap = files_a & set(step_b.files_to_modify)
-            if overlap:
-                conflicts[step_a.step_id].append(step_b.step_id)
-                conflicts[step_b.step_id].append(step_a.step_id)
-    return conflicts
-
-
-def generate_plan(groups: list[ParallelGroup]) -> dict:
-    """Generate execution plan as structured data."""
-    all_steps = [step for group in groups for step in group.steps]
-    step_conflicts = compute_cross_step_conflicts(all_steps)
-
-    plan = {
-        "schema_version": "1.0",
-        "summary": {
-            "total_steps": sum(len(g.steps) for g in groups),
-            "total_layers": len(groups),
-            "max_parallelism": max(len(g.steps) for g in groups) if groups else 0,
-            "requires_worktrees": any(g.has_file_conflicts for g in groups),
-        },
-        "layers": [],
-    }
-
-    for group in groups:
-        layer = {
-            "layer": group.layer,
-            "parallel": len(group.steps) > 1,
-            "use_worktrees": group.has_file_conflicts,
-            "steps": [],
-        }
-        for step in group.steps:
-            step_data: dict = {
-                "step_id": step.step_id,
-                "name": step.name,
-                "files_to_modify": step.files_to_modify,
-            }
-            if step.description:
-                step_data["description"] = step.description
-            if step_conflicts[step.step_id]:
-                step_data["conflicts_with"] = sorted(step_conflicts[step.step_id])
-            layer["steps"].append(step_data)
-
-        if group.conflicting_pairs:
-            layer["file_conflicts"] = [
-                {"step_a": a, "step_b": b, "files": f}
-                for a, b, f in group.conflicting_pairs
-            ]
-        plan["layers"].append(layer)
-
-    return plan
-
-
 def cmd_analyze(args: list[str]) -> int:
     """Handle 'analyze' subcommand."""
     if not args:
@@ -235,59 +182,12 @@ def cmd_analyze(args: list[str]) -> int:
     return 0
 
 
-def cmd_plan(args: list[str]) -> int:
-    """Handle 'plan' subcommand."""
-    roadmap_path = None
-    output_path = None
-
-    i = 0
-    while i < len(args):
-        if args[i] == "--output" and i + 1 < len(args):
-            output_path = args[i + 1]
-            i += 2
-        elif not roadmap_path:
-            roadmap_path = args[i]
-            i += 1
-        else:
-            print(f"Unknown argument: {args[i]}", file=sys.stderr)
-            return 2
-
-    if not roadmap_path:
-        print("Error: roadmap path required", file=sys.stderr)
-        return 2
-
-    roadmap_file = Path(roadmap_path)
-    if not roadmap_file.exists():
-        print(f"Error: file not found: {roadmap_file}", file=sys.stderr)
-        return 2
-
-    roadmap = yaml.safe_load(roadmap_file.read_text())
-    steps = extract_steps(roadmap)
-
-    if not steps:
-        print("Error: no steps found in roadmap", file=sys.stderr)
-        return 1
-
-    groups = identify_parallel_groups(steps)
-    plan = generate_plan(groups)
-
-    if output_path:
-        Path(output_path).write_text(
-            yaml.dump(plan, default_flow_style=False, sort_keys=False)
-        )
-        print(f"Execution plan written to {output_path}")
-    else:
-        print(yaml.dump(plan, default_flow_style=False, sort_keys=False))
-
-    return 0
-
-
 def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
 
     if not argv:
-        print("Usage: python -m nw_teams.cli.parallel_groups {analyze|plan} [OPTIONS]")
+        print("Usage: python -m nw_teams.cli.parallel_groups analyze [OPTIONS]")
         return 2
 
     subcommand = argv[0]
@@ -295,8 +195,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if subcommand == "analyze":
         return cmd_analyze(sub_args)
-    elif subcommand == "plan":
-        return cmd_plan(sub_args)
     else:
         print(f"Unknown subcommand: {subcommand}", file=sys.stderr)
         return 2
