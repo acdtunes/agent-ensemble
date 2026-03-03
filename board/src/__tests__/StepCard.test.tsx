@@ -47,11 +47,36 @@ describe('StepCard', () => {
     expect(screen.getByText('📁 0 files')).toBeInTheDocument();
   });
 
-  it('displays step ID in top-right corner with monospace font', () => {
-    render(<StepCard card={baseCard} />);
-    const stepId = screen.getByText('01-04');
-    expect(stepId).toBeInTheDocument();
-    expect(stepId.className).toMatch(/font-mono/);
+  describe('teammate emoji footer', () => {
+    it('shows step ID right-aligned in footer with monospace font when no teammate', () => {
+      render(<StepCard card={baseCard} />);
+      const footer = screen.getByTestId('card-footer');
+      const stepId = screen.getByText('01-04');
+      expect(footer).toContainElement(stepId);
+      expect(stepId.className).toMatch(/font-mono/);
+      expect(footer.className).toMatch(/justify-end/);
+    });
+
+    it('shows emoji and colored teammate name when teammateId is set', () => {
+      render(<StepCard card={{ ...baseCard, teammateId: 'alice' }} />);
+      const footer = screen.getByTestId('card-footer');
+      // Should show emoji (from getTeammateEmoji) + name
+      expect(footer.textContent).toMatch(/🐙\s*alice/);
+    });
+
+    it('shows both teammate and step ID in footer row when teammate present', () => {
+      render(<StepCard card={{ ...baseCard, teammateId: 'alice' }} />);
+      const footer = screen.getByTestId('card-footer');
+      expect(footer).toContainElement(screen.getByText(/alice/));
+      expect(footer).toContainElement(screen.getByText('01-04'));
+      expect(footer.className).toMatch(/justify-between/);
+    });
+
+    it('shows teammate in done column', () => {
+      render(<StepCard card={{ ...baseCard, displayColumn: 'done', teammateId: 'bob' }} />);
+      expect(screen.getByText(/bob/)).toBeInTheDocument();
+      expect(screen.getByTestId('card-footer')).toBeInTheDocument();
+    });
   });
 
   it('does not render review count badge even when reviewCount > 0', () => {
@@ -97,14 +122,14 @@ describe('StepCard', () => {
     expect(screen.getByTestId('step-card')).toHaveClass('animate-pulse-glow');
   });
 
-  it('shows teammate indicator when teammateId is set, hides when null', () => {
+  it('shows teammate in footer when teammateId is set, footer always present', () => {
     const { unmount } = render(<StepCard card={{ ...baseCard, teammateId: 'crafter-03' }} />);
-    expect(screen.getByText('crafter-03')).toBeInTheDocument();
-    expect(screen.getByTestId('teammate-indicator')).toBeInTheDocument();
+    expect(screen.getByText(/crafter-03/)).toBeInTheDocument();
+    expect(screen.getByTestId('card-footer')).toBeInTheDocument();
     unmount();
 
     render(<StepCard card={baseCard} />);
-    expect(screen.queryByTestId('teammate-indicator')).not.toBeInTheDocument();
+    expect(screen.getByTestId('card-footer')).toBeInTheDocument();
   });
 
   it('calls onCardClick with stepId when card is clicked', () => {

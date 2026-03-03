@@ -2,12 +2,7 @@ import type { StepCardData } from '../utils/statusMapping';
 import { getStatusTopBarColor } from '../utils/statusColors';
 import { getCardAnimationClasses } from '../utils/animationClasses';
 import { getTeammateColor } from '../utils/teammateColors';
-
-const PersonIcon = () => (
-  <svg className="h-3 w-3 text-gray-500" viewBox="0 0 16 16" fill="currentColor">
-    <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM12.735 14c.618 0 1.093-.561.872-1.139a6.002 6.002 0 0 0-11.215 0c-.22.578.254 1.139.872 1.139h9.47Z" />
-  </svg>
-);
+import { getTeammateEmoji } from '../utils/teammateEmoji';
 
 const Badge = ({ bg, text, children }: { readonly bg: string; readonly text: string; readonly children: React.ReactNode }) => (
   <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${bg} ${text}`}>{children}</span>
@@ -26,6 +21,7 @@ export const StepCard = ({ card, onCardClick }: StepCardProps) => {
   const animationClasses = getCardAnimationClasses(card.displayColumn);
   const topBarColor = getStatusTopBarColor(card.displayColumn);
   const isClickable = onCardClick !== undefined;
+  const hasTeammate = card.teammateId !== null;
 
   return (
     <div
@@ -33,9 +29,8 @@ export const StepCard = ({ card, onCardClick }: StepCardProps) => {
       className={`rounded min-h-[160px] flex flex-col bg-gray-900/80 backdrop-blur-sm p-2 text-sm shadow-sm ${topBarColor} ${animationClasses}${isClickable ? ' cursor-pointer' : ''}`}
       onClick={isClickable ? () => onCardClick(card.stepId) : undefined}
     >
-      <div className="flex items-start justify-between">
+      <div className="flex items-start">
         <span className="min-w-0 font-medium text-gray-100">{card.stepName}</span>
-        <span className="shrink-0 whitespace-nowrap font-mono text-xs text-gray-400">{card.stepId}</span>
       </div>
       <div className="mt-1 flex flex-wrap gap-1">
         <MetadataChip>📁 {card.fileCount} {card.fileCount === 1 ? 'file' : 'files'}</MetadataChip>
@@ -43,14 +38,6 @@ export const StepCard = ({ card, onCardClick }: StepCardProps) => {
           <MetadataChip>🔗 {card.dependencyCount} {card.dependencyCount === 1 ? 'dep' : 'deps'}</MetadataChip>
         )}
       </div>
-      {card.teammateId !== null && (
-        <div data-testid="teammate-indicator" className="mt-1 flex items-center gap-1">
-          <PersonIcon />
-          <span className={`text-xs font-medium ${getTeammateColor(card.teammateId)}`}>
-            {card.teammateId}
-          </span>
-        </div>
-      )}
       <div className="mt-1 flex flex-wrap gap-1">
         {card.worktree && (
           <Badge bg="bg-indigo-950/50" text="text-indigo-400">worktree</Badge>
@@ -58,6 +45,18 @@ export const StepCard = ({ card, onCardClick }: StepCardProps) => {
         {card.isBlocked && (
           <Badge bg="bg-red-950/50" text="text-red-400">blocked</Badge>
         )}
+      </div>
+      <div className="flex-grow" />
+      <div
+        data-testid="card-footer"
+        className={`mt-2 flex items-center ${hasTeammate ? 'justify-between' : 'justify-end'}`}
+      >
+        {hasTeammate && (
+          <span className={`text-xs font-medium ${getTeammateColor(card.teammateId!)}`}>
+            {getTeammateEmoji(card.teammateId!)} {card.teammateId}
+          </span>
+        )}
+        <span className="shrink-0 whitespace-nowrap font-mono text-xs text-gray-400">{card.stepId}</span>
       </div>
     </div>
   );
