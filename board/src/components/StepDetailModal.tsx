@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import type { StepState, PlanStep } from '../../shared/types';
+import type { RoadmapStep, ReviewEntry } from '../../shared/types';
 import { mapStatusToDisplayColumn } from '../utils/statusMapping';
 import { getStatusLabel, getStatusColor } from '../utils/statusColors';
 import { getTeammateColor } from '../utils/teammateColors';
@@ -11,33 +11,44 @@ import { computeDuration } from '../utils/stepDetailUtils';
 const formatTimestamp = (iso: string): string =>
   new Date(iso).toLocaleString();
 
-const resolveConflictName = (
-  conflictId: string,
-  lookup: ReadonlyMap<string, PlanStep>,
-): string => lookup.get(conflictId)?.name ?? conflictId;
+const resolveDependencyName = (
+  dependencyId: string,
+  lookup: ReadonlyMap<string, RoadmapStep>,
+): string => lookup.get(dependencyId)?.name ?? dependencyId;
+
+const formatOutcomeLabel = (outcome: ReviewEntry['outcome']): string =>
+  outcome === 'approved' ? 'Approved' : 'Rejected';
+
+const getOutcomeColor = (outcome: ReviewEntry['outcome']): string =>
+  outcome === 'approved' ? 'text-green-400' : 'text-red-400';
+
+const sortNewestFirst = (entries: readonly ReviewEntry[]): readonly ReviewEntry[] =>
+  [...entries].sort((a, b) => b.cycle - a.cycle);
 
 // --- Section helper ---
 
 const DetailSection = ({ title, children }: { readonly title: string; readonly children: React.ReactNode }) => (
-  <div className="mb-3">
-    <h3 className="mb-1 text-xs font-medium uppercase text-gray-500">{title}</h3>
-    {children}
+  <div className="rounded-md border border-gray-800 bg-gray-950/60">
+    <div className="border-b border-gray-800 px-3 py-1.5">
+      <h3 className="text-xs font-medium uppercase tracking-wider text-gray-500">{title}</h3>
+    </div>
+    <div className="px-3 py-2">
+      {children}
+    </div>
   </div>
 );
 
 // --- Component ---
 
 interface StepDetailModalProps {
-  readonly stepState: StepState;
-  readonly planStep: PlanStep;
-  readonly planStepLookup: ReadonlyMap<string, PlanStep>;
+  readonly step: RoadmapStep;
+  readonly stepLookup: ReadonlyMap<string, RoadmapStep>;
   readonly onClose: () => void;
 }
 
 export const StepDetailModal = ({
-  stepState,
-  planStep,
-  planStepLookup,
+  step,
+  stepLookup,
   onClose,
 }: StepDetailModalProps) => {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -54,15 +65,14 @@ export const StepDetailModal = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const displayColumn = mapStatusToDisplayColumn(stepState.status);
+  const displayColumn = mapStatusToDisplayColumn(step.status);
   const statusLabel = getStatusLabel(displayColumn);
   const statusColor = getStatusColor(displayColumn);
-  const duration = computeDuration(stepState.started_at, stepState.completed_at);
-  const conflicts = planStep.conflicts_with ?? [];
+  const duration = computeDuration(step.started_at, step.completed_at);
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
       role="presentation"
     >
@@ -70,97 +80,116 @@ export const StepDetailModal = ({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={stepState.name}
+        aria-label={step.name}
         tabIndex={-1}
-        className="relative mx-4 max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl outline-none"
+        className={`relative mx-4 max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-lg border border-gray-800 border-l-2 ${statusColor.border} bg-gray-900/95 shadow-xl outline-none backdrop-blur-xl`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">{stepState.name}</h2>
-            <span className="font-mono text-sm text-gray-400">{stepState.step_id}</span>
+        <div className="flex items-start justify-between border-b border-gray-800 px-5 py-4">
+          <div className="flex-1">
+            <h2 className="text-lg font-semibold text-gray-100">{step.name}</h2>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="font-mono text-sm text-gray-400">{step.id}</span>
+              <span className="text-gray-700">&middot;</span>
+              <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusColor.bg} ${statusColor.text}`}>
+                {statusLabel}
+              </span>
+            </div>
           </div>
           <button
             type="button"
             aria-label="Close"
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="ml-3 rounded-md border border-gray-700 p-1.5 text-gray-400 transition-colors hover:border-gray-600 hover:bg-gray-800 hover:text-gray-200"
             onClick={onClose}
           >
-            ×
+            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 4l8 8M12 4l-8 8" />
+            </svg>
           </button>
         </div>
 
-        {/* Description — omitted entirely when undefined */}
-        {planStep.description !== undefined && (
-          <div data-testid="description-section" className="mb-4">
-            <p className="text-sm text-gray-700">{planStep.description}</p>
-          </div>
-        )}
+        {/* Body */}
+        <div className="space-y-3 px-5 py-4">
+          {/* Description */}
+          {step.description !== undefined && (
+            <div data-testid="description-section" className="rounded-md border border-gray-800 bg-gray-950/40 px-3 py-2.5">
+              <p className="text-sm leading-relaxed text-gray-300">{step.description}</p>
+            </div>
+          )}
 
-        {/* Status */}
-        <div className="mb-3">
-          <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor.bg} ${statusColor.text}`}>
-            {statusLabel}
-          </span>
+          {/* Teammate */}
+          {step.teammate_id !== null && (
+            <DetailSection title="Teammate">
+              <span className={`text-sm font-medium ${getTeammateColor(step.teammate_id)}`}>
+                {step.teammate_id}
+              </span>
+            </DetailSection>
+          )}
+
+          {/* Files */}
+          {step.files_to_modify.length > 0 && (
+            <DetailSection title="Files">
+              <ul className="space-y-1">
+                {step.files_to_modify.map((file) => (
+                  <li key={file} className="rounded bg-gray-900 px-2 py-1 font-mono text-sm text-gray-400">{file}</li>
+                ))}
+              </ul>
+            </DetailSection>
+          )}
+
+          {/* Dependencies */}
+          {step.dependencies.length > 0 && (
+            <DetailSection title="Dependencies">
+              <ul className="space-y-1">
+                {step.dependencies.map((depId) => (
+                  <li key={depId} className="text-sm text-gray-400">
+                    {resolveDependencyName(depId, stepLookup)}
+                  </li>
+                ))}
+              </ul>
+            </DetailSection>
+          )}
+
+          {/* Timing and review attempts */}
+          {step.started_at !== null && (
+            <DetailSection title="Timing">
+              <p className="text-sm text-gray-400">
+                {`Started: ${formatTimestamp(step.started_at)}`}
+                {step.completed_at !== null && ` — Completed: ${formatTimestamp(step.completed_at)}`}
+                {duration !== null && ` (${duration})`}
+                {step.review_attempts > 0 && ` · ${step.review_attempts} review attempts`}
+              </p>
+            </DetailSection>
+          )}
+          {step.started_at === null && step.review_attempts > 0 && (
+            <DetailSection title="Review Attempts">
+              <span className="text-sm text-gray-400">{step.review_attempts}</span>
+            </DetailSection>
+          )}
+
+          {/* Review History */}
+          {step.review_history !== undefined && step.review_history.length > 0 && (
+            <DetailSection title="Review History">
+              <ul className="space-y-2">
+                {sortNewestFirst(step.review_history).map((entry) => (
+                  <li key={entry.cycle} data-testid="review-entry" className="rounded bg-gray-900 px-2 py-1.5">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-mono text-gray-500">Cycle {entry.cycle}</span>
+                      <span className="text-gray-700">&middot;</span>
+                      <span className={`font-medium ${getOutcomeColor(entry.outcome)}`}>
+                        {formatOutcomeLabel(entry.outcome)}
+                      </span>
+                      <span className="text-gray-700">&middot;</span>
+                      <span className="text-gray-500">{formatTimestamp(entry.timestamp)}</span>
+                    </div>
+                    <p className="mt-1 text-sm text-gray-400">{entry.feedback}</p>
+                  </li>
+                ))}
+              </ul>
+            </DetailSection>
+          )}
         </div>
-
-        {/* Teammate */}
-        {stepState.teammate_id !== null && (
-          <DetailSection title="Teammate">
-            <span className={`text-sm font-medium ${getTeammateColor(stepState.teammate_id)}`}>
-              {stepState.teammate_id}
-            </span>
-          </DetailSection>
-        )}
-
-        {/* Files */}
-        {stepState.files_to_modify.length > 0 && (
-          <DetailSection title="Files">
-            <ul className="space-y-0.5">
-              {stepState.files_to_modify.map((file) => (
-                <li key={file} className="font-mono text-sm text-gray-600">{file}</li>
-              ))}
-            </ul>
-          </DetailSection>
-        )}
-
-        {/* Conflicts */}
-        {conflicts.length > 0 && (
-          <DetailSection title="Conflicts">
-            <ul className="space-y-0.5">
-              {conflicts.map((conflictId) => (
-                <li key={conflictId} className="text-sm text-gray-600">
-                  {resolveConflictName(conflictId, planStepLookup)}
-                </li>
-              ))}
-            </ul>
-          </DetailSection>
-        )}
-
-        {/* Timing and review attempts */}
-        {stepState.started_at !== null && (
-          <DetailSection title="Timing">
-            <p className="text-sm text-gray-600">
-              {`Started: ${formatTimestamp(stepState.started_at)}`}
-              {stepState.completed_at !== null && ` — Completed: ${formatTimestamp(stepState.completed_at)}`}
-              {duration !== null && ` (${duration})`}
-              {stepState.review_attempts > 0 && ` · ${stepState.review_attempts} review attempts`}
-            </p>
-          </DetailSection>
-        )}
-        {stepState.started_at === null && stepState.review_attempts > 0 && (
-          <DetailSection title="Review Attempts">
-            <span className="text-sm text-gray-600">{stepState.review_attempts}</span>
-          </DetailSection>
-        )}
-
-        {/* Worktree */}
-        {stepState.worktree && (
-          <div className="mb-3">
-            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">worktree</span>
-          </div>
-        )}
       </div>
     </div>,
     document.body,

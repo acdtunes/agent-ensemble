@@ -3,23 +3,20 @@
  *
  * Driving port: StepDetailModal component (rendered via props)
  * Driving port: BoardContent in App.tsx (click propagation -> modal state)
- * Validates: modal opens on click, displays joined step+plan data, closes correctly
+ * Validates: modal opens on click, displays RoadmapStep data, closes correctly
  *
  * Gherkin reference: milestone-4-step-detail-modal.feature (US-02 scenarios)
  *
  * Note: These tests render the modal component directly via its props interface
  * (driving port). The click-to-open flow is tested through KanbanBoard/FileCard
  * rendering which exercises the prop callback chain.
- *
- * IMPORTANT: All tests are skipped because StepDetailModal does not exist yet.
- * The software-crafter will un-skip these one at a time as they implement the modal.
- * The dynamic import uses a computed path to avoid Vite static analysis failures.
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { createStepState, createPlanStep } from './test-fixtures';
+import { createRoadmapStep } from './test-fixtures';
+import type { RoadmapStep } from '../../../../../shared/types';
 
 afterEach(cleanup);
 
@@ -27,47 +24,38 @@ afterEach(cleanup);
 const MODAL_MODULE_PATH = ['..', '..', '..', '..', 'components', 'StepDetailModal'].join('/');
 
 // =================================================================
-// Helper: renders the modal with given step + plan data.
-// Will fail at import until StepDetailModal is created.
+// Helper: renders the modal with given RoadmapStep data.
 // =================================================================
 const renderModal = async (overrides?: {
-  stepState?: ReturnType<typeof createStepState>;
-  planStep?: ReturnType<typeof createPlanStep>;
-  planStepLookup?: ReadonlyMap<string, ReturnType<typeof createPlanStep>>;
+  step?: RoadmapStep;
+  stepLookup?: ReadonlyMap<string, RoadmapStep>;
 }) => {
   const { StepDetailModal } = await import(
     /* @vite-ignore */ MODAL_MODULE_PATH
   );
 
-  const stepState = overrides?.stepState ?? createStepState({
-    step_id: '01-02',
+  const step = overrides?.step ?? createRoadmapStep({
+    id: '01-02',
     name: 'Setup API routes',
     status: 'in_progress',
+    description: 'Create REST API route handlers for authentication endpoints.',
     teammate_id: 'crafter-02',
     started_at: '2026-01-01T00:15:00Z',
     files_to_modify: ['src/routes.ts', 'src/schema.ts'],
+    dependencies: ['01-01'],
   });
 
-  const planStep = overrides?.planStep ?? createPlanStep({
-    step_id: '01-02',
-    name: 'Setup API routes',
-    description: 'Create REST API route handlers for authentication endpoints.',
-    files_to_modify: ['src/routes.ts', 'src/schema.ts'],
-    conflicts_with: ['01-01'],
-  });
-
-  const planStepLookup = overrides?.planStepLookup ?? new Map([
-    ['01-01', createPlanStep({ step_id: '01-01', name: 'Setup database', files_to_modify: ['src/db.ts'] })],
-    ['01-02', planStep],
+  const stepLookup = overrides?.stepLookup ?? new Map([
+    ['01-01', createRoadmapStep({ id: '01-01', name: 'Setup database', files_to_modify: ['src/db.ts'] })],
+    ['01-02', step],
   ]);
 
   const onClose = vi.fn();
 
   render(
     <StepDetailModal
-      stepState={stepState}
-      planStep={planStep}
-      planStepLookup={planStepLookup}
+      step={step}
+      stepLookup={stepLookup}
       onClose={onClose}
     />,
   );
@@ -97,17 +85,17 @@ describe('US-02: Clicking a card opens modal with step description', () => {
 });
 
 // =================================================================
-// US-02 Scenario 2: Modal displays file list and conflicts
+// US-02 Scenario 2: Modal displays file list and dependency information
 // =================================================================
-describe('US-02: Modal displays file list and conflict information', () => {
-  it('modal lists files and shows conflicting step name', async () => {
-    // Given step "01-02" modifies two files and conflicts with "01-01"
+describe('US-02: Modal displays file list and dependency information', () => {
+  it('modal lists files and shows dependency step name', async () => {
+    // Given step "01-02" modifies two files and depends on "01-01"
     await renderModal();
 
     // Then the modal lists both files
     expect(screen.getByText('src/routes.ts')).toBeInTheDocument();
     expect(screen.getByText('src/schema.ts')).toBeInTheDocument();
-    // And the conflicts section shows "Setup database"
+    // And the dependencies section shows "Setup database"
     expect(screen.getByText(/Setup database/)).toBeInTheDocument();
   });
 });
@@ -118,8 +106,8 @@ describe('US-02: Modal displays file list and conflict information', () => {
 describe('US-02: Modal shows timing and review attempts for completed step', () => {
   it('modal shows status, timing, and review attempts', async () => {
     // Given step "01-01" is approved with timing data and 2 review attempts
-    const stepState = createStepState({
-      step_id: '01-01',
+    const step = createRoadmapStep({
+      id: '01-01',
       name: 'Setup database',
       status: 'approved',
       teammate_id: 'crafter-01',
@@ -129,13 +117,7 @@ describe('US-02: Modal shows timing and review attempts for completed step', () 
       files_to_modify: ['src/db.ts'],
     });
 
-    const planStep = createPlanStep({
-      step_id: '01-01',
-      name: 'Setup database',
-      files_to_modify: ['src/db.ts'],
-    });
-
-    await renderModal({ stepState, planStep });
+    await renderModal({ step });
 
     // Then the modal shows status (mapped to display label)
     expect(screen.getByText(/Done|Approved/i)).toBeInTheDocument();
@@ -149,24 +131,17 @@ describe('US-02: Modal shows timing and review attempts for completed step', () 
 // =================================================================
 // US-02 Scenario 4: Modal omits description when absent
 // =================================================================
-describe('US-02: Modal omits description section when plan has no description', () => {
+describe('US-02: Modal omits description section when step has no description', () => {
   it('modal does not show description section or placeholder', async () => {
-    // Given step "02-01" has no description in the plan
-    const stepState = createStepState({
-      step_id: '02-01',
+    // Given step "02-01" has no description
+    const step = createRoadmapStep({
+      id: '02-01',
       name: 'Integration tests',
       status: 'pending',
       files_to_modify: ['tests/integration.ts'],
     });
 
-    const planStep = createPlanStep({
-      step_id: '02-01',
-      name: 'Integration tests',
-      files_to_modify: ['tests/integration.ts'],
-      // No description field
-    });
-
-    await renderModal({ stepState, planStep });
+    await renderModal({ step });
 
     // Then no description section appears
     expect(screen.queryByText(/description/i)).not.toBeInTheDocument();
@@ -217,21 +192,15 @@ describe('US-02: Modal closes via close button, outside click, and Escape key', 
 describe('US-02: Modal shows minimal data for pending step with no teammate', () => {
   it('pending step modal shows status but no teammate or timing', async () => {
     // Given step "02-01" is pending with no teammate
-    const stepState = createStepState({
-      step_id: '02-01',
+    const step = createRoadmapStep({
+      id: '02-01',
       name: 'Integration tests',
       status: 'pending',
       teammate_id: null,
       files_to_modify: ['tests/integration.ts'],
     });
 
-    const planStep = createPlanStep({
-      step_id: '02-01',
-      name: 'Integration tests',
-      files_to_modify: ['tests/integration.ts'],
-    });
-
-    await renderModal({ stepState, planStep });
+    await renderModal({ step });
 
     // Then the modal shows status "Pending"
     expect(screen.getByText(/Pending/i)).toBeInTheDocument();
@@ -244,7 +213,120 @@ describe('US-02: Modal shows minimal data for pending step with no teammate', ()
 });
 
 // =================================================================
-// US-02 Scenario 7: Modal is read-only
+// US-02 Scenario 7: Review history renders newest-first
+// =================================================================
+describe('US-02: Modal shows review history when present', () => {
+  it('renders review entries newest-first with cycle, outcome, and feedback', async () => {
+    // Given step "01-01" has review_history with two entries
+    const step = createRoadmapStep({
+      id: '01-01',
+      name: 'Setup database',
+      status: 'approved',
+      started_at: '2026-01-01T00:10:00Z',
+      completed_at: '2026-01-01T00:30:00Z',
+      review_attempts: 2,
+      files_to_modify: ['src/db.ts'],
+      review_history: [
+        { cycle: 1, timestamp: '2026-01-01T00:20:00Z', outcome: 'rejected', feedback: 'Missing error handling' },
+        { cycle: 2, timestamp: '2026-01-01T00:25:00Z', outcome: 'approved', feedback: 'Looks good now' },
+      ],
+    });
+
+    await renderModal({ step });
+
+    // Then a "Review History" section is visible
+    expect(screen.getByText('Review History')).toBeInTheDocument();
+    // And both entries are rendered
+    expect(screen.getByText(/Missing error handling/)).toBeInTheDocument();
+    expect(screen.getByText(/Looks good now/)).toBeInTheDocument();
+    // And cycle numbers are shown
+    expect(screen.getByText(/Cycle 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Cycle 2/)).toBeInTheDocument();
+    // And outcomes are shown
+    expect(screen.getByText(/Rejected/i)).toBeInTheDocument();
+    expect(screen.getByText(/Approved/i)).toBeInTheDocument();
+    // And entries are ordered newest-first (cycle 2 before cycle 1)
+    const entries = screen.getAllByTestId('review-entry');
+    expect(entries).toHaveLength(2);
+    expect(entries[0].textContent).toContain('Cycle 2');
+    expect(entries[1].textContent).toContain('Cycle 1');
+  });
+});
+
+// =================================================================
+// US-02 Scenario 8: Review history absent falls back to review_attempts
+// =================================================================
+describe('US-02: Modal falls back to review_attempts when review_history absent', () => {
+  it('shows review attempts count without review history section', async () => {
+    // Given step has review_attempts but no review_history
+    const step = createRoadmapStep({
+      id: '01-01',
+      name: 'Setup database',
+      status: 'approved',
+      started_at: '2026-01-01T00:10:00Z',
+      completed_at: '2026-01-01T00:30:00Z',
+      review_attempts: 3,
+      files_to_modify: ['src/db.ts'],
+    });
+
+    await renderModal({ step });
+
+    // Then review attempts count is shown in timing section
+    expect(screen.getByText(/3 review attempts/)).toBeInTheDocument();
+    // And no "Review History" section appears
+    expect(screen.queryByText('Review History')).not.toBeInTheDocument();
+  });
+});
+
+// =================================================================
+// US-02 Scenario 9: Empty review_history renders no review section
+// =================================================================
+describe('US-02: Modal omits review history when array is empty', () => {
+  it('does not render review history section for empty array', async () => {
+    const step = createRoadmapStep({
+      id: '01-01',
+      name: 'Setup database',
+      status: 'in_progress',
+      started_at: '2026-01-01T00:10:00Z',
+      review_attempts: 0,
+      files_to_modify: ['src/db.ts'],
+      review_history: [],
+    });
+
+    await renderModal({ step });
+
+    // Then no review history section
+    expect(screen.queryByText('Review History')).not.toBeInTheDocument();
+    // And no review entries
+    expect(screen.queryByTestId('review-entry')).not.toBeInTheDocument();
+  });
+});
+
+// =================================================================
+// US-02 Scenario 10: No review content when review_attempts is 0 and review_history absent
+// =================================================================
+describe('US-02: No review-related content when review_attempts=0 and no review_history', () => {
+  it('renders no review content at all', async () => {
+    const step = createRoadmapStep({
+      id: '01-01',
+      name: 'Setup database',
+      status: 'in_progress',
+      started_at: '2026-01-01T00:10:00Z',
+      review_attempts: 0,
+      files_to_modify: ['src/db.ts'],
+    });
+
+    await renderModal({ step });
+
+    // Then no review history section
+    expect(screen.queryByText('Review History')).not.toBeInTheDocument();
+    // And no review attempts text
+    expect(screen.queryByText(/review attempt/i)).not.toBeInTheDocument();
+  });
+});
+
+// =================================================================
+// US-02 Scenario 11: Modal is read-only
 // =================================================================
 describe('US-02: Modal is read-only with no mutation controls', () => {
   it('modal contains no edit buttons, input fields, or form controls', async () => {
