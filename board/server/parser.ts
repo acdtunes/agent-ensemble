@@ -27,7 +27,7 @@ const loadYaml = (content: string): Result<unknown, ParseError> => {
 
 // --- Validation helpers (pure functions) ---
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 // --- DES feature execution-log → DeliveryState (kept for DES audit trail) ---

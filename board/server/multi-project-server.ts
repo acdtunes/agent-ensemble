@@ -106,7 +106,7 @@ export const createMultiProjectServer = (
     }
   };
 
-  const toConfig = (projectId: ProjectId): ProjectConfig => ({
+  const toConfigFromDiscovery = (projectId: ProjectId): ProjectConfig => ({
     projectId,
     projectPath: join(config.projectsRoot, projectId as string),
     statePath: join(config.projectsRoot, projectId as string, 'state.yaml'),
@@ -154,7 +154,7 @@ export const createMultiProjectServer = (
   const registryActions: RegistryActions = {
     add: (projectId: ProjectId) => {
       pathMap.set(projectId, join(config.projectsRoot, projectId as string));
-      registry.add(toConfig(projectId));
+      registry.add(toConfigFromDiscovery(projectId));
       refreshFeatures(projectId).then(() => subscriptionServer?.notifyProjectListChange());
     },
     remove: (projectId: ProjectId) => {

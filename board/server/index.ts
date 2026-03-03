@@ -26,12 +26,9 @@ import { validateDocPath } from './doc-content.js';
 import { validateBrowsePath, computeParentPath } from './browse.js';
 import { buildDocTree } from './doc-tree.js';
 import { resolveFeatureRoadmap } from './feature-path-resolver.js';
-import { parseRoadmap, computeRoadmapSummary } from './parser.js';
+import { isRecord, parseRoadmap, computeRoadmapSummary } from './parser.js';
 
 // --- Client message parsing (pure function) ---
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export const parseClientMessage = (data: string): ClientWSMessage | null => {
   try {
