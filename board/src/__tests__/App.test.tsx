@@ -1,14 +1,14 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import type { Roadmap, RoadmapTransition, ProjectSummary, ProjectId, FeatureSummary } from '../../shared/types';
+import type { Roadmap, ProjectSummary, ProjectId, FeatureSummary } from '../../shared/types';
 import type { Route } from '../hooks/useRouter';
 
 // --- Mock hooks before importing App ---
 
 const mockResult = vi.hoisted(() => ({
   roadmap: null as Roadmap | null,
-  transitions: [] as readonly RoadmapTransition[],
+  transitions: [] as readonly unknown[],
   connectionStatus: 'connecting' as 'connecting' | 'connected' | 'disconnected',
   error: null as string | null,
 }));

@@ -13,13 +13,12 @@ import { KanbanBoard } from './components/KanbanBoard';
 import { StepDetailModal } from './components/StepDetailModal';
 import { buildPlanStepLookup } from './utils/stepDetailUtils';
 import { TeamPanel } from './components/TeamPanel';
-import { ActivityFeed } from './components/ActivityFeed';
 import { OverviewDashboard } from './components/OverviewDashboard';
 import { AddProjectDialog } from './components/AddProjectDialog';
 import { ProjectFeatureView } from './components/ProjectFeatureView';
 import { DocViewer } from './components/DocViewer';
 import { FeatureDocsView } from './components/FeatureDocsView';
-import type { Roadmap, RoadmapTransition, ProjectId } from '../shared/types';
+import type { Roadmap, ProjectId } from '../shared/types';
 
 // --- Pure functions ---
 
@@ -82,7 +81,6 @@ const PageShell = ({
 
 interface BoardContentProps {
   readonly roadmap: Roadmap;
-  readonly transitions: readonly RoadmapTransition[];
 }
 
 const computeCurrentPhase = (roadmap: Roadmap): number => {
@@ -92,7 +90,7 @@ const computeCurrentPhase = (roadmap: Roadmap): number => {
   return index === -1 ? roadmap.phases.length : index + 1;
 };
 
-const BoardContent = ({ roadmap, transitions }: BoardContentProps) => {
+const BoardContent = ({ roadmap }: BoardContentProps) => {
   const summary = useMemo(() => computeRoadmapSummary(roadmap), [roadmap]);
   const currentPhase = useMemo(() => computeCurrentPhase(roadmap), [roadmap]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
@@ -123,10 +121,6 @@ const BoardContent = ({ roadmap, transitions }: BoardContentProps) => {
           <section aria-label="Teammates">
             <h2 className="mb-3 text-lg font-medium text-gray-300">Teammates</h2>
             <TeamPanel roadmap={roadmap} />
-          </section>
-          <section aria-label="Activity">
-            <h2 className="mb-3 text-lg font-medium text-gray-300">Activity</h2>
-            <ActivityFeed transitions={transitions} />
           </section>
         </div>
       </div>
@@ -194,7 +188,7 @@ const BoardView = ({ projectId }: { readonly projectId: ProjectId }) => {
       headerContent={<ProjectTabs projectId={projectId} activeTab="board" />}
     >
       {roadmap !== null
-        ? <BoardContent roadmap={roadmap} transitions={transitions} />
+        ? <BoardContent roadmap={roadmap} />
         : <Placeholder error={error} />
       }
     </PageShell>
@@ -240,7 +234,7 @@ const FeatureBoardView = ({ projectId, featureId }: { readonly projectId: string
       headerContent={<FeatureNavHeader projectId={projectId} featureId={featureId} activeTab="board" />}
     >
       {roadmap !== null
-        ? <BoardContent roadmap={roadmap} transitions={[]} />
+        ? <BoardContent roadmap={roadmap} />
         : loading
           ? <Placeholder error={null} />
           : <Placeholder error={error} />
