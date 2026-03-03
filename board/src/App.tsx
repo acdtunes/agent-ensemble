@@ -208,6 +208,35 @@ const BoardView = ({ projectId }: { readonly projectId: ProjectId }) => {
   );
 };
 
+const FeatureNavHeader = ({
+  projectId,
+  featureId,
+  activeTab,
+}: {
+  readonly projectId: string;
+  readonly featureId: string;
+  readonly activeTab: 'board' | 'docs';
+}) => {
+  const tabClass = (tab: 'board' | 'docs') =>
+    tab === activeTab
+      ? 'px-3 py-1 text-sm rounded-t text-gray-100 border-b-2 border-blue-500'
+      : 'px-3 py-1 text-sm rounded-t text-gray-400 hover:text-gray-200';
+
+  return (
+    <div className="flex items-center gap-3">
+      <a href="#/" className="text-sm text-gray-400 hover:text-gray-200">Overview</a>
+      <span className="text-gray-600">/</span>
+      <a href={`#/projects/${projectId}`} className="text-sm text-gray-400 hover:text-gray-200">{projectId}</a>
+      <span className="text-gray-600">/</span>
+      <h1 className="text-lg font-semibold text-gray-100">{featureId}</h1>
+      <nav className="ml-4 flex gap-1">
+        <a href={`#/projects/${projectId}/features/${featureId}/board`} className={tabClass('board')}>Board</a>
+        <a href={`#/projects/${projectId}/features/${featureId}/docs`} className={tabClass('docs')}>Docs</a>
+      </nav>
+    </div>
+  );
+};
+
 const FeatureBoardView = ({ projectId, featureId }: { readonly projectId: string; readonly featureId: string }) => {
   const { roadmap, loading, error } = useFeatureState(projectId, featureId);
   const { connectionStatus } = useProjectList(WS_URL);
@@ -219,29 +248,7 @@ const FeatureBoardView = ({ projectId, featureId }: { readonly projectId: string
   return (
     <PageShell
       connectionStatus={connectionStatus}
-      headerContent={
-        <div className="flex items-center gap-3">
-          <a href="#/" className="text-sm text-gray-400 hover:text-gray-200">Overview</a>
-          <span className="text-gray-600">/</span>
-          <a href={`#/projects/${projectId}`} className="text-sm text-gray-400 hover:text-gray-200">{projectId}</a>
-          <span className="text-gray-600">/</span>
-          <h1 className="text-lg font-semibold text-gray-100">{featureId}</h1>
-          <nav className="ml-4 flex gap-1">
-            <a
-              href={`#/projects/${projectId}/features/${featureId}/board`}
-              className="px-3 py-1 text-sm rounded-t text-gray-100 border-b-2 border-blue-500"
-            >
-              Board
-            </a>
-            <a
-              href={`#/projects/${projectId}/features/${featureId}/docs`}
-              className="px-3 py-1 text-sm rounded-t text-gray-400 hover:text-gray-200"
-            >
-              Docs
-            </a>
-          </nav>
-        </div>
-      }
+      headerContent={<FeatureNavHeader projectId={projectId} featureId={featureId} activeTab="board" />}
     >
       {hasData
         ? <BoardContent state={state ?? EMPTY_STATE} plan={plan} transitions={[]} />

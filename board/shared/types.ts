@@ -159,27 +159,24 @@ export type ParseError =
   | { readonly type: 'invalid_yaml'; readonly message: string }
   | { readonly type: 'invalid_schema'; readonly message: string };
 
-// --- Multi-project types ---
+// --- Branded slug IDs ---
+
+const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+
+const createSlugId = <T extends string>(raw: string, label: string): Result<T, string> =>
+  SLUG_PATTERN.test(raw)
+    ? ok(raw as T)
+    : err(`Invalid ${label}: '${raw}'. Must be a lowercase slug (a-z, 0-9, hyphens, no leading/trailing hyphens).`);
 
 export type ProjectId = string & { readonly __brand: 'ProjectId' };
 
-const PROJECT_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
-
 export const createProjectId = (raw: string): Result<ProjectId, string> =>
-  PROJECT_ID_PATTERN.test(raw)
-    ? ok(raw as ProjectId)
-    : err(`Invalid project ID: '${raw}'. Must be a lowercase slug (a-z, 0-9, hyphens, no leading/trailing hyphens).`);
-
-// --- Feature types ---
+  createSlugId<ProjectId>(raw, 'project ID');
 
 export type FeatureId = string & { readonly __brand: 'FeatureId' };
 
-const FEATURE_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
-
 export const createFeatureId = (raw: string): Result<FeatureId, string> =>
-  FEATURE_ID_PATTERN.test(raw)
-    ? ok(raw as FeatureId)
-    : err(`Invalid feature ID: '${raw}'. Must be a lowercase slug (a-z, 0-9, hyphens, no leading/trailing hyphens).`);
+  createSlugId<FeatureId>(raw, 'feature ID');
 
 export interface FeatureSummary {
   readonly featureId: FeatureId;

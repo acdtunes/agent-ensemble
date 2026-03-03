@@ -73,7 +73,9 @@ const roadmapStepToStepState = (step: RoadmapStep, layerIndex: number): StepStat
   files_to_modify: step.files_to_modify as string[],
 });
 
-export const roadmapToDeliveryState = (roadmap: Roadmap): DeliveryState => {
+const buildStepsAndTeammates = (
+  roadmap: Roadmap,
+): { steps: Record<string, StepState>; teammates: Record<string, TeammateState> } => {
   const steps: Record<string, StepState> = {};
   const teammateMap = new Map<string, { current_step: string | null; completed_steps: string[] }>();
 
@@ -97,14 +99,26 @@ export const roadmapToDeliveryState = (roadmap: Roadmap): DeliveryState => {
   });
 
   const teammates: Record<string, TeammateState> = {};
-  for (const [id, info] of teammateMap) {
-    teammates[id] = { teammate_id: id, current_step: info.current_step, completed_steps: info.completed_steps };
+  for (const [id, teammateInfo] of teammateMap) {
+    teammates[id] = { teammate_id: id, current_step: teammateInfo.current_step, completed_steps: teammateInfo.completed_steps };
   }
 
+  return { steps, teammates };
+};
+
+const findTimestampRange = (roadmap: Roadmap): { earliest: string; latest: string } => {
+  const timestamps = roadmap.phases
+    .flatMap((p) => p.steps)
+    .flatMap((s) => [s.started_at, s.completed_at].filter(Boolean)) as string[];
+  if (timestamps.length === 0) return { earliest: '', latest: '' };
+  const sorted = timestamps.sort();
+  return { earliest: sorted[0], latest: sorted.at(-1)! };
+};
+
+export const roadmapToDeliveryState = (roadmap: Roadmap): DeliveryState => {
+  const { steps, teammates } = buildStepsAndTeammates(roadmap);
   const summary = computeRoadmapSummary(roadmap);
-  const timestamps = roadmap.phases.flatMap((p) => p.steps).flatMap((s) => [s.started_at, s.completed_at].filter(Boolean)) as string[];
-  const latest = timestamps.length > 0 ? timestamps.sort().at(-1)! : '';
-  const earliest = timestamps.length > 0 ? timestamps.sort()[0] : '';
+  const { earliest, latest } = findTimestampRange(roadmap);
 
   return {
     schema_version: '1.0',
