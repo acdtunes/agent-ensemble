@@ -55,8 +55,9 @@ const formatUpdatedAt = (updatedAt: string): string => {
 
 export const ProjectCard = ({ project, onNavigate, onRemove }: ProjectCardProps) => {
   const percentage = computeCompletionPercentage(project.completed, project.totalSteps);
-  const featureLabel = formatFeatureCount(project.featureCount);
-  const featureStats = aggregateFeatureStatuses(project.features);
+  const featureCount = project.featureCount ?? 0;
+  const featureLabel = formatFeatureCount(featureCount);
+  const featureStats = aggregateFeatureStatuses(project.features ?? []);
 
   return (
     <div
@@ -64,16 +65,16 @@ export const ProjectCard = ({ project, onNavigate, onRemove }: ProjectCardProps)
       tabIndex={0}
       onClick={() => onNavigate(project.projectId)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onNavigate(project.projectId); }}
-      className="w-full cursor-pointer rounded-lg border border-gray-800 bg-gray-900/80 p-4 text-left shadow-sm transition-all duration-200 hover:shadow-md"
+      className="w-full cursor-pointer rounded-lg border border-gray-800 bg-gray-900/80 px-3 py-2 text-left shadow-sm transition-all duration-200 hover:shadow-md"
     >
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-gray-100">{project.name}</h3>
         <span className="text-sm text-gray-400">Layer {project.currentLayer}</span>
       </div>
 
-      <div className="mt-1 text-xs text-gray-400">{featureLabel}</div>
+      <div className="text-xs text-gray-400">{featureLabel}</div>
 
-      <div className="mt-3">
+      <div className="mt-1.5">
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-300">{project.completed} / {project.totalSteps}</span>
           <span className="font-medium text-gray-200">{percentage}%</span>
@@ -92,7 +93,7 @@ export const ProjectCard = ({ project, onNavigate, onRemove }: ProjectCardProps)
         </div>
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+      <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
         {project.inProgress > 0 && (
           <span className="rounded-full bg-blue-950/50 px-1.5 py-0.5 font-medium text-blue-400">
             {project.inProgress} active
@@ -105,8 +106,8 @@ export const ProjectCard = ({ project, onNavigate, onRemove }: ProjectCardProps)
         )}
       </div>
 
-      {project.featureCount > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+      {featureCount > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
           {featureStats.completed > 0 && (
             <span className="rounded-full bg-emerald-950/50 px-1.5 py-0.5 font-medium text-emerald-400">
               {featureStats.completed} done
@@ -125,7 +126,7 @@ export const ProjectCard = ({ project, onNavigate, onRemove }: ProjectCardProps)
         </div>
       )}
 
-      <div className="mt-2 flex items-center justify-between">
+      <div className="mt-1 flex items-center justify-between">
         <p className="text-xs text-gray-500">{formatUpdatedAt(project.updatedAt)}</p>
         {onRemove !== undefined && (
           <button
