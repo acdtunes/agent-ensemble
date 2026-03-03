@@ -16,7 +16,7 @@ phases:
   steps:
   - id: 01-01
     name: Add shared browse types
-    files_to_modify:
+    files:
       - board/shared/types.ts
     dependencies: []
     criteria:
@@ -28,7 +28,7 @@ phases:
     review_attempts: 1
   - id: 01-02
     name: Create validation core
-    files_to_modify:
+    files:
       - board/server/browse.ts
     dependencies:
       - 01-01
@@ -41,7 +41,7 @@ phases:
     review_attempts: 0
   - id: 01-03
     name: Create IO shell adapter
-    files_to_modify:
+    files:
       - board/server/browse.ts
     dependencies:
       - 01-02
@@ -98,7 +98,7 @@ describe('parseRoadmap', () => {
     expect(step3.review_attempts).toBe(0);
   });
 
-  it('should default missing dependencies, criteria, and files_to_modify to empty arrays', () => {
+  it('should default missing dependencies, criteria, and files to empty arrays', () => {
     const minimalStep = `
 roadmap:
   project_id: test
@@ -167,6 +167,101 @@ phases:
     expect(result.value.roadmap.project_id).toBeUndefined();
     expect(result.value.roadmap.created_at).toBeUndefined();
     expect(result.value.roadmap.total_steps).toBeUndefined();
+  });
+
+  it('should parse valid review_history entries on a step', () => {
+    const yamlWithReview = `
+roadmap:
+  project_id: test
+phases:
+- id: '01'
+  name: Phase one
+  steps:
+  - id: 01-01
+    name: Step with reviews
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-01T10:00:00Z'
+      outcome: rejected
+      feedback: Missing edge case tests
+    - cycle: 2
+      timestamp: '2026-03-02T14:00:00Z'
+      outcome: approved
+      feedback: All criteria met
+`;
+    const result = parseRoadmap(yamlWithReview);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const step = result.value.phases[0].steps[0];
+    expect(step.review_history).toHaveLength(2);
+    expect(step.review_history![0]).toEqual({
+      cycle: 1,
+      timestamp: '2026-03-01T10:00:00Z',
+      outcome: 'rejected',
+      feedback: 'Missing edge case tests',
+    });
+    expect(step.review_history![1]).toEqual({
+      cycle: 2,
+      timestamp: '2026-03-02T14:00:00Z',
+      outcome: 'approved',
+      feedback: 'All criteria met',
+    });
+  });
+
+  it('should skip invalid review_history entries without failing the step', () => {
+    const yamlWithInvalid = `
+roadmap:
+  project_id: test
+phases:
+- id: '01'
+  name: Phase one
+  steps:
+  - id: 01-01
+    name: Step with mixed reviews
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-01T10:00:00Z'
+      outcome: approved
+      feedback: Looks good
+    - cycle: not-a-number
+      timestamp: '2026-03-01T11:00:00Z'
+      outcome: approved
+      feedback: Bad cycle
+    - cycle: 2
+      outcome: invalid_outcome
+      feedback: Bad outcome
+    - just-a-string
+`;
+    const result = parseRoadmap(yamlWithInvalid);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const step = result.value.phases[0].steps[0];
+    expect(step.review_history).toHaveLength(1);
+    expect(step.review_history![0].cycle).toBe(1);
+  });
+
+  it('should parse missing review_history as undefined (backward compatible)', () => {
+    const yamlNoReview = `
+roadmap:
+  project_id: test
+phases:
+- id: '01'
+  name: Phase one
+  steps:
+  - id: 01-01
+    name: Step without reviews
+`;
+    const result = parseRoadmap(yamlNoReview);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const step = result.value.phases[0].steps[0];
+    expect(step.review_history).toBeUndefined();
   });
 
   it('should use id field directly without normalization', () => {

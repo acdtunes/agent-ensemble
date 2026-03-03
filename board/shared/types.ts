@@ -20,6 +20,17 @@ export const STEP_STATUSES = [
 
 export type StepStatus = (typeof STEP_STATUSES)[number];
 
+// --- Review history ---
+
+export type ReviewOutcome = 'approved' | 'rejected';
+
+export interface ReviewEntry {
+  readonly cycle: number;
+  readonly timestamp: string;
+  readonly outcome: ReviewOutcome;
+  readonly feedback: string;
+}
+
 // --- Unified Roadmap types ---
 
 export interface RoadmapStep {
@@ -34,6 +45,7 @@ export interface RoadmapStep {
   readonly started_at: string | null;
   readonly completed_at: string | null;
   readonly review_attempts: number;
+  readonly review_history?: readonly ReviewEntry[];
 }
 
 export interface RoadmapPhase {
@@ -67,91 +79,36 @@ export interface RoadmapSummary {
   readonly pending: number;
 }
 
-// --- State YAML schema types ---
+// --- Computed summary (pure, never stored) ---
 
-export interface StateSummary {
-  readonly total_steps: number;
-  readonly total_layers: number;
-  readonly completed: number;
-  readonly failed: number;
-  readonly in_progress: number;
-}
+const IN_PROGRESS_STATUSES: ReadonlySet<StepStatus> = new Set(['claimed', 'in_progress', 'review']);
 
-export interface StepState {
-  readonly step_id: string;
-  readonly name: string;
-  readonly layer: number;
-  readonly status: StepStatus;
-  readonly teammate_id: string | null;
-  readonly started_at: string | null;
-  readonly completed_at: string | null;
-  readonly review_attempts: number;
-  readonly files_to_modify: readonly string[];
-  readonly worktree?: boolean;
-}
+export const computeRoadmapSummary = (roadmap: Roadmap): RoadmapSummary => {
+  const allSteps = roadmap.phases.flatMap((p) => p.steps);
+  const completed = allSteps.filter((s) => s.status === 'approved').length;
+  const failed = allSteps.filter((s) => s.status === 'failed').length;
+  const in_progress = allSteps.filter((s) => IN_PROGRESS_STATUSES.has(s.status)).length;
 
-export interface TeammateState {
-  readonly teammate_id: string;
-  readonly current_step: string | null;
-  readonly completed_steps: readonly string[];
-}
+  return {
+    total_steps: allSteps.length,
+    total_phases: roadmap.phases.length,
+    completed,
+    failed,
+    in_progress,
+    pending: allSteps.length - completed - failed - in_progress,
+  };
+};
 
-export interface DeliveryState {
-  readonly schema_version: string;
-  readonly created_at: string;
-  readonly updated_at: string;
-  readonly plan_path: string;
-  readonly current_layer: number;
-  readonly summary: StateSummary;
-  readonly steps: Readonly<Record<string, StepState>>;
-  readonly teammates: Readonly<Record<string, TeammateState>>;
-}
+// --- Roadmap transitions ---
 
-// --- Plan YAML schema types ---
-
-export interface PlanSummary {
-  readonly total_steps: number;
-  readonly total_layers: number;
-  readonly max_parallelism: number;
-  readonly requires_worktrees: boolean;
-}
-
-export interface PlanStep {
-  readonly step_id: string;
-  readonly name: string;
-  readonly description?: string;
-  readonly files_to_modify: readonly string[];
-  readonly conflicts_with?: readonly string[];
-}
-
-export interface ExecutionLayer {
-  readonly layer: number;
-  readonly parallel: boolean;
-  readonly use_worktrees: boolean;
-  readonly steps: readonly PlanStep[];
-}
-
-export interface ExecutionPlan {
-  readonly schema_version: string;
-  readonly summary: PlanSummary;
-  readonly layers: readonly ExecutionLayer[];
-}
-
-// --- State transitions ---
-
-export interface StateTransition {
+/** Roadmap-native transition — computed directly from Roadmap snapshots. */
+export interface RoadmapTransition {
   readonly step_id: string;
   readonly from_status: StepStatus;
   readonly to_status: StepStatus;
   readonly teammate_id: string | null;
   readonly timestamp: string;
 }
-
-// --- WebSocket protocol ---
-
-export type WSMessage =
-  | { readonly type: 'init'; readonly state: DeliveryState; readonly plan: ExecutionPlan }
-  | { readonly type: 'update'; readonly state: DeliveryState; readonly transitions: readonly StateTransition[] };
 
 // --- Parser error types ---
 
@@ -217,27 +174,42 @@ export interface ProjectSummary {
   readonly features: readonly FeatureSummary[];
 }
 
+const latestRoadmapTimestamp = (roadmap: Roadmap): string => {
+  const timestamps = roadmap.phases
+    .flatMap((p) => p.steps)
+    .flatMap((s) => [s.started_at, s.completed_at])
+    .filter((t): t is string => t !== null);
+  return timestamps.length > 0 ? timestamps.sort().at(-1)! : '';
+};
+
+const countCompletedPhases = (roadmap: Roadmap): number =>
+  roadmap.phases.filter((phase) =>
+    phase.steps.length > 0 && phase.steps.every((step) => step.status === 'approved'),
+  ).length;
+
 export const deriveProjectSummary = (
   projectId: ProjectId,
-  state: DeliveryState,
+  roadmap: Roadmap,
   features: readonly FeatureSummary[] = [],
-): ProjectSummary => ({
-  projectId,
-  name: projectId as string,
-  totalSteps: state.summary.total_steps,
-  completed: state.summary.completed,
-  failed: state.summary.failed,
-  inProgress: state.summary.in_progress,
-  currentLayer: state.current_layer,
-  updatedAt: state.updated_at,
-  featureCount: features.length,
-  features,
-});
+): ProjectSummary => {
+  const summary = computeRoadmapSummary(roadmap);
+  return {
+    projectId,
+    name: projectId as string,
+    totalSteps: summary.total_steps,
+    completed: summary.completed,
+    failed: summary.failed,
+    inProgress: summary.in_progress,
+    currentLayer: countCompletedPhases(roadmap),
+    updatedAt: latestRoadmapTimestamp(roadmap),
+    featureCount: features.length,
+    features,
+  };
+};
 
 export interface ProjectEntry {
   readonly projectId: ProjectId;
-  readonly state: DeliveryState;
-  readonly plan: ExecutionPlan;
+  readonly roadmap: Roadmap;
 }
 
 export interface ProjectConfig {
@@ -252,8 +224,8 @@ export interface ProjectConfig {
 // --- Multi-project WebSocket protocol ---
 
 export type ClientWSMessage =
-  | { readonly type: 'subscribe'; readonly projectId: ProjectId }
-  | { readonly type: 'unsubscribe'; readonly projectId: ProjectId };
+  | { readonly type: 'subscribe'; readonly projectId: ProjectId; readonly featureId?: FeatureId }
+  | { readonly type: 'unsubscribe'; readonly projectId: ProjectId; readonly featureId?: FeatureId };
 
 // --- Doc-viewer domain types ---
 
@@ -322,8 +294,8 @@ export interface BrowseResponse {
 }
 
 export type ServerWSMessage =
-  | { readonly type: 'init'; readonly projectId: ProjectId; readonly state: DeliveryState; readonly plan: ExecutionPlan }
-  | { readonly type: 'update'; readonly projectId: ProjectId; readonly state: DeliveryState; readonly transitions: readonly StateTransition[] }
+  | { readonly type: 'init'; readonly projectId: ProjectId; readonly roadmap: Roadmap; readonly featureId?: FeatureId }
+  | { readonly type: 'update'; readonly projectId: ProjectId; readonly roadmap: Roadmap; readonly roadmapTransitions: readonly RoadmapTransition[]; readonly featureId?: FeatureId }
   | { readonly type: 'project_list'; readonly projects: readonly ProjectSummary[] }
   | { readonly type: 'project_removed'; readonly projectId: ProjectId }
-  | { readonly type: 'parse_error'; readonly projectId: ProjectId; readonly error: string };
+  | { readonly type: 'parse_error'; readonly projectId: ProjectId; readonly error: string; readonly featureId?: FeatureId };
