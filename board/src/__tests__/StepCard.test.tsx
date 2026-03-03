@@ -16,6 +16,7 @@ const baseCard: StepCardData = {
   worktree: false,
   isBlocked: false,
   teammateId: null,
+  dependencyCount: 0,
 };
 
 describe('StepCard', () => {

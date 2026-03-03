@@ -4,21 +4,23 @@ import {
   DISPLAY_COLUMNS,
   mapStatusToDisplayColumn,
   expandStepToFileCards,
+  expandStepToStepCard,
 } from '../utils/statusMapping';
-import { STEP_STATUSES, type StepState } from '../../shared/types';
+import { STEP_STATUSES, type RoadmapStep } from '../../shared/types';
 
-// --- Helper: build a StepState with sensible defaults ---
+// --- Helper: build a RoadmapStep with sensible defaults ---
 
-const makeStep = (overrides: Partial<StepState> = {}): StepState => ({
-  step_id: 'step-01',
+const makeStep = (overrides: Partial<RoadmapStep> = {}): RoadmapStep => ({
+  id: 'step-01',
   name: 'Implement feature',
-  layer: 1,
+  files_to_modify: ['src/foo.ts', 'src/bar.ts'],
+  dependencies: [],
+  criteria: [],
   status: 'pending',
   teammate_id: null,
   started_at: null,
   completed_at: null,
   review_attempts: 0,
-  files_to_modify: ['src/foo.ts', 'src/bar.ts'],
   ...overrides,
 });
 
@@ -88,7 +90,7 @@ describe('expandStepToFileCards', () => {
   });
 
   it('carries stepId and stepName from the step', () => {
-    const step = makeStep({ step_id: 'step-42', name: 'Add auth' });
+    const step = makeStep({ id: 'step-42', name: 'Add auth' });
     const cards = expandStepToFileCards(step, false);
     for (const card of cards) {
       expect(card.stepId).toBe('step-42');
@@ -108,14 +110,9 @@ describe('expandStepToFileCards', () => {
     expect(card.reviewCount).toBe(3);
   });
 
-  it('sets worktree flag from step', () => {
-    const withWorktree = makeStep({ worktree: true });
-    const withoutWorktree = makeStep({ worktree: false });
-    const undefinedWorktree = makeStep();
-
-    expect(expandStepToFileCards(withWorktree, false)[0].worktree).toBe(true);
-    expect(expandStepToFileCards(withoutWorktree, false)[0].worktree).toBe(false);
-    expect(expandStepToFileCards(undefinedWorktree, false)[0].worktree).toBe(false);
+  it('sets worktree flag from step (always false for RoadmapStep)', () => {
+    const step = makeStep();
+    expect(expandStepToFileCards(step, false)[0].worktree).toBe(false);
   });
 
   it('propagates isBlocked flag from parameter', () => {
@@ -148,3 +145,20 @@ describe('expandStepToFileCards', () => {
   });
 });
 
+// =============================================================
+// expandStepToStepCard — step-card expansion with dependency count
+// =============================================================
+
+describe('expandStepToStepCard', () => {
+  it('sets dependencyCount from dependencies.length', () => {
+    const step = makeStep({ dependencies: ['step-00', 'step-01', 'step-02'] });
+    const card = expandStepToStepCard(step, false);
+    expect(card.dependencyCount).toBe(3);
+  });
+
+  it('sets dependencyCount to 0 when dependencies is empty', () => {
+    const step = makeStep({ dependencies: [] });
+    const card = expandStepToStepCard(step, false);
+    expect(card.dependencyCount).toBe(0);
+  });
+});

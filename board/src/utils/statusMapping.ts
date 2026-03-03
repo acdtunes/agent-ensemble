@@ -1,4 +1,4 @@
-import type { StepStatus, StepState } from '../../shared/types';
+import type { StepStatus, RoadmapStep } from '../../shared/types';
 
 // --- DisplayColumn: the 4 visual columns on the board ---
 
@@ -25,6 +25,40 @@ const STATUS_TO_COLUMN: Readonly<Record<StepStatus, DisplayColumn>> = {
 export const mapStatusToDisplayColumn = (status: StepStatus): DisplayColumn =>
   STATUS_TO_COLUMN[status];
 
+// --- StepCardData: one card per step ---
+
+export interface StepCardData {
+  readonly stepId: string;
+  readonly stepName: string;
+  readonly displayColumn: DisplayColumn;
+  readonly fileCount: number;
+  readonly files: readonly string[];
+  readonly reviewCount: number;
+  readonly worktree: boolean;
+  readonly isBlocked: boolean;
+  readonly teammateId: string | null;
+  readonly dependencyCount: number;
+}
+
+export const expandStepToStepCard = (step: RoadmapStep, isBlocked: boolean): StepCardData => {
+  const files = step.files_to_modify.length > 0
+    ? step.files_to_modify
+    : [step.name];
+
+  return {
+    stepId: step.id,
+    stepName: step.name,
+    displayColumn: mapStatusToDisplayColumn(step.status),
+    fileCount: files.length,
+    files,
+    reviewCount: step.review_attempts,
+    worktree: false,
+    isBlocked,
+    teammateId: step.teammate_id,
+    dependencyCount: step.dependencies.length,
+  };
+};
+
 // --- FileCardData: one card per file in a step ---
 
 export interface FileCardData {
@@ -38,18 +72,18 @@ export interface FileCardData {
   readonly teammateId: string | null;
 }
 
-export const expandStepToFileCards = (step: StepState, isBlocked: boolean): readonly FileCardData[] => {
+export const expandStepToFileCards = (step: RoadmapStep, isBlocked: boolean): readonly FileCardData[] => {
   const files = step.files_to_modify.length > 0
     ? step.files_to_modify
     : [step.name];
 
-  return files.map((filename) => ({
+  return files.map((filename: string) => ({
     filename,
-    stepId: step.step_id,
+    stepId: step.id,
     stepName: step.name,
     displayColumn: mapStatusToDisplayColumn(step.status),
     reviewCount: step.review_attempts,
-    worktree: step.worktree ?? false,
+    worktree: false,
     isBlocked,
     teammateId: step.teammate_id,
   }));
