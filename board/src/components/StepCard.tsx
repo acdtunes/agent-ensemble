@@ -48,9 +48,6 @@ export const StepCard = ({ card, onCardClick }: StepCardProps) => {
         {card.worktree && (
           <Badge bg="bg-indigo-950/50" text="text-indigo-400">worktree</Badge>
         )}
-        {card.reviewCount > 0 && (
-          <Badge bg="bg-orange-950/50" text="text-orange-400">{card.reviewCount} {card.reviewCount === 1 ? 'review' : 'reviews'}</Badge>
-        )}
         {card.isBlocked && (
           <Badge bg="bg-red-950/50" text="text-red-400">blocked</Badge>
         )}

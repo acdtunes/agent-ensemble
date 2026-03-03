@@ -108,12 +108,12 @@ describe('KanbanBoard acceptance', () => {
     expect(within(inProgressCol).getByText('2 files')).toBeInTheDocument();
   });
 
-  it('shows step card with review badge when step has review attempts', () => {
+  it('does not show review badge on step card even when step has review attempts', () => {
     render(<KanbanBoard roadmap={testRoadmap} />);
     const phase1 = screen.getByTestId('phase-phase-1');
     const doneCol = within(phase1).getByTestId('column-done');
-    // Step 01-01 has review_attempts: 2 → one card with review badge
-    expect(within(doneCol).getByText('2 reviews')).toBeInTheDocument();
+    // Step 01-01 has review_attempts: 2 → but review badge is no longer rendered on cards
+    expect(within(doneCol).queryByText(/reviews?$/i)).not.toBeInTheDocument();
   });
 
   it('displays status-based color coding on columns', () => {

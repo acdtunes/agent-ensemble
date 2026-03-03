@@ -53,18 +53,11 @@ describe('StepCard', () => {
     expect(stepId.className).toMatch(/font-mono/);
   });
 
-  it.each([
-    { reviewCount: 3, expected: '3 reviews' },
-    { reviewCount: 1, expected: '1 review' },
-    { reviewCount: 0, expected: null },
-  ])('review badge: reviewCount=$reviewCount', ({ reviewCount, expected }) => {
-    const card = { ...baseCard, reviewCount };
+  it('does not render review count badge even when reviewCount > 0', () => {
+    const card = { ...baseCard, reviewCount: 3 };
     render(<StepCard card={card} />);
-    if (expected) {
-      expect(screen.getByText(expected)).toBeInTheDocument();
-    } else {
-      expect(screen.queryByText(/reviews?$/i)).not.toBeInTheDocument();
-    }
+    expect(screen.queryByText(/reviews?$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/3 review/)).not.toBeInTheDocument();
   });
 
   it.each([
