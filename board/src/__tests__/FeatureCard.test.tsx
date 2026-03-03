@@ -118,29 +118,23 @@ describe('FeatureCard', () => {
     expect(screen.getByText(/2 in progress/i)).toBeInTheDocument();
   });
 
-  it('shows Board link when feature has roadmap', () => {
-    const onBoardClick = vi.fn();
-    render(<FeatureCard feature={makeFeature({ hasRoadmap: true })} onBoardClick={onBoardClick} />);
-    const boardLink = screen.getByText('Board');
-    expect(boardLink).toBeInTheDocument();
-    fireEvent.click(boardLink);
-    expect(onBoardClick).toHaveBeenCalledOnce();
+  it('calls onClick when card is clicked', () => {
+    const onClick = vi.fn();
+    render(<FeatureCard feature={makeFeature()} onClick={onClick} />);
+    fireEvent.click(screen.getByRole('button'));
+    expect(onClick).toHaveBeenCalledOnce();
   });
 
   it('shows Docs only indicator when feature has no roadmap', () => {
     const feature = makeFeature({ hasRoadmap: false, totalSteps: 0, completed: 0, inProgress: 0, failed: 0 });
     render(<FeatureCard feature={feature} />);
     expect(screen.getByText('Docs only')).toBeInTheDocument();
-    expect(screen.queryByText('Board')).not.toBeInTheDocument();
   });
 
-  it('shows Docs link for docs-only feature', () => {
-    const onDocsClick = vi.fn();
-    const feature = makeFeature({ hasRoadmap: false, totalSteps: 0, completed: 0, inProgress: 0, failed: 0 });
-    render(<FeatureCard feature={feature} onDocsClick={onDocsClick} />);
-    const docsLink = screen.getByText('Docs');
-    fireEvent.click(docsLink);
-    expect(onDocsClick).toHaveBeenCalledOnce();
+  it('has no Board or Docs buttons', () => {
+    render(<FeatureCard feature={makeFeature()} />);
+    expect(screen.queryByText('Board')).not.toBeInTheDocument();
+    expect(screen.queryByText('Docs')).not.toBeInTheDocument();
   });
 
   it('shows Planned state for feature not yet started', () => {

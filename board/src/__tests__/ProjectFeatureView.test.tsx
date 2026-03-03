@@ -74,7 +74,7 @@ describe('ProjectFeatureView', () => {
     expect(grid!.children.length).toBe(3);
   });
 
-  it('calls onNavigateFeatureBoard with featureId when Board clicked', () => {
+  it('clicking feature card with roadmap calls onNavigateFeatureBoard', () => {
     const onNavigateFeatureBoard = vi.fn();
     const features = [makeFeature('card-redesign', { hasRoadmap: true })];
     render(
@@ -86,11 +86,11 @@ describe('ProjectFeatureView', () => {
         onNavigateFeatureDocs={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByText('Board'));
+    fireEvent.click(screen.getByText('card-redesign').closest('[role="button"]')!);
     expect(onNavigateFeatureBoard).toHaveBeenCalledWith('card-redesign');
   });
 
-  it('calls onNavigateFeatureDocs with featureId when Docs clicked', () => {
+  it('clicking feature card without roadmap calls onNavigateFeatureDocs', () => {
     const onNavigateFeatureDocs = vi.fn();
     const features = [makeFeature('kanban-board', { hasRoadmap: false, totalSteps: 0, completed: 0, inProgress: 0, failed: 0 })];
     render(
@@ -102,7 +102,7 @@ describe('ProjectFeatureView', () => {
         onNavigateFeatureDocs={onNavigateFeatureDocs}
       />,
     );
-    fireEvent.click(screen.getByText('Docs'));
+    fireEvent.click(screen.getByText('kanban-board').closest('[role="button"]')!);
     expect(onNavigateFeatureDocs).toHaveBeenCalledWith('kanban-board');
   });
 

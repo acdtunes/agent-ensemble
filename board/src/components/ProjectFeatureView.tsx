@@ -40,18 +40,17 @@ export const ProjectFeatureView = ({
       ) : (
         <div
           data-testid="feature-grid"
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         >
           {features.map(feature => (
             <FeatureCard
               key={feature.featureId}
               feature={feature}
-              onBoardClick={
+              onClick={() =>
                 feature.hasRoadmap
-                  ? () => onNavigateFeatureBoard(feature.featureId)
-                  : undefined
+                  ? onNavigateFeatureBoard(feature.featureId)
+                  : onNavigateFeatureDocs(feature.featureId)
               }
-              onDocsClick={() => onNavigateFeatureDocs(feature.featureId)}
             />
           ))}
         </div>

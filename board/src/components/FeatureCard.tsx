@@ -19,8 +19,7 @@ export const formatProgressLabel = (completed: number, total: number): string =>
 
 interface FeatureCardProps {
   readonly feature: FeatureSummary;
-  readonly onBoardClick?: () => void;
-  readonly onDocsClick?: () => void;
+  readonly onClick?: () => void;
 }
 
 const STATE_LABELS: Record<FeatureDisplayState, string> = {
@@ -30,20 +29,26 @@ const STATE_LABELS: Record<FeatureDisplayState, string> = {
   'docs-only': 'Docs only',
 };
 
-export const FeatureCard = ({ feature, onBoardClick, onDocsClick }: FeatureCardProps) => {
+export const FeatureCard = ({ feature, onClick }: FeatureCardProps) => {
   const displayState = classifyFeatureDisplayState(feature);
   const percentage = computeCompletionPercentage(feature.completed, feature.totalSteps);
 
   return (
-    <div className="rounded-lg border border-gray-800 bg-gray-900/80 p-4 shadow-sm">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onClick?.(); }}
+      className="cursor-pointer rounded-lg border border-gray-800 bg-gray-900/80 p-3 shadow-sm transition-colors hover:border-gray-600 hover:bg-gray-900"
+    >
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-gray-100">{feature.name}</h3>
+        <h3 className="text-sm font-semibold text-gray-100">{feature.name}</h3>
         <span className="text-xs font-medium text-gray-400">{STATE_LABELS[displayState]}</span>
       </div>
 
       {displayState !== 'docs-only' && (
         <>
-          <div className="mt-2 text-sm text-gray-300">
+          <div className="mt-1.5 text-sm text-gray-300">
             {formatProgressLabel(feature.completed, feature.totalSteps)}
           </div>
 
@@ -60,7 +65,7 @@ export const FeatureCard = ({ feature, onBoardClick, onDocsClick }: FeatureCardP
             />
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          <div className="mt-1.5 flex flex-wrap gap-2 text-xs">
             {feature.inProgress > 0 && (
               <span className="rounded-full bg-blue-950/50 px-1.5 py-0.5 font-medium text-blue-400">
                 {feature.inProgress} in progress
@@ -74,25 +79,6 @@ export const FeatureCard = ({ feature, onBoardClick, onDocsClick }: FeatureCardP
           </div>
         </>
       )}
-
-      <div className="mt-3 flex gap-2">
-        {feature.hasRoadmap && onBoardClick && (
-          <button
-            onClick={onBoardClick}
-            className="rounded bg-gray-800 px-2.5 py-1 text-xs font-medium text-gray-200 transition-colors hover:bg-gray-700"
-          >
-            Board
-          </button>
-        )}
-        {onDocsClick && (
-          <button
-            onClick={onDocsClick}
-            className="rounded bg-gray-800 px-2.5 py-1 text-xs font-medium text-gray-200 transition-colors hover:bg-gray-700"
-          >
-            Docs
-          </button>
-        )}
-      </div>
     </div>
   );
 };
