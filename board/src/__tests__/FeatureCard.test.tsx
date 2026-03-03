@@ -16,8 +16,7 @@ const makeFeature = (overrides: Partial<FeatureSummary> = {}): FeatureSummary =>
   hasRoadmap: true,
   hasExecutionLog: true,
   totalSteps: 7,
-  completed: 3,
-  failed: 0,
+  done: 3,
   inProgress: 2,
   currentLayer: 2,
   updatedAt: '2026-03-01T12:00:00Z',
@@ -35,17 +34,17 @@ describe('classifyFeatureDisplayState', () => {
   });
 
   it('returns completed when all steps are done', () => {
-    const feature = makeFeature({ completed: 7, totalSteps: 7, inProgress: 0 });
+    const feature = makeFeature({ done: 7, totalSteps: 7, inProgress: 0 });
     expect(classifyFeatureDisplayState(feature)).toBe('completed');
   });
 
   it('returns active when steps are in progress', () => {
-    const feature = makeFeature({ completed: 3, inProgress: 2 });
+    const feature = makeFeature({ done: 3, inProgress: 2 });
     expect(classifyFeatureDisplayState(feature)).toBe('active');
   });
 
   it('returns active when some steps completed but not all', () => {
-    const feature = makeFeature({ completed: 3, inProgress: 0, failed: 0, hasExecutionLog: true });
+    const feature = makeFeature({ done: 3, inProgress: 0, hasExecutionLog: true });
     expect(classifyFeatureDisplayState(feature)).toBe('active');
   });
 
@@ -54,9 +53,8 @@ describe('classifyFeatureDisplayState', () => {
       hasRoadmap: true,
       hasExecutionLog: false,
       totalSteps: 10,
-      completed: 0,
+      done: 0,
       inProgress: 0,
-      failed: 0,
     });
     expect(classifyFeatureDisplayState(feature)).toBe('planned');
   });
@@ -66,16 +64,10 @@ describe('classifyFeatureDisplayState', () => {
       hasRoadmap: true,
       hasExecutionLog: true,
       totalSteps: 10,
-      completed: 0,
+      done: 0,
       inProgress: 0,
-      failed: 0,
     });
     expect(classifyFeatureDisplayState(feature)).toBe('planned');
-  });
-
-  it('returns active when has failed steps', () => {
-    const feature = makeFeature({ failed: 1, inProgress: 0, completed: 0 });
-    expect(classifyFeatureDisplayState(feature)).toBe('active');
   });
 });
 
@@ -124,13 +116,29 @@ describe('FeatureCard', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it('does not show state label when feature has no roadmap (null state)', () => {
-    const feature = makeFeature({ hasRoadmap: false, totalSteps: 0, completed: 0, inProgress: 0, failed: 0 });
+  it('shows only feature name for no-roadmap features', () => {
+    const feature = makeFeature({
+      name: 'docs-only-feature',
+      hasRoadmap: false,
+      totalSteps: 0,
+      done: 0,
+      inProgress: 0
+    });
     render(<FeatureCard feature={feature} />);
-    expect(screen.queryByText('Docs only')).not.toBeInTheDocument();
+
+    // Feature name IS displayed
+    expect(screen.getByText('docs-only-feature')).toBeInTheDocument();
+
+    // No status labels
     expect(screen.queryByText('Planned')).not.toBeInTheDocument();
     expect(screen.queryByText('Active')).not.toBeInTheDocument();
     expect(screen.queryByText('Completed')).not.toBeInTheDocument();
+
+    // No progress bar
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+
+    // No step count
+    expect(screen.queryByText(/of/)).not.toBeInTheDocument();
   });
 
   it('has no Board or Docs buttons', () => {
@@ -144,22 +152,11 @@ describe('FeatureCard', () => {
       hasRoadmap: true,
       hasExecutionLog: false,
       totalSteps: 10,
-      completed: 0,
+      done: 0,
       inProgress: 0,
-      failed: 0,
     });
     render(<FeatureCard feature={feature} />);
     expect(screen.getByText('Planned')).toBeInTheDocument();
     expect(screen.getByText('0 of 10')).toBeInTheDocument();
-  });
-
-  it('shows failed count when failures exist', () => {
-    render(<FeatureCard feature={makeFeature({ failed: 1 })} />);
-    expect(screen.getByText(/1 failed/i)).toBeInTheDocument();
-  });
-
-  it('hides failed count when no failures', () => {
-    render(<FeatureCard feature={makeFeature({ failed: 0 })} />);
-    expect(screen.queryByText(/failed/i)).not.toBeInTheDocument();
   });
 });

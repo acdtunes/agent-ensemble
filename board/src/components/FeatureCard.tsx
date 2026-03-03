@@ -7,13 +7,13 @@ export type FeatureDisplayState = 'completed' | 'active' | 'planned';
 
 export const classifyFeatureDisplayState = (feature: FeatureSummary): FeatureDisplayState | null => {
   if (!feature.hasRoadmap) return null;
-  if (feature.totalSteps > 0 && feature.completed === feature.totalSteps) return 'completed';
-  if (feature.inProgress > 0 || feature.completed > 0 || feature.failed > 0) return 'active';
+  if (feature.totalSteps > 0 && feature.done === feature.totalSteps) return 'completed';
+  if (feature.inProgress > 0 || feature.done > 0) return 'active';
   return 'planned';
 };
 
-export const formatProgressLabel = (completed: number, total: number): string =>
-  `${completed} of ${total}`;
+export const formatProgressLabel = (done: number, total: number): string =>
+  `${done} of ${total}`;
 
 // --- Component ---
 
@@ -30,7 +30,7 @@ const STATE_LABELS: Record<FeatureDisplayState, string> = {
 
 export const FeatureCard = ({ feature, onClick }: FeatureCardProps) => {
   const displayState = classifyFeatureDisplayState(feature);
-  const percentage = computeCompletionPercentage(feature.completed, feature.totalSteps);
+  const percentage = computeCompletionPercentage(feature.done, feature.totalSteps);
 
   return (
     <div
@@ -50,7 +50,7 @@ export const FeatureCard = ({ feature, onClick }: FeatureCardProps) => {
       {displayState !== null && (
         <>
           <div className="mt-1.5 text-sm text-gray-300">
-            {formatProgressLabel(feature.completed, feature.totalSteps)}
+            {formatProgressLabel(feature.done, feature.totalSteps)}
           </div>
 
           <div
@@ -66,18 +66,13 @@ export const FeatureCard = ({ feature, onClick }: FeatureCardProps) => {
             />
           </div>
 
-          <div className="mt-1.5 flex flex-wrap gap-2 text-xs">
-            {feature.inProgress > 0 && (
+          {feature.inProgress > 0 && (
+            <div className="mt-1.5 text-xs">
               <span className="rounded-full bg-blue-950/50 px-1.5 py-0.5 font-medium text-blue-400">
                 {feature.inProgress} in progress
               </span>
-            )}
-            {feature.failed > 0 && (
-              <span className="rounded-full bg-red-950/50 px-1.5 py-0.5 font-medium text-red-400">
-                {feature.failed} failed
-              </span>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
     </div>
