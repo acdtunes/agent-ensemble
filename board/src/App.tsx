@@ -5,6 +5,8 @@ import { useFeatureList } from './hooks/useFeatureList';
 import { useAddProject } from './hooks/useAddProject';
 import { useRemoveProject } from './hooks/useRemoveProject';
 import { useDocTree } from './hooks/useDocTree';
+import { useFeatureState } from './hooks/useFeatureState';
+import { roadmapToExecutionPlan, roadmapToDeliveryState } from '../shared/roadmap-bridge';
 import { useRouter } from './hooks/useRouter';
 import { ProgressHeader } from './components/ProgressHeader';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -18,6 +20,19 @@ import { ProjectFeatureView } from './components/ProjectFeatureView';
 import { DocViewer } from './components/DocViewer';
 import { FeatureDocsView } from './components/FeatureDocsView';
 import type { DeliveryState, ExecutionPlan, StateTransition, ProjectId } from '../shared/types';
+
+// --- Constants ---
+
+const EMPTY_STATE: DeliveryState = {
+  schema_version: '1.0',
+  created_at: '',
+  updated_at: '',
+  plan_path: '',
+  current_layer: 0,
+  summary: { total_steps: 0, total_layers: 0, completed: 0, failed: 0, in_progress: 0 },
+  steps: {},
+  teammates: {},
+};
 
 // --- Pure functions ---
 
@@ -193,6 +208,51 @@ const BoardView = ({ projectId }: { readonly projectId: ProjectId }) => {
   );
 };
 
+const FeatureBoardView = ({ projectId, featureId }: { readonly projectId: string; readonly featureId: string }) => {
+  const { roadmap, loading, error } = useFeatureState(projectId, featureId);
+  const { connectionStatus } = useProjectList(WS_URL);
+
+  const plan = roadmap !== null ? roadmapToExecutionPlan(roadmap) : null;
+  const state = roadmap !== null ? roadmapToDeliveryState(roadmap) : null;
+  const hasData = plan !== null;
+
+  return (
+    <PageShell
+      connectionStatus={connectionStatus}
+      headerContent={
+        <div className="flex items-center gap-3">
+          <a href="#/" className="text-sm text-gray-400 hover:text-gray-200">Overview</a>
+          <span className="text-gray-600">/</span>
+          <a href={`#/projects/${projectId}`} className="text-sm text-gray-400 hover:text-gray-200">{projectId}</a>
+          <span className="text-gray-600">/</span>
+          <h1 className="text-lg font-semibold text-gray-100">{featureId}</h1>
+          <nav className="ml-4 flex gap-1">
+            <a
+              href={`#/projects/${projectId}/features/${featureId}/board`}
+              className="px-3 py-1 text-sm rounded-t text-gray-100 border-b-2 border-blue-500"
+            >
+              Board
+            </a>
+            <a
+              href={`#/projects/${projectId}/features/${featureId}/docs`}
+              className="px-3 py-1 text-sm rounded-t text-gray-400 hover:text-gray-200"
+            >
+              Docs
+            </a>
+          </nav>
+        </div>
+      }
+    >
+      {hasData
+        ? <BoardContent state={state ?? EMPTY_STATE} plan={plan} transitions={[]} />
+        : loading
+          ? <Placeholder error={null} />
+          : <Placeholder error={error} />
+      }
+    </PageShell>
+  );
+};
+
 const navigateToBoard = (projectId: string): void => {
   window.location.hash = `#/projects/${projectId}/board`;
 };
@@ -350,7 +410,7 @@ const renderRoute = (route: ReturnType<typeof useRouter>): React.ReactNode => {
     case 'project':
       return <ProjectView projectId={route.projectId} />;
     case 'feature-board':
-      return <BoardView projectId={route.projectId as ProjectId} />;
+      return <FeatureBoardView projectId={route.projectId} featureId={route.featureId} />;
     case 'feature-docs':
       return <FeatureDocsRouteView projectId={route.projectId} featureId={route.featureId} />;
     case 'overview':

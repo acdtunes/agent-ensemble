@@ -1,22 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { DeliveryState, ExecutionPlan } from '../../shared/types';
+import type { Roadmap, RoadmapSummary } from '../../shared/types';
 
 // --- Hook return type ---
 
 export interface UseFeatureStateResult {
-  readonly plan: ExecutionPlan | null;
-  readonly state: DeliveryState | null;
+  readonly roadmap: Roadmap | null;
+  readonly summary: RoadmapSummary | null;
   readonly loading: boolean;
   readonly error: string | null;
 }
 
 // --- Pure helpers ---
 
-const buildPlanUrl = (projectId: string, featureId: string): string =>
-  `/api/projects/${projectId}/features/${featureId}/plan`;
-
-const buildStateUrl = (projectId: string, featureId: string): string =>
-  `/api/projects/${projectId}/features/${featureId}/state`;
+const buildRoadmapUrl = (projectId: string, featureId: string): string =>
+  `/api/projects/${projectId}/features/${featureId}/roadmap`;
 
 const parseErrorBody = async (response: Response): Promise<string> => {
   try {
@@ -27,51 +24,41 @@ const parseErrorBody = async (response: Response): Promise<string> => {
   }
 };
 
+// --- Response shape from server ---
+
+interface RoadmapResponse extends Roadmap {
+  readonly summary: RoadmapSummary;
+}
+
 // --- Hook ---
 
 export const useFeatureState = (
   projectId: string,
   featureId: string,
 ): UseFeatureStateResult => {
-  const [plan, setPlan] = useState<ExecutionPlan | null>(null);
-  const [state, setState] = useState<DeliveryState | null>(null);
+  const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
+  const [summary, setSummary] = useState<RoadmapSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchFeatureData = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setPlan(null);
-    setState(null);
+    setRoadmap(null);
+    setSummary(null);
 
     try {
-      const [planResponse, stateResponse] = await Promise.all([
-        fetch(buildPlanUrl(projectId, featureId)),
-        fetch(buildStateUrl(projectId, featureId)),
-      ]);
+      const response = await fetch(buildRoadmapUrl(projectId, featureId));
 
-      // Plan: 404 = error (missing roadmap), other errors = error
-      if (!planResponse.ok) {
-        const errorMessage = await parseErrorBody(planResponse);
+      if (!response.ok) {
+        const errorMessage = await parseErrorBody(response);
         setError(errorMessage);
         return;
       }
 
-      // State: 404 = null (no execution log yet), other errors = error
-      if (!stateResponse.ok && stateResponse.status !== 404) {
-        const errorMessage = await parseErrorBody(stateResponse);
-        setError(errorMessage);
-        return;
-      }
-
-      const planData = (await planResponse.json()) as ExecutionPlan;
-      setPlan(planData);
-
-      if (stateResponse.ok) {
-        const stateData = (await stateResponse.json()) as DeliveryState;
-        setState(stateData);
-      }
-      // state stays null if 404
+      const data = (await response.json()) as RoadmapResponse;
+      setRoadmap({ roadmap: data.roadmap, phases: data.phases });
+      setSummary(data.summary);
     } catch {
       setError('Failed to load feature data');
     } finally {
@@ -83,5 +70,5 @@ export const useFeatureState = (
     fetchFeatureData();
   }, [fetchFeatureData]);
 
-  return { plan, state, loading, error };
+  return { roadmap, summary, loading, error };
 };
