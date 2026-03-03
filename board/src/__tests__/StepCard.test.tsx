@@ -1,10 +1,18 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest';
+import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { StepCard } from '../components/StepCard';
 import type { StepCardData } from '../utils/statusMapping';
 
 afterEach(cleanup);
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 const baseCard: StepCardData = {
   stepId: '01-04',
@@ -230,6 +238,54 @@ describe('StepCard', () => {
       const stepCard = screen.getByTestId('step-card');
       expect(stepCard.className).toMatch(/border-t-4/);
       expect(stepCard.className).toContain(expectedBorder);
+    });
+  });
+
+  describe('tooltip integration', () => {
+    it('shows tooltip with step details after 300ms hover', () => {
+      render(<StepCard card={baseCard} />);
+
+      fireEvent.mouseEnter(screen.getByTestId('step-card'));
+
+      // Before 300ms - tooltip should not be visible
+      act(() => { vi.advanceTimersByTime(299); });
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+      // At 300ms - tooltip should appear
+      act(() => { vi.advanceTimersByTime(1); });
+      expect(screen.getByRole('tooltip')).toBeInTheDocument();
+    });
+
+    it('card click still triggers onCardClick callback when tooltip wrapper present', () => {
+      const onCardClick = vi.fn();
+      render(<StepCard card={baseCard} onCardClick={onCardClick} />);
+
+      fireEvent.click(screen.getByTestId('step-card'));
+
+      expect(onCardClick).toHaveBeenCalledTimes(1);
+      expect(onCardClick).toHaveBeenCalledWith('01-04');
+    });
+
+    it('tooltip dismisses on mouse leave', () => {
+      render(<StepCard card={baseCard} />);
+
+      fireEvent.mouseEnter(screen.getByTestId('step-card'));
+      act(() => { vi.advanceTimersByTime(300); });
+      expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+      fireEvent.mouseLeave(screen.getByTestId('step-card'));
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    });
+
+    it('tooltip shows file list from card data', () => {
+      const cardWithFiles = { ...baseCard, files: ['src/auth.ts', 'src/utils.ts'] };
+      render(<StepCard card={cardWithFiles} />);
+
+      fireEvent.mouseEnter(screen.getByTestId('step-card'));
+      act(() => { vi.advanceTimersByTime(300); });
+
+      expect(screen.getByText('src/auth.ts')).toBeInTheDocument();
+      expect(screen.getByText('src/utils.ts')).toBeInTheDocument();
     });
   });
 });
