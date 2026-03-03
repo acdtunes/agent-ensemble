@@ -1,10 +1,11 @@
 /**
- * Feature Discovery IO — integration tests
+ * Feature Discovery IO — integration tests (unified roadmap)
  *
- * Tests the IO adapter functions (scanFeatureDirsFs, loadFeatureArtifactsFs,
+ * Tests the IO adapter functions (scanFeatureDirsFs, loadFeatureRoadmapFs,
  * discoverFeaturesFs) against the real filesystem using temp directories.
  *
- * These are adapter/integration tests — no mocks, real I/O.
+ * Feature discovery reads only roadmap.yaml (not execution-log.yaml).
+ * FeatureSummary is derived from Roadmap via computeRoadmapSummary.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -16,7 +17,7 @@ import type { FeatureId } from '../../shared/types.js';
 import { createFeatureId } from '../../shared/types.js';
 import {
   scanFeatureDirsFs,
-  loadFeatureArtifactsFs,
+  loadFeatureRoadmapFs,
   discoverFeaturesFs,
 } from '../feature-discovery.js';
 
@@ -36,81 +37,55 @@ const makeFeatureDir = async (projectPath: string, featureName: string): Promise
   return featureDir;
 };
 
-const validRoadmapYaml = (): string =>
+const unifiedRoadmapYaml = (opts?: { withActivity?: boolean }): string =>
   yaml.dump({
-    schema_version: '1',
-    summary: {
+    roadmap: {
+      project_id: 'test-project',
+      created_at: '2026-01-01T00:00:00Z',
       total_steps: 2,
-      total_layers: 1,
-      max_parallelism: 2,
-      requires_worktrees: false,
+      phases: 1,
     },
-    layers: [
-      {
-        layer: 1,
-        parallel: true,
-        use_worktrees: false,
-        steps: [
-          { step_id: '01-01', name: 'Step A', files_to_modify: ['a.ts'] },
-          { step_id: '01-02', name: 'Step B', files_to_modify: ['b.ts'] },
-        ],
-      },
-    ],
+    phases: [{
+      id: '01',
+      name: 'Phase 1',
+      steps: [
+        {
+          id: '01-01',
+          name: 'Step A',
+          files_to_modify: ['a.ts'],
+          dependencies: [],
+          criteria: ['AC1'],
+          ...(opts?.withActivity ? {
+            status: 'approved',
+            teammate_id: 'crafter-1',
+            started_at: '2026-01-01T01:00:00Z',
+            completed_at: '2026-01-01T02:00:00Z',
+            review_attempts: 1,
+          } : {}),
+        },
+        {
+          id: '01-02',
+          name: 'Step B',
+          files_to_modify: ['b.ts'],
+          dependencies: ['01-01'],
+          criteria: ['AC2'],
+          ...(opts?.withActivity ? {
+            status: 'in_progress',
+            teammate_id: 'crafter-2',
+            started_at: '2026-01-01T03:00:00Z',
+          } : {}),
+        },
+      ],
+    }],
   });
 
-const validExecutionLogYaml = (): string =>
-  yaml.dump({
-    schema_version: '1',
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-03-01T12:00:00Z',
-    plan_path: 'roadmap.yaml',
-    current_layer: 1,
-    summary: {
-      total_steps: 2,
-      total_layers: 1,
-      completed: 1,
-      failed: 0,
-      in_progress: 1,
-    },
-    steps: {
-      '01-01': {
-        step_id: '01-01',
-        name: 'Step A',
-        layer: 1,
-        status: 'approved',
-        teammate_id: 'crafter-1',
-        started_at: '2026-01-01T01:00:00Z',
-        completed_at: '2026-01-01T02:00:00Z',
-        review_attempts: 1,
-        files_to_modify: ['a.ts'],
-      },
-      '01-02': {
-        step_id: '01-02',
-        name: 'Step B',
-        layer: 1,
-        status: 'in_progress',
-        teammate_id: 'crafter-2',
-        started_at: '2026-01-01T01:00:00Z',
-        completed_at: null,
-        review_attempts: 0,
-        files_to_modify: ['b.ts'],
-      },
-    },
-    teammates: {},
-  });
-
-const writeFeatureArtifacts = async (
+const writeFeatureRoadmap = async (
   projectPath: string,
   featureName: string,
-  options: { roadmap?: boolean; executionLog?: boolean } = { roadmap: true, executionLog: true },
+  opts?: { withActivity?: boolean },
 ): Promise<void> => {
   const featureDir = await makeFeatureDir(projectPath, featureName);
-  if (options.roadmap) {
-    await writeFile(join(featureDir, 'roadmap.yaml'), validRoadmapYaml(), 'utf-8');
-  }
-  if (options.executionLog) {
-    await writeFile(join(featureDir, 'execution-log.yaml'), validExecutionLogYaml(), 'utf-8');
-  }
+  await writeFile(join(featureDir, 'roadmap.yaml'), unifiedRoadmapYaml(opts), 'utf-8');
 };
 
 // --- Temp directory management ---
@@ -126,12 +101,12 @@ afterEach(async () => {
 });
 
 // =================================================================
-// Acceptance: discoverFeaturesFs full pipeline
+// Acceptance: discoverFeaturesFs full pipeline (roadmap-only)
 // =================================================================
-describe('discoverFeaturesFs: full discovery pipeline (scan → load → derive)', () => {
-  it('discovers all features with their summaries from a project directory', async () => {
-    await writeFeatureArtifacts(projectPath, 'auth');
-    await writeFeatureArtifacts(projectPath, 'card-redesign');
+describe('discoverFeaturesFs: full discovery pipeline (scan → loadRoadmap → derive)', () => {
+  it('discovers features with correct metrics from unified roadmap', async () => {
+    await writeFeatureRoadmap(projectPath, 'auth', { withActivity: true });
+    await writeFeatureRoadmap(projectPath, 'card-redesign', { withActivity: true });
 
     const summaries = await discoverFeaturesFs(projectPath);
 
@@ -153,25 +128,34 @@ describe('discoverFeaturesFs: full discovery pipeline (scan → load → derive)
     expect(summaries).toEqual([]);
   });
 
-  it('discovers features with partial artifacts (roadmap only, state only)', async () => {
-    await writeFeatureArtifacts(projectPath, 'roadmap-only', { roadmap: true, executionLog: false });
-    await writeFeatureArtifacts(projectPath, 'state-only', { roadmap: false, executionLog: true });
+  it('discovers features without roadmap.yaml with zero counts', async () => {
+    await makeFeatureDir(projectPath, 'no-roadmap');
+    await writeFeatureRoadmap(projectPath, 'has-roadmap');
 
     const summaries = await discoverFeaturesFs(projectPath);
 
     expect(summaries).toHaveLength(2);
 
-    const roadmapOnly = summaries.find((s) => (s.featureId as string) === 'roadmap-only')!;
-    expect(roadmapOnly.hasRoadmap).toBe(true);
-    expect(roadmapOnly.hasExecutionLog).toBe(false);
-    expect(roadmapOnly.totalSteps).toBe(2);
-    expect(roadmapOnly.completed).toBe(0);
+    const noRoadmap = summaries.find((s) => (s.featureId as string) === 'no-roadmap')!;
+    expect(noRoadmap.hasRoadmap).toBe(false);
+    expect(noRoadmap.hasExecutionLog).toBe(false);
+    expect(noRoadmap.totalSteps).toBe(0);
+    expect(noRoadmap.completed).toBe(0);
 
-    const stateOnly = summaries.find((s) => (s.featureId as string) === 'state-only')!;
-    expect(stateOnly.hasRoadmap).toBe(false);
-    expect(stateOnly.hasExecutionLog).toBe(true);
-    expect(stateOnly.totalSteps).toBe(0);
-    expect(stateOnly.completed).toBe(1);
+    const hasRoadmap = summaries.find((s) => (s.featureId as string) === 'has-roadmap')!;
+    expect(hasRoadmap.hasRoadmap).toBe(true);
+    expect(hasRoadmap.totalSteps).toBe(2);
+  });
+
+  it('all-pending roadmap shows hasExecutionLog false', async () => {
+    await writeFeatureRoadmap(projectPath, 'pending-feature');
+
+    const summaries = await discoverFeaturesFs(projectPath);
+
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0].hasExecutionLog).toBe(false);
+    expect(summaries[0].totalSteps).toBe(2);
+    expect(summaries[0].completed).toBe(0);
   });
 });
 
@@ -210,7 +194,6 @@ describe('scanFeatureDirsFs: reads feature subdirectories from project path', ()
 
   it('returns empty list when docs/feature/ has no subdirectories', async () => {
     await mkdir(join(projectPath, FEATURE_BASE), { recursive: true });
-    // Write a file (not a directory) inside docs/feature/
     await writeFile(join(projectPath, FEATURE_BASE, 'readme.txt'), 'not a feature', 'utf-8');
 
     const featureIds = await scanFeatureDirsFs(projectPath);
@@ -220,57 +203,36 @@ describe('scanFeatureDirsFs: reads feature subdirectories from project path', ()
 });
 
 // =================================================================
-// loadFeatureArtifactsFs: reads YAML artifacts per feature
+// loadFeatureRoadmapFs: reads roadmap.yaml per feature
 // =================================================================
-describe('loadFeatureArtifactsFs: reads roadmap.yaml and execution-log.yaml per feature', () => {
+describe('loadFeatureRoadmapFs: reads roadmap.yaml and parses as Roadmap', () => {
   const featureId = makeFeatureId('auth');
 
-  it('loads both artifacts when present', async () => {
-    await writeFeatureArtifacts(projectPath, 'auth');
+  it('loads and parses roadmap when present', async () => {
+    await writeFeatureRoadmap(projectPath, 'auth', { withActivity: true });
 
-    const { plan, state } = await loadFeatureArtifactsFs(projectPath, featureId);
+    const roadmap = await loadFeatureRoadmapFs(projectPath, featureId);
 
-    expect(plan).not.toBeNull();
-    expect(plan!.summary.total_steps).toBe(2);
-    expect(state).not.toBeNull();
-    expect(state!.summary.completed).toBe(1);
+    expect(roadmap).not.toBeNull();
+    expect(roadmap!.phases).toHaveLength(1);
+    expect(roadmap!.phases[0].steps).toHaveLength(2);
+    expect(roadmap!.phases[0].steps[0].status).toBe('approved');
   });
 
-  it('returns null plan when roadmap.yaml is missing', async () => {
-    await writeFeatureArtifacts(projectPath, 'auth', { roadmap: false, executionLog: true });
-
-    const { plan, state } = await loadFeatureArtifactsFs(projectPath, featureId);
-
-    expect(plan).toBeNull();
-    expect(state).not.toBeNull();
-  });
-
-  it('returns null state when execution-log.yaml is missing', async () => {
-    await writeFeatureArtifacts(projectPath, 'auth', { roadmap: true, executionLog: false });
-
-    const { plan, state } = await loadFeatureArtifactsFs(projectPath, featureId);
-
-    expect(plan).not.toBeNull();
-    expect(state).toBeNull();
-  });
-
-  it('returns null for both when feature directory has no YAML files', async () => {
+  it('returns null when roadmap.yaml is missing', async () => {
     await makeFeatureDir(projectPath, 'auth');
 
-    const { plan, state } = await loadFeatureArtifactsFs(projectPath, featureId);
+    const roadmap = await loadFeatureRoadmapFs(projectPath, featureId);
 
-    expect(plan).toBeNull();
-    expect(state).toBeNull();
+    expect(roadmap).toBeNull();
   });
 
-  it('returns null for plan when roadmap.yaml has invalid YAML', async () => {
+  it('returns null when roadmap.yaml has invalid YAML', async () => {
     const featureDir = await makeFeatureDir(projectPath, 'auth');
     await writeFile(join(featureDir, 'roadmap.yaml'), '{{invalid yaml', 'utf-8');
-    await writeFile(join(featureDir, 'execution-log.yaml'), validExecutionLogYaml(), 'utf-8');
 
-    const { plan, state } = await loadFeatureArtifactsFs(projectPath, featureId);
+    const roadmap = await loadFeatureRoadmapFs(projectPath, featureId);
 
-    expect(plan).toBeNull();
-    expect(state).not.toBeNull();
+    expect(roadmap).toBeNull();
   });
 });

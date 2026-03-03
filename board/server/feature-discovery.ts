@@ -1,39 +1,74 @@
 /**
- * Feature discovery — pure core + IO adapters.
+ * Feature discovery — pure core + IO adapters (unified roadmap).
  *
  * Pure core:
- *   deriveFeatureSummary: FeatureId × optional plan × optional state → FeatureSummary
+ *   deriveFeatureSummary: FeatureId × optional Roadmap → FeatureSummary
  *   isFeatureDir: directory name → boolean (valid feature directory?)
  *
  * IO adapters:
  *   scanFeatureDirsFs: projectPath → FeatureId[] (reads docs/feature/ subdirectories)
- *   loadFeatureArtifactsFs: projectPath × FeatureId → { plan, state } (reads YAML artifacts)
+ *   loadFeatureRoadmapFs: projectPath × FeatureId → Roadmap | null (reads roadmap.yaml only)
  *   discoverFeaturesFs: projectPath → FeatureSummary[] (full discovery pipeline)
  */
 
-import type { FeatureId, FeatureSummary, ExecutionPlan, DeliveryState } from '../shared/types.js';
+import type { FeatureId, FeatureSummary, Roadmap } from '../shared/types.js';
 import { createFeatureId } from '../shared/types.js';
+import { computeRoadmapSummary } from './parser.js';
 
 // =====================================================================
 // Pure Core — no filesystem access, no side effects
 // =====================================================================
 
+const hasNonPendingStep = (roadmap: Roadmap): boolean =>
+  roadmap.phases.some((phase) => phase.steps.some((step) => step.status !== 'pending'));
+
+const countCompletedPhases = (roadmap: Roadmap): number =>
+  roadmap.phases.filter((phase) =>
+    phase.steps.length > 0 && phase.steps.every((step) => step.status === 'approved'),
+  ).length;
+
+const latestTimestamp = (roadmap: Roadmap): string => {
+  const timestamps = roadmap.phases
+    .flatMap((p) => p.steps)
+    .flatMap((s) => [s.started_at, s.completed_at])
+    .filter((t): t is string => t !== null);
+  return timestamps.length > 0 ? timestamps.sort().at(-1)! : '';
+};
+
 export const deriveFeatureSummary = (
   featureId: FeatureId,
-  plan: ExecutionPlan | null,
-  state: DeliveryState | null,
-): FeatureSummary => ({
-  featureId,
-  name: featureId as string,
-  hasRoadmap: plan !== null,
-  hasExecutionLog: state !== null,
-  totalSteps: plan?.summary.total_steps ?? 0,
-  completed: state?.summary.completed ?? 0,
-  inProgress: state?.summary.in_progress ?? 0,
-  failed: state?.summary.failed ?? 0,
-  currentLayer: state?.current_layer ?? 0,
-  updatedAt: state?.updated_at ?? '',
-});
+  roadmap: Roadmap | null,
+): FeatureSummary => {
+  if (roadmap === null) {
+    return {
+      featureId,
+      name: featureId as string,
+      hasRoadmap: false,
+      hasExecutionLog: false,
+      totalSteps: 0,
+      completed: 0,
+      inProgress: 0,
+      failed: 0,
+      currentLayer: 0,
+      updatedAt: '',
+    };
+  }
+
+  const summary = computeRoadmapSummary(roadmap);
+
+  return {
+    featureId,
+    name: featureId as string,
+    hasRoadmap: true,
+    hasExecutionLog: hasNonPendingStep(roadmap),
+    totalSteps: summary.total_steps,
+    completed: summary.completed,
+    inProgress: summary.in_progress,
+    failed: summary.failed,
+    currentLayer: countCompletedPhases(roadmap),
+    updatedAt: latestTimestamp(roadmap),
+  };
+};
 
 export const isFeatureDir = (name: string): boolean =>
   createFeatureId(name).ok;
@@ -43,8 +78,8 @@ export const isFeatureDir = (name: string): boolean =>
 // =====================================================================
 
 import { readdir, readFile } from 'node:fs/promises';
-import { resolveFeatureRoadmap, resolveFeatureExecutionLog } from './feature-path-resolver.js';
-import { parsePlanYaml, parseStateYaml } from './parser.js';
+import { resolveFeatureRoadmap } from './feature-path-resolver.js';
+import { parseRoadmap } from './parser.js';
 
 const FEATURE_BASE = 'docs/feature';
 
@@ -75,25 +110,17 @@ export const scanFeatureDirsFs = async (
     .map((result) => result.value as FeatureId);
 };
 
-export const loadFeatureArtifactsFs = async (
+export const loadFeatureRoadmapFs = async (
   projectPath: string,
   featureId: FeatureId,
-): Promise<{ readonly plan: ExecutionPlan | null; readonly state: DeliveryState | null }> => {
+): Promise<Roadmap | null> => {
   const roadmapPath = resolveFeatureRoadmap(projectPath, featureId);
-  const executionLogPath = resolveFeatureExecutionLog(projectPath, featureId);
+  const roadmapYaml = await readYamlFile(roadmapPath);
 
-  const [roadmapYaml, executionLogYaml] = await Promise.all([
-    readYamlFile(roadmapPath),
-    readYamlFile(executionLogPath),
-  ]);
+  if (roadmapYaml === null) return null;
 
-  const planResult = roadmapYaml !== null ? parsePlanYaml(roadmapYaml) : null;
-  const stateResult = executionLogYaml !== null ? parseStateYaml(executionLogYaml) : null;
-
-  return {
-    plan: planResult !== null && planResult.ok ? planResult.value : null,
-    state: stateResult !== null && stateResult.ok ? stateResult.value : null,
-  };
+  const result = parseRoadmap(roadmapYaml);
+  return result.ok ? result.value : null;
 };
 
 export const discoverFeaturesFs = async (
@@ -103,8 +130,8 @@ export const discoverFeaturesFs = async (
 
   return Promise.all(
     featureIds.map(async (featureId) => {
-      const { plan, state } = await loadFeatureArtifactsFs(projectPath, featureId);
-      return deriveFeatureSummary(featureId, plan, state);
+      const roadmap = await loadFeatureRoadmapFs(projectPath, featureId);
+      return deriveFeatureSummary(featureId, roadmap);
     }),
   );
 };
