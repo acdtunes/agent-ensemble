@@ -227,6 +227,49 @@ export interface MultiProjectHttpDeps {
   readonly featureArtifacts?: FeatureArtifactDeps;
 }
 
+// --- Shared doc response helpers (reduce duplication across project/feature endpoints) ---
+
+const sendDocTree = async (
+  docs: DocHttpDeps,
+  docsRoot: string,
+  res: express.Response,
+  label: string,
+): Promise<void> => {
+  const scanResult = await docs.scanDocsDir(docsRoot);
+  if (!scanResult.ok) {
+    const status = scanResult.error.type === 'not_found' ? 404 : 500;
+    res.status(status).json({ error: scanResult.error.type === 'not_found'
+      ? `${label} directory not found`
+      : `Failed to scan ${label.toLowerCase()} directory` });
+    return;
+  }
+  res.json(buildDocTree(scanResult.value));
+};
+
+const sendDocContent = async (
+  docs: DocHttpDeps,
+  docsRoot: string,
+  pathParam: string,
+  res: express.Response,
+): Promise<void> => {
+  const pathResult = validateDocPath(docsRoot, pathParam);
+  if (!pathResult.ok) {
+    res.status(400).json({ error: pathResult.error.message });
+    return;
+  }
+
+  const contentResult = await docs.readDocContent(pathResult.value);
+  if (!contentResult.ok) {
+    const status = contentResult.error.type === 'not_found' ? 404 : 500;
+    res.status(status).json({ error: contentResult.error.type === 'not_found'
+      ? 'Document not found'
+      : 'Failed to read document' });
+    return;
+  }
+
+  res.type('text/markdown; charset=utf-8').send(contentResult.value);
+};
+
 export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.Application => {
   const app = express();
   app.use(express.json());
@@ -439,16 +482,7 @@ export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.A
         return;
       }
 
-      const scanResult = await docs.scanDocsDir(docsRoot);
-      if (!scanResult.ok) {
-        const status = scanResult.error.type === 'not_found' ? 404 : 500;
-        res.status(status).json({ error: scanResult.error.type === 'not_found'
-          ? 'Documentation directory not found'
-          : 'Failed to scan documentation directory' });
-        return;
-      }
-
-      res.json(buildDocTree(scanResult.value));
+      await sendDocTree(docs, docsRoot, res, 'Documentation');
     });
 
     app.get('/api/projects/:id/docs/content', async (req, res) => {
@@ -470,22 +504,7 @@ export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.A
         return;
       }
 
-      const pathResult = validateDocPath(docsRoot, pathParam);
-      if (!pathResult.ok) {
-        res.status(400).json({ error: pathResult.error.message });
-        return;
-      }
-
-      const contentResult = await docs.readDocContent(pathResult.value);
-      if (!contentResult.ok) {
-        const status = contentResult.error.type === 'not_found' ? 404 : 500;
-        res.status(status).json({ error: contentResult.error.type === 'not_found'
-          ? 'Document not found'
-          : 'Failed to read document' });
-        return;
-      }
-
-      res.type('text/markdown; charset=utf-8').send(contentResult.value);
+      await sendDocContent(docs, docsRoot, pathParam, res);
     });
 
     // --- Feature-scoped doc endpoints ---
@@ -512,16 +531,7 @@ export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.A
           return;
         }
 
-        const scanResult = await docs.scanDocsDir(featureDocsRoot);
-        if (!scanResult.ok) {
-          const status = scanResult.error.type === 'not_found' ? 404 : 500;
-          res.status(status).json({ error: scanResult.error.type === 'not_found'
-            ? 'Feature documentation directory not found'
-            : 'Failed to scan feature documentation directory' });
-          return;
-        }
-
-        res.json(buildDocTree(scanResult.value));
+        await sendDocTree(docs, featureDocsRoot, res, 'Feature documentation');
       });
 
       app.get('/api/projects/:id/features/:featureId/docs/content', async (req, res) => {
@@ -549,22 +559,7 @@ export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.A
           return;
         }
 
-        const pathResult = validateDocPath(featureDocsRoot, pathParam);
-        if (!pathResult.ok) {
-          res.status(400).json({ error: pathResult.error.message });
-          return;
-        }
-
-        const contentResult = await docs.readDocContent(pathResult.value);
-        if (!contentResult.ok) {
-          const status = contentResult.error.type === 'not_found' ? 404 : 500;
-          res.status(status).json({ error: contentResult.error.type === 'not_found'
-            ? 'Document not found'
-            : 'Failed to read document' });
-          return;
-        }
-
-        res.type('text/markdown; charset=utf-8').send(contentResult.value);
+        await sendDocContent(docs, featureDocsRoot, pathParam, res);
       });
     }
   }

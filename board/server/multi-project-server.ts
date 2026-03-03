@@ -109,14 +109,8 @@ export const createMultiProjectServer = (
   config: MultiProjectServerConfig,
 ): MultiProjectServer => {
 
-  const toConfigFromDiscovery = (projectId: ProjectId): ProjectConfig => ({
-    projectId,
-    projectPath: join(config.projectsRoot, projectId as string),
-    statePath: join(config.projectsRoot, projectId as string, 'state.yaml'),
-    planPath: join(config.projectsRoot, projectId as string, 'plan.yaml'),
-    roadmapPath: join(config.projectsRoot, projectId as string, 'roadmap.yaml'),
-    docsRoot: join(config.projectsRoot, projectId as string, 'docs'),
-  });
+  const toConfigFromDiscovery = (projectId: ProjectId): ProjectConfig =>
+    toConfigFromPath(projectId, join(config.projectsRoot, projectId as string));
 
   // Project path tracking and feature cache for synchronous access
   const pathMap = new Map<ProjectId, string>();
