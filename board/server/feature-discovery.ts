@@ -78,6 +78,7 @@ export const isFeatureDir = (name: string): boolean =>
 // =====================================================================
 
 import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { resolveFeatureRoadmap } from './feature-path-resolver.js';
 import { parseRoadmap } from './parser.js';
 
@@ -94,7 +95,7 @@ const readYamlFile = async (path: string): Promise<string | null> => {
 export const scanFeatureDirsFs = async (
   projectPath: string,
 ): Promise<readonly FeatureId[]> => {
-  const featureRoot = `${projectPath}/${FEATURE_BASE}`;
+  const featureRoot = join(projectPath, FEATURE_BASE);
 
   let entries;
   try {
