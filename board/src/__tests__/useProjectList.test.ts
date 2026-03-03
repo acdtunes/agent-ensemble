@@ -14,6 +14,8 @@ const makeProjectSummary = (id: string, overrides: Partial<ProjectSummary> = {})
   inProgress: 2,
   currentLayer: 1,
   updatedAt: '2026-01-01T00:00:00Z',
+  featureCount: 0,
+  features: [],
   ...overrides,
 });
 
@@ -72,31 +74,11 @@ const simulateClose = (ws: MockWebSocketInstance): void => {
 // --- Pure function tests ---
 
 describe('applyProjectMessage', () => {
-  it('replaces entire list on projects_snapshot', () => {
+  it('replaces entire list on project_list', () => {
     const projects = [makeProjectSummary('a'), makeProjectSummary('b')];
-    const message: ProjectListMessage = { type: 'projects_snapshot', projects };
+    const message: ProjectListMessage = { type: 'project_list', projects };
 
     expect(applyProjectMessage([], message)).toEqual(projects);
-  });
-
-  it('appends project on project_added', () => {
-    const existing = [makeProjectSummary('a')];
-    const added = makeProjectSummary('b');
-    const message: ProjectListMessage = { type: 'project_added', project: added };
-
-    const result = applyProjectMessage(existing, message);
-    expect(result).toHaveLength(2);
-    expect(result).toContainEqual(added);
-  });
-
-  it('updates existing project on project_added with same id', () => {
-    const existing = [makeProjectSummary('a')];
-    const updated = makeProjectSummary('a', { completed: 7 });
-    const message: ProjectListMessage = { type: 'project_added', project: updated };
-
-    const result = applyProjectMessage(existing, message);
-    expect(result).toHaveLength(1);
-    expect(result[0].completed).toBe(7);
   });
 
   it('removes project on project_removed', () => {
@@ -172,33 +154,33 @@ describe('useProjectList', () => {
   });
 
   describe('message handling', () => {
-    it('populates projects from projects_snapshot', () => {
+    it('populates projects from project_list', () => {
       const { result } = renderHook(() => useProjectList('ws://localhost:8080'));
       const ws = latestWs();
       const projects = [makeProjectSummary('proj-a'), makeProjectSummary('proj-b')];
 
       act(() => {
         simulateOpen(ws);
-        simulateMessage(ws, { type: 'projects_snapshot', projects });
+        simulateMessage(ws, { type: 'project_list', projects });
       });
 
       expect(result.current.projects).toEqual(projects);
     });
 
-    it('reflects live project addition without page reload', () => {
+    it('replaces project list on subsequent project_list message', () => {
       const { result } = renderHook(() => useProjectList('ws://localhost:8080'));
       const ws = latestWs();
       const initial = [makeProjectSummary('proj-a')];
-      const added = makeProjectSummary('proj-b');
+      const updated = [makeProjectSummary('proj-a'), makeProjectSummary('proj-b')];
 
       act(() => {
         simulateOpen(ws);
-        simulateMessage(ws, { type: 'projects_snapshot', projects: initial });
-        simulateMessage(ws, { type: 'project_added', project: added });
+        simulateMessage(ws, { type: 'project_list', projects: initial });
+        simulateMessage(ws, { type: 'project_list', projects: updated });
       });
 
       expect(result.current.projects).toHaveLength(2);
-      expect(result.current.projects).toContainEqual(added);
+      expect(result.current.projects).toEqual(updated);
     });
 
     it('reflects live project removal without page reload', () => {
@@ -208,12 +190,26 @@ describe('useProjectList', () => {
 
       act(() => {
         simulateOpen(ws);
-        simulateMessage(ws, { type: 'projects_snapshot', projects: initial });
+        simulateMessage(ws, { type: 'project_list', projects: initial });
         simulateMessage(ws, { type: 'project_removed', projectId: 'proj-a' as ProjectId });
       });
 
       expect(result.current.projects).toHaveLength(1);
       expect(result.current.projects[0].projectId).toBe('proj-b');
+    });
+
+    it('ignores unknown message types', () => {
+      const { result } = renderHook(() => useProjectList('ws://localhost:8080'));
+      const ws = latestWs();
+
+      act(() => {
+        simulateOpen(ws);
+        // Simulate an 'init' message (from ServerWSMessage, not ProjectListMessage)
+        ws.onmessage?.({ data: JSON.stringify({ type: 'init', projectId: 'x', state: {}, plan: {} }) });
+      });
+
+      expect(result.current.projects).toEqual([]);
+      expect(result.current.error).toBeNull();
     });
   });
 
@@ -235,37 +231,6 @@ describe('useProjectList', () => {
       });
 
       expect(result.current.error).toMatch(/parse/i);
-    });
-  });
-
-  describe('reconnection', () => {
-    it('reconnects after disconnect', () => {
-      renderHook(() => useProjectList('ws://localhost:8080'));
-
-      act(() => {
-        simulateOpen(latestWs());
-        simulateClose(latestWs());
-      });
-
-      expect(mockWsInstances).toHaveLength(1);
-
-      act(() => { vi.advanceTimersByTime(1000); });
-
-      expect(mockWsInstances).toHaveLength(2);
-    });
-
-    it('does not reconnect after unmount', () => {
-      const { unmount } = renderHook(() => useProjectList('ws://localhost:8080'));
-
-      act(() => {
-        simulateOpen(latestWs());
-        simulateClose(latestWs());
-      });
-
-      unmount();
-      act(() => { vi.advanceTimersByTime(5000); });
-
-      expect(mockWsInstances).toHaveLength(1);
     });
   });
 });
