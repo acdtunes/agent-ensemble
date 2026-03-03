@@ -26,3 +26,13 @@ const STATUS_LABEL_MAP: Readonly<Record<DisplayColumn, string>> = {
 
 export const getStatusLabel = (column: DisplayColumn): string =>
   STATUS_LABEL_MAP[column];
+
+const STATUS_TOP_BAR_COLOR_MAP: Readonly<Record<DisplayColumn, string>> = {
+  pending: 'border-t-4 border-t-gray-500',
+  in_progress: 'border-t-4 border-t-yellow-400',
+  review: 'border-t-4 border-t-violet-400',
+  done: 'border-t-4 border-t-green-400',
+};
+
+export const getStatusTopBarColor = (column: DisplayColumn): string =>
+  STATUS_TOP_BAR_COLOR_MAP[column];

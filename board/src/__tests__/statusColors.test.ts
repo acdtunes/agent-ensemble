@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getStatusColor, getStatusLabel } from '../utils/statusColors';
+import { getStatusColor, getStatusLabel, getStatusTopBarColor } from '../utils/statusColors';
 import { DISPLAY_COLUMNS, type DisplayColumn } from '../utils/statusMapping';
 
 describe('getStatusColor', () => {
@@ -49,5 +49,23 @@ describe('getStatusLabel', () => {
     expect(allLabels).not.toContain('Claimed');
     expect(allLabels).not.toContain('Approved');
     expect(allLabels).not.toContain('Failed');
+  });
+});
+
+describe('getStatusTopBarColor', () => {
+  it.each<[DisplayColumn, string]>([
+    ['pending', 'border-t-4 border-t-gray-500'],
+    ['in_progress', 'border-t-4 border-t-yellow-400'],
+    ['review', 'border-t-4 border-t-violet-400'],
+    ['done', 'border-t-4 border-t-green-400'],
+  ])('returns %s -> %s', (column, expected) => {
+    expect(getStatusTopBarColor(column)).toBe(expected);
+  });
+
+  it('returns border-t-4 format for all columns', () => {
+    for (const column of DISPLAY_COLUMNS) {
+      const result = getStatusTopBarColor(column);
+      expect(result).toMatch(/^border-t-4 border-t-\w+-\d+$/);
+    }
   });
 });
