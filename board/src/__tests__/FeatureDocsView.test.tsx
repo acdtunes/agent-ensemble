@@ -1,17 +1,18 @@
 /**
- * Tests for FeatureDocsView — wraps DocViewer with context dropdowns and tabs.
+ * Tests for FeatureDocsView — wraps DocViewer with context dropdowns.
  *
  * Driving port: FeatureDocsView component props
  * Acceptance criteria:
  * - Doc tree shows only files within selected feature directory
  * - Feature with no documentation shows empty state with guidance
- * - Board-Docs tab switching preserves project and feature context
  * - Feature dropdown lists all features including docs-only
- * - Project dropdown switching navigates to feature list for new project
+ *
+ * Note: Breadcrumb and Board/Docs tabs are rendered by FeatureNavHeader
+ * in the PageShell header (tested via App-level routing tests).
  */
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, screen, cleanup, within, fireEvent } from '@testing-library/react';
+import { describe, it, expect, afterEach } from 'vitest';
+import { render, screen, cleanup, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import type {
   DocTree,
@@ -74,8 +75,6 @@ describe('FeatureDocsView acceptance', () => {
         featureId="card-redesign"
         tree={tree}
         features={[makeFeature('card-redesign')]}
-        onNavigateOverview={vi.fn()}
-        onNavigateProject={vi.fn()}
       />,
     );
 
@@ -96,69 +95,10 @@ describe('FeatureDocsView acceptance', () => {
         featureId="new-feature"
         tree={makeEmptyDocTree()}
         features={[makeFeature('new-feature')]}
-        onNavigateOverview={vi.fn()}
-        onNavigateProject={vi.fn()}
       />,
     );
 
     expect(screen.getByText(/no documentation found/i)).toBeInTheDocument();
-  });
-
-  it('shows breadcrumb with "Overview / {project} / {feature}"', async () => {
-    const { FeatureDocsView } = await import(/* @vite-ignore */ COMPONENT_PATH);
-    const tree = makeDocTree([{ name: 'discuss', files: ['readme.md'] }]);
-
-    render(
-      <FeatureDocsView
-        projectId="nw-teams"
-        featureId="card-redesign"
-        tree={tree}
-        features={[makeFeature('card-redesign')]}
-        onNavigateOverview={vi.fn()}
-        onNavigateProject={vi.fn()}
-      />,
-    );
-
-    const breadcrumb = screen.getByRole('navigation', { name: /breadcrumb/i });
-    expect(breadcrumb).toHaveTextContent('Overview');
-    expect(breadcrumb).toHaveTextContent('nw-teams');
-    expect(breadcrumb).toHaveTextContent('card-redesign');
-  });
-
-  it('Board tab links to feature board URL preserving context', async () => {
-    const { FeatureDocsView } = await import(/* @vite-ignore */ COMPONENT_PATH);
-
-    render(
-      <FeatureDocsView
-        projectId="my-project"
-        featureId="auth-flow"
-        tree={makeEmptyDocTree()}
-        features={[makeFeature('auth-flow')]}
-        onNavigateOverview={vi.fn()}
-        onNavigateProject={vi.fn()}
-      />,
-    );
-
-    const boardTab = screen.getByRole('link', { name: /^Board$/i });
-    expect(boardTab).toHaveAttribute('href', '#/projects/my-project/features/auth-flow/board');
-  });
-
-  it('Docs tab links to feature docs URL preserving context', async () => {
-    const { FeatureDocsView } = await import(/* @vite-ignore */ COMPONENT_PATH);
-
-    render(
-      <FeatureDocsView
-        projectId="my-project"
-        featureId="auth-flow"
-        tree={makeEmptyDocTree()}
-        features={[makeFeature('auth-flow')]}
-        onNavigateOverview={vi.fn()}
-        onNavigateProject={vi.fn()}
-      />,
-    );
-
-    const docsTab = screen.getByRole('link', { name: /^Docs$/i });
-    expect(docsTab).toHaveAttribute('href', '#/projects/my-project/features/auth-flow/docs');
   });
 
   it('feature dropdown lists all features including docs-only', async () => {
@@ -175,8 +115,6 @@ describe('FeatureDocsView acceptance', () => {
         featureId="card-redesign"
         tree={makeEmptyDocTree()}
         features={features}
-        onNavigateOverview={vi.fn()}
-        onNavigateProject={vi.fn()}
       />,
     );
 
@@ -187,44 +125,5 @@ describe('FeatureDocsView acceptance', () => {
     expect(optionLabels).toContain('card-redesign');
     expect(optionLabels).toContain('kanban-board');
     expect(optionLabels).toContain('doc-viewer');
-  });
-
-  it('breadcrumb Overview is clickable and calls onNavigateOverview', async () => {
-    const { FeatureDocsView } = await import(/* @vite-ignore */ COMPONENT_PATH);
-    const onNavigateOverview = vi.fn();
-
-    render(
-      <FeatureDocsView
-        projectId="nw-teams"
-        featureId="card-redesign"
-        tree={makeEmptyDocTree()}
-        features={[makeFeature('card-redesign')]}
-        onNavigateOverview={onNavigateOverview}
-        onNavigateProject={vi.fn()}
-      />,
-    );
-
-    fireEvent.click(screen.getByText('Overview'));
-    expect(onNavigateOverview).toHaveBeenCalledOnce();
-  });
-
-  it('breadcrumb project name is clickable and calls onNavigateProject', async () => {
-    const { FeatureDocsView } = await import(/* @vite-ignore */ COMPONENT_PATH);
-    const onNavigateProject = vi.fn();
-
-    render(
-      <FeatureDocsView
-        projectId="my-project"
-        featureId="auth-flow"
-        tree={makeEmptyDocTree()}
-        features={[makeFeature('auth-flow')]}
-        onNavigateOverview={vi.fn()}
-        onNavigateProject={onNavigateProject}
-      />,
-    );
-
-    const breadcrumb = screen.getByRole('navigation', { name: /breadcrumb/i });
-    fireEvent.click(within(breadcrumb).getByText('my-project'));
-    expect(onNavigateProject).toHaveBeenCalledOnce();
   });
 });

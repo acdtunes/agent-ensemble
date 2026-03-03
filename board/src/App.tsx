@@ -1,12 +1,12 @@
 import { useMemo, useState, useCallback } from 'react';
-import { useDeliveryState, type ConnectionStatus } from './hooks/useDeliveryState';
+import { useRoadmapState, type ConnectionStatus } from './hooks/useRoadmapState';
 import { useProjectList } from './hooks/useProjectList';
 import { useFeatureList } from './hooks/useFeatureList';
 import { useAddProject } from './hooks/useAddProject';
 import { useRemoveProject } from './hooks/useRemoveProject';
 import { useDocTree } from './hooks/useDocTree';
 import { useFeatureState } from './hooks/useFeatureState';
-import { roadmapToExecutionPlan, roadmapToDeliveryState } from '../shared/roadmap-bridge';
+import { computeRoadmapSummary } from '../shared/types';
 import { useRouter } from './hooks/useRouter';
 import { ProgressHeader } from './components/ProgressHeader';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -19,26 +19,15 @@ import { AddProjectDialog } from './components/AddProjectDialog';
 import { ProjectFeatureView } from './components/ProjectFeatureView';
 import { DocViewer } from './components/DocViewer';
 import { FeatureDocsView } from './components/FeatureDocsView';
-import type { DeliveryState, ExecutionPlan, StateTransition, ProjectId } from '../shared/types';
-
-// --- Constants ---
-
-const EMPTY_STATE: DeliveryState = {
-  schema_version: '1.0',
-  created_at: '',
-  updated_at: '',
-  plan_path: '',
-  current_layer: 0,
-  summary: { total_steps: 0, total_layers: 0, completed: 0, failed: 0, in_progress: 0 },
-  steps: {},
-  teammates: {},
-};
+import type { Roadmap, RoadmapTransition, ProjectId } from '../shared/types';
 
 // --- Pure functions ---
 
-const computeWsUrl = (location: { protocol: string; host: string }): string => {
+const computeWsUrl = (location: { protocol: string; host: string; hostname: string }): string => {
   const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${wsProtocol}//${location.host}/ws`;
+  const wsPort = import.meta.env.DEV ? '3002' : '';
+  const wsHost = wsPort ? `${location.hostname}:${wsPort}` : location.host;
+  return `${wsProtocol}//${wsHost}`;
 };
 
 const CONNECTION_LABELS: Readonly<Record<ConnectionStatus, string>> = {
@@ -92,14 +81,22 @@ const PageShell = ({
 );
 
 interface BoardContentProps {
-  readonly state: DeliveryState;
-  readonly plan: ExecutionPlan;
-  readonly transitions: readonly StateTransition[];
+  readonly roadmap: Roadmap;
+  readonly transitions: readonly RoadmapTransition[];
 }
 
-const BoardContent = ({ state, plan, transitions }: BoardContentProps) => {
+const computeCurrentPhase = (roadmap: Roadmap): number => {
+  const index = roadmap.phases.findIndex(p =>
+    p.steps.some(s => s.status !== 'approved'),
+  );
+  return index === -1 ? roadmap.phases.length : index + 1;
+};
+
+const BoardContent = ({ roadmap, transitions }: BoardContentProps) => {
+  const summary = useMemo(() => computeRoadmapSummary(roadmap), [roadmap]);
+  const currentPhase = useMemo(() => computeCurrentPhase(roadmap), [roadmap]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
-  const planStepLookup = useMemo(() => buildPlanStepLookup(plan), [plan]);
+  const stepLookup = useMemo(() => buildPlanStepLookup(roadmap), [roadmap]);
 
   const handleCardClick = useCallback((stepId: string) => {
     setSelectedStepId(stepId);
@@ -109,24 +106,23 @@ const BoardContent = ({ state, plan, transitions }: BoardContentProps) => {
     setSelectedStepId(null);
   }, []);
 
-  const selectedStepState = selectedStepId !== null ? state.steps[selectedStepId] ?? null : null;
-  const selectedPlanStep = selectedStepId !== null ? planStepLookup.get(selectedStepId) ?? null : null;
+  const selectedStep = selectedStepId !== null ? stepLookup.get(selectedStepId) ?? null : null;
 
   return (
     <>
       <ProgressHeader
-        summary={state.summary}
-        currentLayer={state.current_layer}
-        createdAt={state.created_at}
+        summary={summary}
+        currentPhase={currentPhase}
+        createdAt={roadmap.roadmap.created_at ?? ''}
       />
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-4">
         <div className="lg:col-span-3">
-          <KanbanBoard state={state} plan={plan} onCardClick={handleCardClick} />
+          <KanbanBoard roadmap={roadmap} onCardClick={handleCardClick} />
         </div>
         <div className="space-y-6">
           <section aria-label="Teammates">
             <h2 className="mb-3 text-lg font-medium text-gray-300">Teammates</h2>
-            <TeamPanel teammates={state.teammates} steps={state.steps} />
+            <TeamPanel roadmap={roadmap} />
           </section>
           <section aria-label="Activity">
             <h2 className="mb-3 text-lg font-medium text-gray-300">Activity</h2>
@@ -134,11 +130,10 @@ const BoardContent = ({ state, plan, transitions }: BoardContentProps) => {
           </section>
         </div>
       </div>
-      {selectedStepState !== null && selectedPlanStep !== null && (
+      {selectedStep !== null && (
         <StepDetailModal
-          stepState={selectedStepState}
-          planStep={selectedPlanStep}
-          planStepLookup={planStepLookup}
+          step={selectedStep}
+          stepLookup={stepLookup}
           onClose={handleCloseModal}
         />
       )}
@@ -146,12 +141,12 @@ const BoardContent = ({ state, plan, transitions }: BoardContentProps) => {
   );
 };
 
-// --- Board view (owns useDeliveryState hook for a specific project) ---
+// --- Board view (owns useRoadmapState hook for a specific project) ---
 
 const WS_URL = computeWsUrl(
   typeof window !== 'undefined'
     ? window.location
-    : { protocol: 'ws:', host: 'localhost:3000' },
+    : { protocol: 'ws:', host: 'localhost:3000', hostname: 'localhost' },
 );
 
 const ProjectTabs = ({
@@ -191,17 +186,15 @@ const ProjectTabs = ({
 );
 
 const BoardView = ({ projectId }: { readonly projectId: ProjectId }) => {
-  const { state, plan, transitions, connectionStatus, error } = useDeliveryState(WS_URL, projectId);
-
-  const hasData = state !== null && plan !== null;
+  const { roadmap, transitions, connectionStatus, error } = useRoadmapState(WS_URL, projectId);
 
   return (
     <PageShell
       connectionStatus={connectionStatus}
       headerContent={<ProjectTabs projectId={projectId} activeTab="board" />}
     >
-      {hasData
-        ? <BoardContent state={state} plan={plan} transitions={transitions} />
+      {roadmap !== null
+        ? <BoardContent roadmap={roadmap} transitions={transitions} />
         : <Placeholder error={error} />
       }
     </PageShell>
@@ -241,17 +234,13 @@ const FeatureBoardView = ({ projectId, featureId }: { readonly projectId: string
   const { roadmap, loading, error } = useFeatureState(projectId, featureId);
   const { connectionStatus } = useProjectList(WS_URL);
 
-  const plan = roadmap !== null ? roadmapToExecutionPlan(roadmap) : null;
-  const state = roadmap !== null ? roadmapToDeliveryState(roadmap) : null;
-  const hasData = plan !== null;
-
   return (
     <PageShell
       connectionStatus={connectionStatus}
       headerContent={<FeatureNavHeader projectId={projectId} featureId={featureId} activeTab="board" />}
     >
-      {hasData
-        ? <BoardContent state={state ?? EMPTY_STATE} plan={plan} transitions={[]} />
+      {roadmap !== null
+        ? <BoardContent roadmap={roadmap} transitions={[]} />
         : loading
           ? <Placeholder error={null} />
           : <Placeholder error={error} />
@@ -391,7 +380,7 @@ const FeatureDocsRouteView = ({ projectId, featureId }: { readonly projectId: st
   return (
     <PageShell
       connectionStatus={connectionStatus}
-      headerContent={<h1 className="text-xl font-semibold text-gray-100">NW Teams Board</h1>}
+      headerContent={<FeatureNavHeader projectId={projectId} featureId={featureId} activeTab="docs" />}
     >
       <FeatureDocsView
         projectId={projectId}
@@ -399,8 +388,6 @@ const FeatureDocsRouteView = ({ projectId, featureId }: { readonly projectId: st
         tree={tree}
         features={features}
         error={error ?? undefined}
-        onNavigateOverview={navigateToOverview}
-        onNavigateProject={() => navigateToProject(projectId)}
       />
     </PageShell>
   );
