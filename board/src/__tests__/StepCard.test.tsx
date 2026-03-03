@@ -27,24 +27,24 @@ describe('StepCard', () => {
     expect(title.className).toMatch(/font-(medium|semibold|bold)/);
   });
 
-  it('displays file count as muted subtitle below title', () => {
+  it('displays file count in metadata chip with pill styling', () => {
     render(<StepCard card={baseCard} />);
-    const subtitle = screen.getByText('1 file');
-    expect(subtitle).toBeInTheDocument();
-    expect(subtitle.className).toMatch(/text-(xs|sm)/);
-    expect(subtitle.className).toMatch(/text-gray/);
+    const fileChip = screen.getByText('📁 1 file');
+    expect(fileChip).toBeInTheDocument();
+    expect(fileChip.className).toMatch(/text-xs/);
+    expect(fileChip.className).toMatch(/bg-gray-800/);
   });
 
-  it('displays plural files label for multiple files', () => {
+  it('displays plural files label for multiple files in chip', () => {
     const card = { ...baseCard, fileCount: 3, files: ['a.ts', 'b.ts', 'c.ts'] };
     render(<StepCard card={card} />);
-    expect(screen.getByText('3 files')).toBeInTheDocument();
+    expect(screen.getByText('📁 3 files')).toBeInTheDocument();
   });
 
-  it('displays zero files label when no files', () => {
+  it('displays zero files label in chip when no files', () => {
     const card = { ...baseCard, fileCount: 0, files: [] };
     render(<StepCard card={card} />);
-    expect(screen.getByText('0 files')).toBeInTheDocument();
+    expect(screen.getByText('📁 0 files')).toBeInTheDocument();
   });
 
   it('displays step ID in top-right corner with monospace font', () => {
@@ -124,6 +124,51 @@ describe('StepCard', () => {
   it('does not apply cursor-pointer when onCardClick is not provided', () => {
     render(<StepCard card={baseCard} />);
     expect(screen.getByTestId('step-card').className).not.toMatch(/cursor-pointer/);
+  });
+
+  describe('metadata chips', () => {
+    it('displays file chip with emoji and pill styling', () => {
+      const card = { ...baseCard, fileCount: 5 };
+      render(<StepCard card={card} />);
+      const fileChip = screen.getByText('📁 5 files');
+      expect(fileChip).toBeInTheDocument();
+      expect(fileChip.className).toMatch(/bg-gray-800/);
+      expect(fileChip.className).toMatch(/rounded-full/);
+    });
+
+    it('displays dep chip with emoji and pill styling when dependencyCount > 0', () => {
+      const card = { ...baseCard, dependencyCount: 3 };
+      render(<StepCard card={card} />);
+      const depChip = screen.getByText('🔗 3 deps');
+      expect(depChip).toBeInTheDocument();
+      expect(depChip.className).toMatch(/bg-gray-800/);
+      expect(depChip.className).toMatch(/rounded-full/);
+    });
+
+    it('hides dep chip when dependencyCount is 0', () => {
+      const card = { ...baseCard, dependencyCount: 0 };
+      render(<StepCard card={card} />);
+      expect(screen.queryByText(/🔗/)).not.toBeInTheDocument();
+    });
+
+    it.each([
+      { fileCount: 1, expected: '📁 1 file' },
+      { fileCount: 0, expected: '📁 0 files' },
+      { fileCount: 10, expected: '📁 10 files' },
+    ])('file chip shows singular/plural: $expected', ({ fileCount, expected }) => {
+      const card = { ...baseCard, fileCount };
+      render(<StepCard card={card} />);
+      expect(screen.getByText(expected)).toBeInTheDocument();
+    });
+
+    it.each([
+      { dependencyCount: 1, expected: '🔗 1 dep' },
+      { dependencyCount: 5, expected: '🔗 5 deps' },
+    ])('dep chip shows singular/plural: $expected', ({ dependencyCount, expected }) => {
+      const card = { ...baseCard, dependencyCount };
+      render(<StepCard card={card} />);
+      expect(screen.getByText(expected)).toBeInTheDocument();
+    });
   });
 
   describe('tall card layout', () => {

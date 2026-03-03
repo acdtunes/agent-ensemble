@@ -13,6 +13,10 @@ const Badge = ({ bg, text, children }: { readonly bg: string; readonly text: str
   <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${bg} ${text}`}>{children}</span>
 );
 
+const MetadataChip = ({ children }: { readonly children: React.ReactNode }) => (
+  <span className="bg-gray-800 rounded-full px-2 py-0.5 text-xs text-gray-300">{children}</span>
+);
+
 interface StepCardProps {
   readonly card: StepCardData;
   readonly onCardClick?: (stepId: string) => void;
@@ -33,8 +37,11 @@ export const StepCard = ({ card, onCardClick }: StepCardProps) => {
         <span className="min-w-0 font-medium text-gray-100">{card.stepName}</span>
         <span className="shrink-0 whitespace-nowrap font-mono text-xs text-gray-400">{card.stepId}</span>
       </div>
-      <div className="text-xs text-gray-400">
-        {card.fileCount} {card.fileCount === 1 ? 'file' : 'files'}
+      <div className="mt-1 flex flex-wrap gap-1">
+        <MetadataChip>📁 {card.fileCount} {card.fileCount === 1 ? 'file' : 'files'}</MetadataChip>
+        {card.dependencyCount > 0 && (
+          <MetadataChip>🔗 {card.dependencyCount} {card.dependencyCount === 1 ? 'dep' : 'deps'}</MetadataChip>
+        )}
       </div>
       {card.teammateId !== null && (
         <div data-testid="teammate-indicator" className="mt-1 flex items-center gap-1">
