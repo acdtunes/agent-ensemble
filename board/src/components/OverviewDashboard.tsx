@@ -29,13 +29,13 @@ export const OverviewDashboard = ({ projects, onNavigate, onAddProject, onRemove
 
   return (
     <div>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex justify-start">
         <button
           type="button"
           onClick={onAddProject}
           className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-500"
         >
-          Add Project
+          + Add Project
         </button>
       </div>
       <div

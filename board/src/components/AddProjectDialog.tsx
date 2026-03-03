@@ -28,7 +28,7 @@ export const AddProjectDialog = ({ onSubmit, onCancel, submitting, error }: AddP
   };
 
   return (
-    <div className="rounded-lg border border-gray-700 bg-gray-900 p-4">
+    <div className="max-w-md rounded-lg border border-gray-700 bg-gray-900 p-4">
       <h3 className="mb-3 text-sm font-medium text-gray-200">Add Project</h3>
       {browsing ? (
         <DirectoryBrowser onSelect={handleBrowseSelect} onCancel={handleBrowseCancel} />
