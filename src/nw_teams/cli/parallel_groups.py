@@ -59,10 +59,7 @@ def extract_steps(roadmap: dict) -> list[Step]:
 
 def build_dependency_graph(steps: list[Step]) -> dict[str, set[str]]:
     """Build adjacency list: step_id -> set of steps it depends on."""
-    graph: dict[str, set[str]] = {}
-    for step in steps:
-        graph[step.step_id] = set(step.blocked_by)
-    return graph
+    return {step.step_id: set(step.blocked_by) for step in steps}
 
 
 def detect_file_conflicts(steps: list[Step]) -> list[tuple[str, str, list[str]]]:
@@ -118,7 +115,7 @@ def identify_parallel_groups(steps: list[Step]) -> list[ParallelGroup]:
     groups = []
     for i, layer_steps in enumerate(layers):
         conflicts = detect_file_conflicts(layer_steps)
-        has_conflicts = len(conflicts) > 0
+        has_conflicts = bool(conflicts)
         groups.append(ParallelGroup(
             layer=i + 1,
             steps=layer_steps,
@@ -131,8 +128,8 @@ def identify_parallel_groups(steps: list[Step]) -> list[ParallelGroup]:
 
 def print_analysis(groups: list[ParallelGroup]) -> None:
     """Print human-readable analysis."""
-    total_steps = sum(len(g.steps) for g in groups)
-    max_parallel = max(len(g.steps) for g in groups) if groups else 0
+    total_steps = sum(len(group.steps) for group in groups)
+    max_parallel = max(len(group.steps) for group in groups) if groups else 0
 
     print(f"=== Parallel Execution Analysis ===")
     print(f"Total steps: {total_steps}")
