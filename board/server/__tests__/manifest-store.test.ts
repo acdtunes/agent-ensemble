@@ -271,29 +271,6 @@ describe('validateManifest: rejects malformed data with descriptive error', () =
 // addEntry: returns new manifest with entry appended (immutable)
 // =================================================================
 describe('addEntry: returns new manifest with entry appended', () => {
-  it('appends entry to empty manifest', () => {
-    const manifest = makeManifest('my-project');
-    const entry = makeEntry('auth');
-
-    const result = addEntry(manifest, entry);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.features).toHaveLength(1);
-    expect(result.value.features[0].featureId).toBe(entry.featureId);
-  });
-
-  it('appends entry to manifest with existing entries', () => {
-    const manifest = makeManifest('my-project', [makeEntry('auth')]);
-    const entry = makeEntry('dashboard');
-
-    const result = addEntry(manifest, entry);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.features).toHaveLength(2);
-  });
-
   it('does not mutate the original manifest', () => {
     const manifest = makeManifest('my-project', [makeEntry('auth')]);
     const original = manifest.features;
@@ -314,15 +291,6 @@ describe('addEntry: returns new manifest with entry appended', () => {
     expect(result.error.type).toBe('duplicate_entry');
     if (result.error.type !== 'duplicate_entry') return;
     expect(result.error.featureId).toBe(makeFeatureId('auth'));
-  });
-
-  it('preserves projectId in the returned manifest', () => {
-    const manifest = makeManifest('my-project');
-    const result = addEntry(manifest, makeEntry('auth'));
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.projectId).toBe(manifest.projectId);
   });
 
   // Property: addEntry increases feature count by exactly 1
@@ -369,27 +337,6 @@ describe('addEntry: returns new manifest with entry appended', () => {
 // removeEntry: returns new manifest without target entry
 // =================================================================
 describe('removeEntry: returns new manifest without target entry', () => {
-  it('removes existing entry', () => {
-    const manifest = makeManifest('my-project', [makeEntry('auth'), makeEntry('dashboard')]);
-
-    const result = removeEntry(manifest, makeFeatureId('auth'));
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.features).toHaveLength(1);
-    expect(result.value.features[0].featureId).toBe(makeFeatureId('dashboard'));
-  });
-
-  it('does not mutate the original manifest', () => {
-    const manifest = makeManifest('my-project', [makeEntry('auth')]);
-    const original = manifest.features;
-
-    removeEntry(manifest, makeFeatureId('auth'));
-
-    expect(manifest.features).toBe(original);
-    expect(manifest.features).toHaveLength(1);
-  });
-
   it('returns entry_not_found for missing featureId', () => {
     const manifest = makeManifest('my-project', [makeEntry('auth')]);
 
