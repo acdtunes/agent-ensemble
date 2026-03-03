@@ -5,7 +5,6 @@ import {
   FeatureCard,
   classifyFeatureDisplayState,
   formatProgressLabel,
-  type FeatureDisplayState,
 } from '../components/FeatureCard';
 import type { FeatureSummary, FeatureId } from '../../shared/types';
 
@@ -30,9 +29,9 @@ const makeFeature = (overrides: Partial<FeatureSummary> = {}): FeatureSummary =>
 // ================================================================
 
 describe('classifyFeatureDisplayState', () => {
-  it('returns docs-only when feature has no roadmap', () => {
+  it('returns null when feature has no roadmap', () => {
     const feature = makeFeature({ hasRoadmap: false, hasExecutionLog: false, totalSteps: 0 });
-    expect(classifyFeatureDisplayState(feature)).toBe('docs-only');
+    expect(classifyFeatureDisplayState(feature)).toBeNull();
   });
 
   it('returns completed when all steps are done', () => {
@@ -125,10 +124,13 @@ describe('FeatureCard', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it('shows Docs only indicator when feature has no roadmap', () => {
+  it('does not show state label when feature has no roadmap (null state)', () => {
     const feature = makeFeature({ hasRoadmap: false, totalSteps: 0, completed: 0, inProgress: 0, failed: 0 });
     render(<FeatureCard feature={feature} />);
-    expect(screen.getByText('Docs only')).toBeInTheDocument();
+    expect(screen.queryByText('Docs only')).not.toBeInTheDocument();
+    expect(screen.queryByText('Planned')).not.toBeInTheDocument();
+    expect(screen.queryByText('Active')).not.toBeInTheDocument();
+    expect(screen.queryByText('Completed')).not.toBeInTheDocument();
   });
 
   it('has no Board or Docs buttons', () => {

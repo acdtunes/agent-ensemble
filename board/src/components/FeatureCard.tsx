@@ -3,10 +3,10 @@ import { computeCompletionPercentage } from './ProjectCard';
 
 // --- Pure functions ---
 
-export type FeatureDisplayState = 'completed' | 'active' | 'planned' | 'docs-only';
+export type FeatureDisplayState = 'completed' | 'active' | 'planned';
 
-export const classifyFeatureDisplayState = (feature: FeatureSummary): FeatureDisplayState => {
-  if (!feature.hasRoadmap) return 'docs-only';
+export const classifyFeatureDisplayState = (feature: FeatureSummary): FeatureDisplayState | null => {
+  if (!feature.hasRoadmap) return null;
   if (feature.totalSteps > 0 && feature.completed === feature.totalSteps) return 'completed';
   if (feature.inProgress > 0 || feature.completed > 0 || feature.failed > 0) return 'active';
   return 'planned';
@@ -26,7 +26,6 @@ const STATE_LABELS: Record<FeatureDisplayState, string> = {
   'completed': 'Completed',
   'active': 'Active',
   'planned': 'Planned',
-  'docs-only': 'Docs only',
 };
 
 export const FeatureCard = ({ feature, onClick }: FeatureCardProps) => {
@@ -43,10 +42,12 @@ export const FeatureCard = ({ feature, onClick }: FeatureCardProps) => {
     >
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-100">{feature.name}</h3>
-        <span className="text-xs font-medium text-gray-400">{STATE_LABELS[displayState]}</span>
+        {displayState !== null && (
+          <span className="text-xs font-medium text-gray-400">{STATE_LABELS[displayState]}</span>
+        )}
       </div>
 
-      {displayState !== 'docs-only' && (
+      {displayState !== null && (
         <>
           <div className="mt-1.5 text-sm text-gray-300">
             {formatProgressLabel(feature.completed, feature.totalSteps)}
