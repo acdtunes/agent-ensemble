@@ -249,10 +249,6 @@ const FeatureBoardView = ({ projectId, featureId }: { readonly projectId: string
   );
 };
 
-const navigateToBoard = (projectId: string): void => {
-  window.location.hash = `#/projects/${projectId}/board`;
-};
-
 const navigateToProject = (projectId: string): void => {
   window.location.hash = `#/projects/${projectId}`;
 };
@@ -343,10 +339,6 @@ const DocsView = ({ projectId }: { readonly projectId: ProjectId }) => {
   const { connectionStatus } = useProjectList(WS_URL);
   const { tree, error } = useDocTree(projectId);
 
-  const handleNavigateToBoard = useCallback(() => {
-    navigateToBoard(projectId);
-  }, [projectId]);
-
   const fetchContent = useCallback(
     async (path: string): Promise<string> => {
       const response = await fetch(`/api/projects/${projectId}/docs/content?path=${encodeURIComponent(path)}`);
@@ -365,7 +357,6 @@ const DocsView = ({ projectId }: { readonly projectId: ProjectId }) => {
         projectId={projectId}
         tree={tree}
         fetchContent={fetchContent}
-        onNavigateToBoard={handleNavigateToBoard}
         error={error ?? undefined}
       />
     </PageShell>
