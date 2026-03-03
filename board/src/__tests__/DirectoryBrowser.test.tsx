@@ -108,28 +108,19 @@ describe('DirectoryBrowser', () => {
       expect(mockHookReturn.navigateUp).toHaveBeenCalledOnce();
     });
 
-    it('is disabled when parent is null (at filesystem root)', () => {
-      mockHookReturn = {
-        ...mockHookReturn,
-        currentPath: '/',
-        parent: null,
-      };
+    it.each([
+      { parent: null, currentPath: '/', expectedDisabled: true },
+      { parent: '/', currentPath: '/home/user', expectedDisabled: false },
+    ])('is disabled=$expectedDisabled when parent=$parent', ({ parent, currentPath, expectedDisabled }) => {
+      mockHookReturn = { ...mockHookReturn, currentPath, parent };
 
       render(<DirectoryBrowser onSelect={vi.fn()} onCancel={vi.fn()} />);
 
-      expect(screen.getByRole('button', { name: /up/i })).toBeDisabled();
-    });
-
-    it('is enabled when parent is not null', () => {
-      mockHookReturn = {
-        ...mockHookReturn,
-        currentPath: '/home/user',
-        parent: '/',
-      };
-
-      render(<DirectoryBrowser onSelect={vi.fn()} onCancel={vi.fn()} />);
-
-      expect(screen.getByRole('button', { name: /up/i })).not.toBeDisabled();
+      if (expectedDisabled) {
+        expect(screen.getByRole('button', { name: /up/i })).toBeDisabled();
+      } else {
+        expect(screen.getByRole('button', { name: /up/i })).not.toBeDisabled();
+      }
     });
   });
 

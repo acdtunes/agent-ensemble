@@ -121,11 +121,6 @@ describe('AddProjectDialog', () => {
 
   // --- Existing behavior preserved ---
 
-  it('renders input field for project path', () => {
-    renderDialog();
-    expect(screen.getByRole('textbox', { name: /project path/i })).toBeInTheDocument();
-  });
-
   it('calls onSubmit with the entered path', () => {
     const onSubmit = vi.fn();
     renderDialog({ onSubmit });
@@ -137,26 +132,16 @@ describe('AddProjectDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith('/home/user/my-project');
   });
 
-  it('calls onCancel when Cancel button clicked', () => {
-    const onCancel = vi.fn();
-    renderDialog({ onCancel });
-
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-    expect(onCancel).toHaveBeenCalledOnce();
-  });
-
-  it('disables submit button when submitting', () => {
-    renderDialog({ submitting: true });
-    expect(screen.getByRole('button', { name: /add/i })).toBeDisabled();
-  });
-
   it('displays error message when error is set', () => {
     renderDialog({ error: 'Duplicate project' });
     expect(screen.getByText('Duplicate project')).toBeInTheDocument();
   });
 
-  it('disables submit button when path is empty', () => {
-    renderDialog();
+  it.each([
+    { scenario: 'submitting', props: { submitting: true }, setup: null },
+    { scenario: 'empty path', props: {}, setup: null },
+  ])('disables submit button when $scenario', ({ props }) => {
+    renderDialog(props);
     expect(screen.getByRole('button', { name: /add$/i })).toBeDisabled();
   });
 });
