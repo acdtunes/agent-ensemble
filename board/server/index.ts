@@ -2,15 +2,14 @@ import { WebSocketServer, WebSocket } from 'ws';
 import express from 'express';
 import { createServer as createNodeHttpServer } from 'node:http';
 import type {
-  DeliveryState,
-  ExecutionPlan,
+  Roadmap,
+  RoadmapTransition,
   ProjectId,
   ProjectEntry,
   ProjectSummary,
   FeatureSummary,
   ClientWSMessage,
   ServerWSMessage,
-  StateTransition,
   Result,
   DirEntry,
   DocTreeError,
@@ -21,12 +20,12 @@ import type {
   BrowseEntry,
   BrowseError,
 } from '../shared/types.js';
-import { createProjectId, createFeatureId, deriveProjectSummary } from '../shared/types.js';
+import { createProjectId, createFeatureId, computeRoadmapSummary } from '../shared/types.js';
 import { validateDocPath } from './doc-content.js';
 import { validateBrowsePath, computeParentPath } from './browse.js';
 import { buildDocTree } from './doc-tree.js';
 import { resolveFeatureRoadmap } from './feature-path-resolver.js';
-import { isRecord, parseRoadmap, computeRoadmapSummary } from './parser.js';
+import { isRecord, parseRoadmap } from './parser.js';
 
 // --- Client message parsing (pure function) ---
 
@@ -38,6 +37,14 @@ export const parseClientMessage = (data: string): ClientWSMessage | null => {
     if (typeof parsed.projectId !== 'string') return null;
     const projectIdResult = createProjectId(parsed.projectId);
     if (!projectIdResult.ok) return null;
+
+    if ('featureId' in parsed && parsed.featureId !== undefined) {
+      if (typeof parsed.featureId !== 'string') return null;
+      const featureIdResult = createFeatureId(parsed.featureId);
+      if (!featureIdResult.ok) return null;
+      return { type: parsed.type, projectId: projectIdResult.value, featureId: featureIdResult.value };
+    }
+
     return { type: parsed.type, projectId: projectIdResult.value };
   } catch {
     return null;
@@ -49,6 +56,9 @@ export const parseClientMessage = (data: string): ClientWSMessage | null => {
 export interface SubscriptionServerDeps {
   readonly getProject: (projectId: ProjectId) => Result<ProjectEntry, unknown>;
   readonly listProjectSummaries: () => readonly ProjectSummary[];
+  readonly getFeatureRoadmap?: (projectId: ProjectId, featureId: FeatureId) => Roadmap | null;
+  readonly onFeatureSubscribed?: (projectId: ProjectId, featureId: FeatureId) => void;
+  readonly onFeatureUnsubscribed?: (projectId: ProjectId, featureId: FeatureId) => void;
 }
 
 export interface SubscriptionServer {
@@ -56,8 +66,14 @@ export interface SubscriptionServer {
   readonly ready: Promise<void>;
   readonly notifyProjectUpdate: (
     projectId: ProjectId,
-    state: DeliveryState,
-    transitions: readonly StateTransition[],
+    roadmap: Roadmap,
+    roadmapTransitions: readonly RoadmapTransition[],
+  ) => void;
+  readonly notifyFeatureUpdate: (
+    projectId: ProjectId,
+    featureId: FeatureId,
+    roadmap: Roadmap,
+    roadmapTransitions: readonly RoadmapTransition[],
   ) => void;
   readonly notifyProjectListChange: () => void;
   readonly notifyProjectRemoved: (projectId: ProjectId) => void;
@@ -71,75 +87,165 @@ const sendJson = (ws: WebSocket, message: ServerWSMessage): void => {
   }
 };
 
+const featureKey = (projectId: ProjectId, featureId: FeatureId): string =>
+  `${projectId}:${featureId}`;
+
 export const createSubscriptionServer = (
   port: number,
   deps: SubscriptionServerDeps,
 ): SubscriptionServer => {
   const subscriptions = new Map<WebSocket, Set<ProjectId>>();
-  const wss = new WebSocketServer({ port });
+  const featureSubscriptions = new Map<WebSocket, Map<ProjectId, Set<FeatureId>>>();
+  const featureSubscriberCounts = new Map<string, number>();
 
-  wss.on('connection', (rawWs) => {
+  const decrementFeatureSubscriberCount = (projectId: ProjectId, featureId: FeatureId): void => {
+    const key = featureKey(projectId, featureId);
+    const count = (featureSubscriberCounts.get(key) ?? 1) - 1;
+    if (count <= 0) {
+      featureSubscriberCounts.delete(key);
+      deps.onFeatureUnsubscribed?.(projectId, featureId);
+    } else {
+      featureSubscriberCounts.set(key, count);
+    }
+  };
+
+  const webSocketServer = new WebSocketServer({ port });
+
+  webSocketServer.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`WebSocket port ${port} already in use. Kill the existing process: lsof -ti :${port} | xargs kill`);
+    } else {
+      console.error('WebSocket server error:', error.message);
+    }
+    process.exit(1);
+  });
+
+  webSocketServer.on('connection', (rawWs) => {
     const ws = rawWs as WebSocket;
     subscriptions.set(ws, new Set());
+    featureSubscriptions.set(ws, new Map());
 
     sendJson(ws, {
       type: 'project_list',
       projects: deps.listProjectSummaries(),
     });
 
-    ws.on('message', (data) => {
-      const subs = subscriptions.get(ws);
-      if (!subs) return;
+    ws.on('message', (rawData) => {
+      const projectSubs = subscriptions.get(ws);
+      if (!projectSubs) return;
 
-      const msg = parseClientMessage(data.toString());
-      if (!msg) return;
+      const clientMessage = parseClientMessage(rawData.toString());
+      if (!clientMessage) return;
 
-      if (msg.type === 'subscribe') {
-        subs.add(msg.projectId);
-        const result = deps.getProject(msg.projectId);
-        if (result.ok) {
-          sendJson(ws, {
-            type: 'init',
-            projectId: msg.projectId,
-            state: result.value.state,
-            plan: result.value.plan,
-          });
+      if (clientMessage.type === 'subscribe') {
+        if (clientMessage.featureId) {
+          const clientFeatureSubs = featureSubscriptions.get(ws)!;
+          const projectFeatures = clientFeatureSubs.get(clientMessage.projectId) ?? new Set<FeatureId>();
+          if (!projectFeatures.has(clientMessage.featureId)) {
+            projectFeatures.add(clientMessage.featureId);
+            clientFeatureSubs.set(clientMessage.projectId, projectFeatures);
+
+            const key = featureKey(clientMessage.projectId, clientMessage.featureId);
+            const countBefore = featureSubscriberCounts.get(key) ?? 0;
+            featureSubscriberCounts.set(key, countBefore + 1);
+
+            if (countBefore === 0) {
+              deps.onFeatureSubscribed?.(clientMessage.projectId, clientMessage.featureId);
+            }
+          }
+
+          const roadmap = deps.getFeatureRoadmap?.(clientMessage.projectId, clientMessage.featureId);
+          if (roadmap) {
+            sendJson(ws, { type: 'init', projectId: clientMessage.projectId, featureId: clientMessage.featureId, roadmap });
+          }
+        } else {
+          projectSubs.add(clientMessage.projectId);
+          const result = deps.getProject(clientMessage.projectId);
+          if (result.ok) {
+            sendJson(ws, {
+              type: 'init',
+              projectId: clientMessage.projectId,
+              roadmap: result.value.roadmap,
+            });
+          }
         }
-      } else if (msg.type === 'unsubscribe') {
-        subs.delete(msg.projectId);
+      } else if (clientMessage.type === 'unsubscribe') {
+        if (clientMessage.featureId) {
+          const clientFeatureSubs = featureSubscriptions.get(ws);
+          const projectFeatures = clientFeatureSubs?.get(clientMessage.projectId);
+          if (projectFeatures?.has(clientMessage.featureId)) {
+            projectFeatures.delete(clientMessage.featureId);
+            decrementFeatureSubscriberCount(clientMessage.projectId, clientMessage.featureId);
+          }
+        } else {
+          projectSubs.delete(clientMessage.projectId);
+        }
       }
     });
 
     ws.on('close', () => {
+      const clientFeatureSubs = featureSubscriptions.get(ws);
+      if (clientFeatureSubs) {
+        for (const [projectId, featureIds] of clientFeatureSubs) {
+          for (const featureId of featureIds) {
+            decrementFeatureSubscriberCount(projectId, featureId);
+          }
+        }
+      }
+
       subscriptions.delete(ws);
+      featureSubscriptions.delete(ws);
     });
   });
 
   const ready = new Promise<void>((resolve) => {
-    wss.on('listening', resolve);
+    webSocketServer.on('listening', resolve);
   });
 
   const resolvedPort = (): number => {
-    const addr = wss.address();
+    const addr = webSocketServer.address();
     if (typeof addr === 'string' || addr === null) return port;
     return addr.port;
   };
 
   const notifyProjectUpdate = (
     projectId: ProjectId,
-    state: DeliveryState,
-    transitions: readonly StateTransition[],
+    roadmap: Roadmap,
+    roadmapTransitions: readonly RoadmapTransition[],
   ): void => {
-    if (transitions.length === 0) return;
+    if (roadmapTransitions.length === 0) return;
 
     const msg: ServerWSMessage = {
       type: 'update',
       projectId,
-      state,
-      transitions,
+      roadmap,
+      roadmapTransitions,
     };
     for (const [ws, subs] of subscriptions) {
       if (subs.has(projectId)) {
+        sendJson(ws, msg);
+      }
+    }
+  };
+
+  const notifyFeatureUpdate = (
+    projectId: ProjectId,
+    featureId: FeatureId,
+    roadmap: Roadmap,
+    roadmapTransitions: readonly RoadmapTransition[],
+  ): void => {
+    if (roadmapTransitions.length === 0) return;
+
+    const msg: ServerWSMessage = {
+      type: 'update',
+      projectId,
+      featureId,
+      roadmap,
+      roadmapTransitions,
+    };
+    for (const [ws, featureSubs] of featureSubscriptions) {
+      const projectFeatures = featureSubs.get(projectId);
+      if (projectFeatures?.has(featureId)) {
         sendJson(ws, msg);
       }
     }
@@ -176,11 +282,13 @@ export const createSubscriptionServer = (
 
   const close = (): Promise<void> =>
     new Promise((resolve, reject) => {
-      for (const client of wss.clients) {
+      for (const client of webSocketServer.clients) {
         client.close();
       }
       subscriptions.clear();
-      wss.close((error) => {
+      featureSubscriptions.clear();
+      featureSubscriberCounts.clear();
+      webSocketServer.close((error) => {
         if (error) reject(error);
         else resolve();
       });
@@ -190,6 +298,7 @@ export const createSubscriptionServer = (
     get port() { return resolvedPort(); },
     ready,
     notifyProjectUpdate,
+    notifyFeatureUpdate,
     notifyProjectListChange,
     notifyProjectRemoved,
     notifyParseError,
@@ -331,34 +440,6 @@ export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.A
     });
   }
 
-  app.get('/api/projects/:id/state', (req, res) => {
-    const idResult = createProjectId(req.params.id);
-    if (!idResult.ok) {
-      res.status(400).json({ error: idResult.error });
-      return;
-    }
-    const result = deps.getProject(idResult.value);
-    if (!result.ok) {
-      res.status(404).json({ error: 'Project not found' });
-      return;
-    }
-    res.json(result.value.state);
-  });
-
-  app.get('/api/projects/:id/plan', (req, res) => {
-    const idResult = createProjectId(req.params.id);
-    if (!idResult.ok) {
-      res.status(400).json({ error: idResult.error });
-      return;
-    }
-    const result = deps.getProject(idResult.value);
-    if (!result.ok) {
-      res.status(404).json({ error: 'Project not found' });
-      return;
-    }
-    res.json(result.value.plan);
-  });
-
   // --- Feature discovery endpoint ---
 
   if (deps.discoverFeatures) {
@@ -368,6 +449,12 @@ export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.A
       const idResult = createProjectId(req.params.id);
       if (!idResult.ok) {
         res.status(400).json({ error: idResult.error });
+        return;
+      }
+
+      const projectResult = deps.getProject(idResult.value);
+      if (!projectResult.ok) {
+        res.status(404).json({ error: `Project not found: ${idResult.value}` });
         return;
       }
 
@@ -581,7 +668,15 @@ export const createHttpServer = (
 ): HttpServer => {
   const server = createNodeHttpServer(app);
 
-  const ready = new Promise<void>((resolve) => {
+  const ready = new Promise<void>((resolve, reject) => {
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`HTTP port ${port} already in use. Kill the existing process: lsof -ti :${port} | xargs kill`);
+      } else {
+        console.error('HTTP server error:', error.message);
+      }
+      reject(error);
+    });
     server.listen(port, resolve);
   });
 

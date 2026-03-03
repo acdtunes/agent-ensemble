@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { readFile as readFileAsync, writeFile as writeFileAsync, access as fsAccess } from 'node:fs/promises';
 import { join, basename } from 'node:path';
-import type { ProjectId, ProjectConfig, ProjectSummary, FeatureSummary, FeatureId, AddProjectError, RemoveProjectError, Result } from '../shared/types.js';
+import type { ProjectId, ProjectConfig, ProjectSummary, FeatureSummary, FeatureId, Roadmap, RoadmapTransition, AddProjectError, RemoveProjectError, Result } from '../shared/types.js';
 import { createProjectId, deriveProjectSummary } from '../shared/types.js';
-import { parseRoadmap, roadmapToDeliveryState, roadmapToExecutionPlan } from './parser.js';
-import { createFileWatcher } from './watcher.js';
+import { parseRoadmap } from './parser.js';
+import { createFileWatcher, type FileWatcher } from './watcher.js';
 import { createProjectRegistry, type ProjectRegistry } from './registry.js';
 import { computeTransitions } from './differ.js';
 import {
@@ -16,6 +16,7 @@ import {
   type DocHttpDeps,
   type BrowseHttpDeps,
 } from './index.js';
+import { resolveFeatureRoadmap } from './feature-path-resolver.js';
 import {
   createProjectDiscovery,
   scanProjectDirsFs,
@@ -93,6 +94,87 @@ export interface MultiProjectServer {
   readonly close: () => Promise<void>;
 }
 
+// --- Feature watcher lifecycle ---
+
+interface FeatureWatcherManager {
+  readonly getRoadmap: (projectId: ProjectId, featureId: FeatureId) => Roadmap | null;
+  readonly onSubscribed: (projectId: ProjectId, featureId: FeatureId) => void;
+  readonly onUnsubscribed: (projectId: ProjectId, featureId: FeatureId) => void;
+  readonly closeAll: () => Promise<void>;
+}
+
+interface FeatureWatcherManagerDeps {
+  readonly getProjectPath: (projectId: ProjectId) => string | undefined;
+  readonly onRoadmapChanged: (
+    projectId: ProjectId,
+    featureId: FeatureId,
+    roadmap: Roadmap,
+    transitions: readonly RoadmapTransition[],
+  ) => void;
+}
+
+const EMPTY_ROADMAP: Roadmap = { roadmap: {}, phases: [] };
+
+const createFeatureWatcherManager = (deps: FeatureWatcherManagerDeps): FeatureWatcherManager => {
+  const watchers = new Map<string, FileWatcher>();
+  const roadmaps = new Map<string, Roadmap>();
+
+  const toKey = (projectId: ProjectId, featureId: FeatureId): string =>
+    `${projectId}:${featureId}`;
+
+  const getRoadmap = (projectId: ProjectId, featureId: FeatureId): Roadmap | null =>
+    roadmaps.get(toKey(projectId, featureId)) ?? null;
+
+  const onSubscribed = (projectId: ProjectId, featureId: FeatureId): void => {
+    const key = toKey(projectId, featureId);
+    if (watchers.has(key)) return;
+
+    const projectPath = deps.getProjectPath(projectId);
+    if (!projectPath) return;
+
+    const roadmapPath = resolveFeatureRoadmap(projectPath, featureId);
+
+    const fileResult = readFileSyncResult(roadmapPath);
+    if (fileResult.ok) {
+      const parsed = parseRoadmap(fileResult.value);
+      if (parsed.ok) {
+        roadmaps.set(key, parsed.value);
+      }
+    }
+
+    const watcher = createFileWatcher(roadmapPath, (content) => {
+      const parsed = parseRoadmap(content);
+      if (!parsed.ok) return;
+
+      const previousRoadmap = roadmaps.get(key) ?? EMPTY_ROADMAP;
+      roadmaps.set(key, parsed.value);
+
+      const transitions = computeTransitions(previousRoadmap, parsed.value, new Date().toISOString());
+      deps.onRoadmapChanged(projectId, featureId, parsed.value, transitions);
+    });
+
+    watchers.set(key, watcher);
+  };
+
+  const onUnsubscribed = (projectId: ProjectId, featureId: FeatureId): void => {
+    const key = toKey(projectId, featureId);
+    const watcher = watchers.get(key);
+    if (watcher) {
+      watcher.close();
+      watchers.delete(key);
+      roadmaps.delete(key);
+    }
+  };
+
+  const closeAll = async (): Promise<void> => {
+    await Promise.all([...watchers.values()].map((watcher) => watcher.close()));
+    watchers.clear();
+    roadmaps.clear();
+  };
+
+  return { getRoadmap, onSubscribed, onUnsubscribed, closeAll };
+};
+
 // --- Synchronous file read adapter ---
 
 const readFileSyncResult = (path: string): Result<string, string> => {
@@ -125,7 +207,7 @@ export const createMultiProjectServer = (
 
   const listProjectSummariesWithFeatures = (): readonly ProjectSummary[] =>
     registry.getAll().map((entry) =>
-      deriveProjectSummary(entry.projectId, entry.state, featuresCache.get(entry.projectId) ?? []),
+      deriveProjectSummary(entry.projectId, entry.roadmap, featuresCache.get(entry.projectId) ?? []),
     );
 
   // Registry wired with real deps — subscription server set up below
@@ -135,12 +217,17 @@ export const createMultiProjectServer = (
     createWatcher: createFileWatcher,
     readFile: readFileSyncResult,
     parseRoadmap,
-    roadmapToDeliveryState,
-    roadmapToExecutionPlan,
-    onStateChange: (projectId, previousState, newState) => {
+    onStateChange: (projectId, previousRoadmap, newRoadmap) => {
       if (!subscriptionServer) return;
-      const transitions = computeTransitions(previousState, newState, new Date().toISOString());
-      subscriptionServer.notifyProjectUpdate(projectId, newState, transitions);
+      const transitions = computeTransitions(previousRoadmap, newRoadmap, new Date().toISOString());
+      subscriptionServer.notifyProjectUpdate(projectId, newRoadmap, transitions);
+    },
+  });
+
+  const featureWatcherManager = createFeatureWatcherManager({
+    getProjectPath: (projectId) => pathMap.get(projectId),
+    onRoadmapChanged: (projectId, featureId, roadmap, transitions) => {
+      subscriptionServer?.notifyFeatureUpdate(projectId, featureId, roadmap, transitions);
     },
   });
 
@@ -180,6 +267,9 @@ export const createMultiProjectServer = (
   subscriptionServer = createSubscriptionServer(config.wsPort, {
     getProject: (id) => registry.get(id),
     listProjectSummaries: listProjectSummariesWithFeatures,
+    getFeatureRoadmap: featureWatcherManager.getRoadmap,
+    onFeatureSubscribed: featureWatcherManager.onSubscribed,
+    onFeatureUnsubscribed: featureWatcherManager.onUnsubscribed,
   });
 
   // Doc endpoint deps — wired with real scanDocsDir and readDocContent
@@ -244,7 +334,7 @@ export const createMultiProjectServer = (
     subscriptionServer?.notifyProjectListChange();
     const features = featuresCache.get(idResult.value) ?? [];
 
-    return ok(deriveProjectSummary(idResult.value, addResult.value.state, features));
+    return ok(deriveProjectSummary(idResult.value, addResult.value.roadmap, features));
   };
 
   const removeProject = async (projectId: ProjectId): Promise<Result<void, RemoveProjectError>> => {
@@ -303,12 +393,12 @@ export const createMultiProjectServer = (
 
     // Load projects manifest and register persisted projects
     projectsManifest = await loadProjectsManifest(manifestPath);
-    for (const reg of projectsManifest.projects) {
-      const idResult = createProjectId(reg.projectId);
+    for (const registration of projectsManifest.projects) {
+      const idResult = createProjectId(registration.projectId);
       if (idResult.ok) {
         manifestIds.add(idResult.value);
-        pathMap.set(idResult.value, reg.path);
-        registry.add(toConfigFromPath(idResult.value, reg.path));
+        pathMap.set(idResult.value, registration.path);
+        registry.add(toConfigFromPath(idResult.value, registration.path));
       }
     }
 
@@ -324,6 +414,7 @@ export const createMultiProjectServer = (
 
   const close = async (): Promise<void> => {
     discovery.stop();
+    await featureWatcherManager.closeAll();
     await registry.close();
     await subscriptionServer!.close();
     await httpServer.close();
