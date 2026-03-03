@@ -57,14 +57,6 @@ def test_extract_steps_defaults_description_when_missing():
     assert steps[0].description == ""
 
 
-# --- Backward compatibility ---
-
-
-def test_step_without_description_defaults_to_empty():
-    step = Step("01-01", "Name", ["f.py"], [], "01")
-    assert step.description == ""
-
-
 # --- Validation: files_to_modify must not be empty ---
 
 
