@@ -1,5 +1,5 @@
 import type { StepCardData } from '../utils/statusMapping';
-import { getStatusColor } from '../utils/statusColors';
+import { getStatusTopBarColor } from '../utils/statusColors';
 import { getCardAnimationClasses } from '../utils/animationClasses';
 import { getTeammateColor } from '../utils/teammateColors';
 
@@ -19,18 +19,18 @@ interface StepCardProps {
 }
 
 export const StepCard = ({ card, onCardClick }: StepCardProps) => {
-  const colors = getStatusColor(card.displayColumn);
   const animationClasses = getCardAnimationClasses(card.displayColumn);
+  const topBarColor = getStatusTopBarColor(card.displayColumn);
   const isClickable = onCardClick !== undefined;
 
   return (
     <div
       data-testid="step-card"
-      className={`rounded border-l-2 bg-gray-900/80 backdrop-blur-sm p-2 text-sm shadow-sm ${colors.border} ${animationClasses}${isClickable ? ' cursor-pointer' : ''}`}
+      className={`rounded min-h-[160px] flex flex-col bg-gray-900/80 backdrop-blur-sm p-2 text-sm shadow-sm ${topBarColor} ${animationClasses}${isClickable ? ' cursor-pointer' : ''}`}
       onClick={isClickable ? () => onCardClick(card.stepId) : undefined}
     >
-      <div className="flex items-center justify-between">
-        <span className="min-w-0 truncate font-medium text-gray-100">{card.stepName}</span>
+      <div className="flex items-start justify-between">
+        <span className="min-w-0 font-medium text-gray-100">{card.stepName}</span>
         <span className="shrink-0 whitespace-nowrap font-mono text-xs text-gray-400">{card.stepId}</span>
       </div>
       <div className="text-xs text-gray-400">

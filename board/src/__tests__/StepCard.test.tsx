@@ -125,4 +125,41 @@ describe('StepCard', () => {
     render(<StepCard card={baseCard} />);
     expect(screen.getByTestId('step-card').className).not.toMatch(/cursor-pointer/);
   });
+
+  describe('tall card layout', () => {
+    it('has minimum height of 160px', () => {
+      render(<StepCard card={baseCard} />);
+      expect(screen.getByTestId('step-card').className).toMatch(/min-h-\[160px\]/);
+    });
+
+    it('uses flex-col layout', () => {
+      render(<StepCard card={baseCard} />);
+      expect(screen.getByTestId('step-card').className).toMatch(/flex/);
+      expect(screen.getByTestId('step-card').className).toMatch(/flex-col/);
+    });
+
+    it('has no left border', () => {
+      render(<StepCard card={baseCard} />);
+      expect(screen.getByTestId('step-card').className).not.toMatch(/border-l/);
+    });
+
+    it('allows step name to wrap instead of truncate', () => {
+      render(<StepCard card={baseCard} />);
+      const stepName = screen.getByText('refactor-server');
+      expect(stepName.className).not.toMatch(/truncate/);
+    });
+
+    it.each([
+      { displayColumn: 'pending', expectedBorder: 'border-t-gray-500' },
+      { displayColumn: 'in_progress', expectedBorder: 'border-t-yellow-400' },
+      { displayColumn: 'review', expectedBorder: 'border-t-violet-400' },
+      { displayColumn: 'done', expectedBorder: 'border-t-green-400' },
+    ] as const)('has 4px top border with $displayColumn status color', ({ displayColumn, expectedBorder }) => {
+      const card = { ...baseCard, displayColumn };
+      render(<StepCard card={card} />);
+      const stepCard = screen.getByTestId('step-card');
+      expect(stepCard.className).toMatch(/border-t-4/);
+      expect(stepCard.className).toContain(expectedBorder);
+    });
+  });
 });
