@@ -13,7 +13,7 @@
 
 import type { FeatureId, FeatureSummary, Roadmap } from '../shared/types.js';
 import { createFeatureId } from '../shared/types.js';
-import { computeRoadmapSummary } from './parser.js';
+import { computeRoadmapSummary } from '../shared/types.js';
 
 // =====================================================================
 // Pure Core — no filesystem access, no side effects
@@ -82,7 +82,7 @@ import { join } from 'node:path';
 import { resolveFeatureRoadmap } from './feature-path-resolver.js';
 import { parseRoadmap } from './parser.js';
 
-const FEATURE_BASE = 'docs/feature';
+const SCAN_DIRS = ['docs/feature', 'docs/ux', 'docs/requirements'] as const;
 
 const readYamlFile = async (path: string): Promise<string | null> => {
   try {
@@ -92,14 +92,12 @@ const readYamlFile = async (path: string): Promise<string | null> => {
   }
 };
 
-export const scanFeatureDirsFs = async (
-  projectPath: string,
+const scanSingleDir = async (
+  dirPath: string,
 ): Promise<readonly FeatureId[]> => {
-  const featureRoot = join(projectPath, FEATURE_BASE);
-
   let entries;
   try {
-    entries = await readdir(featureRoot, { withFileTypes: true });
+    entries = await readdir(dirPath, { withFileTypes: true });
   } catch {
     return [];
   }
@@ -109,6 +107,26 @@ export const scanFeatureDirsFs = async (
     .map((entry) => createFeatureId(entry.name))
     .filter((result) => result.ok)
     .map((result) => result.value as FeatureId);
+};
+
+const deduplicateFeatureIds = (ids: readonly FeatureId[]): readonly FeatureId[] => {
+  const seen = new Set<string>();
+  return ids.filter((id) => {
+    const key = id as string;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+export const scanFeatureDirsFs = async (
+  projectPath: string,
+): Promise<readonly FeatureId[]> => {
+  const allIds = await Promise.all(
+    SCAN_DIRS.map((dir) => scanSingleDir(join(projectPath, dir))),
+  );
+
+  return deduplicateFeatureIds(allIds.flat());
 };
 
 export const loadFeatureRoadmapFs = async (

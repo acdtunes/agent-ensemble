@@ -30,12 +30,23 @@ const makeFeatureId = (raw: string): FeatureId => {
 };
 
 const FEATURE_BASE = 'docs/feature';
+const UX_BASE = 'docs/ux';
+const REQUIREMENTS_BASE = 'docs/requirements';
 
-const makeFeatureDir = async (projectPath: string, featureName: string): Promise<string> => {
-  const featureDir = join(projectPath, FEATURE_BASE, featureName);
+const makeDirIn = async (projectPath: string, base: string, featureName: string): Promise<string> => {
+  const featureDir = join(projectPath, base, featureName);
   await mkdir(featureDir, { recursive: true });
   return featureDir;
 };
+
+const makeFeatureDir = async (projectPath: string, featureName: string): Promise<string> =>
+  makeDirIn(projectPath, FEATURE_BASE, featureName);
+
+const makeUxDir = async (projectPath: string, featureName: string): Promise<string> =>
+  makeDirIn(projectPath, UX_BASE, featureName);
+
+const makeRequirementsDir = async (projectPath: string, featureName: string): Promise<string> =>
+  makeDirIn(projectPath, REQUIREMENTS_BASE, featureName);
 
 const unifiedRoadmapYaml = (opts?: { withActivity?: boolean }): string =>
   yaml.dump({
@@ -52,7 +63,7 @@ const unifiedRoadmapYaml = (opts?: { withActivity?: boolean }): string =>
         {
           id: '01-01',
           name: 'Step A',
-          files_to_modify: ['a.ts'],
+          files: ['a.ts'],
           dependencies: [],
           criteria: ['AC1'],
           ...(opts?.withActivity ? {
@@ -66,7 +77,7 @@ const unifiedRoadmapYaml = (opts?: { withActivity?: boolean }): string =>
         {
           id: '01-02',
           name: 'Step B',
-          files_to_modify: ['b.ts'],
+          files: ['b.ts'],
           dependencies: ['01-01'],
           criteria: ['AC2'],
           ...(opts?.withActivity ? {
@@ -199,6 +210,75 @@ describe('scanFeatureDirsFs: reads feature subdirectories from project path', ()
     const featureIds = await scanFeatureDirsFs(projectPath);
 
     expect(featureIds).toEqual([]);
+  });
+
+  it('scans docs/ux/ and docs/requirements/ in addition to docs/feature/', async () => {
+    await makeFeatureDir(projectPath, 'auth');
+    await makeUxDir(projectPath, 'onboarding');
+    await makeRequirementsDir(projectPath, 'billing');
+
+    const featureIds = await scanFeatureDirsFs(projectPath);
+
+    const ids = [...featureIds].map((id) => id as string).sort();
+    expect(ids).toEqual(['auth', 'billing', 'onboarding']);
+  });
+
+  it('deduplicates feature IDs found in multiple directories', async () => {
+    await makeFeatureDir(projectPath, 'auth');
+    await makeUxDir(projectPath, 'auth');
+    await makeRequirementsDir(projectPath, 'auth');
+
+    const featureIds = await scanFeatureDirsFs(projectPath);
+
+    expect(featureIds).toHaveLength(1);
+    expect(featureIds[0] as string).toBe('auth');
+  });
+
+  it('silently skips missing scan directories', async () => {
+    // Only docs/feature/ exists, docs/ux/ and docs/requirements/ do not
+    await makeFeatureDir(projectPath, 'auth');
+
+    const featureIds = await scanFeatureDirsFs(projectPath);
+
+    expect(featureIds).toHaveLength(1);
+    expect(featureIds[0] as string).toBe('auth');
+  });
+
+  it('skips invalid directory names across all scan directories', async () => {
+    await makeFeatureDir(projectPath, 'valid-feature');
+    await makeUxDir(projectPath, '.hidden');
+    await makeRequirementsDir(projectPath, 'UPPERCASE');
+
+    const featureIds = await scanFeatureDirsFs(projectPath);
+
+    expect(featureIds).toHaveLength(1);
+    expect(featureIds[0] as string).toBe('valid-feature');
+  });
+});
+
+// =================================================================
+// discoverFeaturesFs: features from ux/requirements have hasRoadmap false
+// =================================================================
+describe('discoverFeaturesFs: multi-directory discovery', () => {
+  it('features discovered only from docs/ux/ or docs/requirements/ return hasRoadmap false', async () => {
+    await writeFeatureRoadmap(projectPath, 'auth', { withActivity: true });
+    await makeUxDir(projectPath, 'onboarding');
+    await makeRequirementsDir(projectPath, 'billing');
+
+    const summaries = await discoverFeaturesFs(projectPath);
+
+    expect(summaries).toHaveLength(3);
+
+    const auth = summaries.find((s) => (s.featureId as string) === 'auth')!;
+    expect(auth.hasRoadmap).toBe(true);
+
+    const onboarding = summaries.find((s) => (s.featureId as string) === 'onboarding')!;
+    expect(onboarding.hasRoadmap).toBe(false);
+    expect(onboarding.totalSteps).toBe(0);
+
+    const billing = summaries.find((s) => (s.featureId as string) === 'billing')!;
+    expect(billing.hasRoadmap).toBe(false);
+    expect(billing.totalSteps).toBe(0);
   });
 });
 
