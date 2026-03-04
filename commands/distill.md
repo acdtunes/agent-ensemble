@@ -1,6 +1,6 @@
-# AGENT-ENSEMBLE:DISTILL — Parallel Acceptance Test Design with Agent Teams
+# Parallel Acceptance Test Design with Agent Teams
 
-**Command**: `/agent-ensemble:distill`
+**Command**: `/ensemble:distill`
 **Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
 
 ## Overview
@@ -221,7 +221,7 @@ Present the consolidated acceptance test suite to the user.
 ## Example Invocation
 
 ```
-User: /agent-ensemble:distill "Design acceptance tests for the checkout feature stories"
+User: /ensemble:distill "Design acceptance tests for the checkout feature stories"
 
 Lead (you):
 1. Read stories: US-10 (cart review), US-11 (payment), US-12 (confirmation), US-13 (order history)

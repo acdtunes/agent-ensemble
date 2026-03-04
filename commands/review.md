@@ -1,6 +1,6 @@
-# AGENT-ENSEMBLE:REVIEW — Multi-Perspective Code Review with Agent Teams
+# Multi-Perspective Code Review with Agent Teams
 
-**Command**: `/agent-ensemble:review`
+**Command**: `/ensemble:review`
 **Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
 
 ## Overview
@@ -150,7 +150,7 @@ Present the unified report to the user.
 Users can request specific focus areas:
 
 ```
-/agent-ensemble:review --focus security,performance
+/ensemble:review --focus security,performance
 ```
 
 This spawns only the requested reviewer types.
@@ -158,7 +158,7 @@ This spawns only the requested reviewer types.
 ## Example Invocation
 
 ```
-User: /agent-ensemble:review PR #142
+User: /ensemble:review PR #142
 
 Lead (you):
 1. Fetch PR diff

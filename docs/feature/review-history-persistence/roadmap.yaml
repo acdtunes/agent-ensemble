@@ -1,0 +1,79 @@
+roadmap:
+  project_id: review-history-persistence
+  created_at: '2026-03-04T10:39:40Z'
+  total_steps: 3
+  phases: 2
+phases:
+- id: '01'
+  name: 'CLI Command Enhancement'
+  steps:
+  - id: 01-01
+    name: 'Add --outcome/--feedback to transition command'
+    criteria:
+    - 'transition accepts optional --outcome flag (approved|rejected)'
+    - 'transition accepts optional --feedback flag (string)'
+    - 'When --outcome provided, review_history entry appended to step in roadmap.yaml'
+    - 'Invalid --outcome value rejected with exit code 2'
+    - 'Omitting --outcome preserves existing behavior (no review_history)'
+    files_to_modify:
+    - src/agent_ensemble/cli/team_state.py
+    - tests/test_review_history_persistence.py
+    dependencies: []
+    time_estimate: '2h'
+    status: approved
+    teammate_id: crafter-01-01
+    started_at: '2026-03-04T10:42:49.678608+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T10:46:36.737591+00:00'
+  - id: 01-02
+    name: 'Add --outcome/--feedback to complete-step command'
+    criteria:
+    - 'complete-step accepts optional --outcome flag (approved|rejected)'
+    - 'complete-step accepts optional --feedback flag (string)'
+    - 'When --outcome provided, review_history entry appended before worktree merge'
+    - 'Omitting --outcome preserves existing behavior (no review_history)'
+    - 'Multiple cycles accumulate in review_history list'
+    files_to_modify:
+    - src/agent_ensemble/cli/team_state.py
+    - tests/test_review_history_persistence.py
+    dependencies:
+    - 01-01
+    time_estimate: '1.5h'
+    status: approved
+    teammate_id: crafter-01-02
+    started_at: '2026-03-04T10:46:45.123252+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T10:51:01.860601+00:00'
+- id: '02'
+  name: 'Documentation Update'
+  steps:
+  - id: 02-01
+    name: 'Update execute.md with review outcome flags'
+    criteria:
+    - 'CLI Tools section shows --outcome/--feedback in transition example'
+    - 'CLI Tools section shows --outcome/--feedback in complete-step example'
+    - 'Reviewer Spawning Protocol includes --outcome/--feedback in approval and rejection
+      flows'
+    - 'Step Lifecycle Summary reflects review_history recording'
+    files_to_modify:
+    - commands/execute.md
+    dependencies:
+    - 01-02
+    time_estimate: '30m'
+    status: approved
+    teammate_id: crafter-02-01
+    started_at: '2026-03-04T10:51:10.385644+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T11:34:57.734763+00:00'
+implementation_scope:
+  source_directories:
+  - src/agent_ensemble/cli/
+  test_directories:
+  - tests/
+  excluded_patterns:
+  - __init__.py
+  - __pycache__/**
+validation:
+  status: pending
+  reviewer: acceptance-designer
+  approved_at:

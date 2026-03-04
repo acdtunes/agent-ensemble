@@ -14,7 +14,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
-import type { ServerWSMessage, Roadmap } from '../../shared/types';
+import type { ServerWSMessage, Roadmap, ProjectId, FeatureId } from '../../shared/types';
 
 // --- WebSocket mock ---
 
@@ -76,14 +76,14 @@ const makeRoadmap = (): Roadmap => ({
     name: 'Foundation',
     steps: [
       {
-        id: '01-01', name: 'Step A', files_to_modify: [], deps: [], criteria: [],
+        id: '01-01', name: 'Step A', files_to_modify: [], dependencies: [], criteria: [],
         status: 'approved', teammate_id: 'crafter-01',
-        started_at: '2026-03-01T01:00:00Z', completed_at: '2026-03-01T02:00:00Z', review_attempts: 1,
+        started_at: null, completed_at: null, review_attempts: 1,
       },
       {
-        id: '01-02', name: 'Step B', files_to_modify: [], deps: [], criteria: [],
+        id: '01-02', name: 'Step B', files_to_modify: [], dependencies: [], criteria: [],
         status: 'in_progress', teammate_id: 'crafter-02',
-        started_at: '2026-03-01T03:00:00Z', review_attempts: 0,
+        started_at: null, completed_at: null, review_attempts: 0,
       },
     ],
   }],
@@ -96,14 +96,14 @@ const makeUpdatedRoadmap = (): Roadmap => ({
     name: 'Foundation',
     steps: [
       {
-        id: '01-01', name: 'Step A', files_to_modify: [], deps: [], criteria: [],
+        id: '01-01', name: 'Step A', files_to_modify: [], dependencies: [], criteria: [],
         status: 'approved', teammate_id: 'crafter-01',
-        started_at: '2026-03-01T01:00:00Z', completed_at: '2026-03-01T02:00:00Z', review_attempts: 1,
+        started_at: null, completed_at: null, review_attempts: 1,
       },
       {
-        id: '01-02', name: 'Step B', files_to_modify: [], deps: [], criteria: [],
+        id: '01-02', name: 'Step B', files_to_modify: [], dependencies: [], criteria: [],
         status: 'approved', teammate_id: 'crafter-02',
-        started_at: '2026-03-01T03:00:00Z', completed_at: '2026-03-01T04:00:00Z', review_attempts: 1,
+        started_at: null, completed_at: null, review_attempts: 1,
       },
     ],
   }],
@@ -135,8 +135,8 @@ describe('useFeatureState', () => {
     const subscribeMsg = JSON.parse(ws.sentMessages[0]);
     expect(subscribeMsg).toEqual({
       type: 'subscribe',
-      projectId: 'my-project',
-      featureId: 'auth-flow',
+      projectId: 'my-project' as ProjectId,
+      featureId: 'auth-flow' as FeatureId,
     });
   });
 
@@ -157,8 +157,8 @@ describe('useFeatureState', () => {
     act(() => {
       ws.simulateMessage({
         type: 'init',
-        projectId: 'my-project',
-        featureId: 'auth-flow',
+        projectId: 'my-project' as ProjectId,
+        featureId: 'auth-flow' as FeatureId,
         roadmap,
       });
     });
@@ -192,8 +192,8 @@ describe('useFeatureState', () => {
     act(() => {
       ws.simulateMessage({
         type: 'init',
-        projectId: 'my-project',
-        featureId: 'auth-flow',
+        projectId: 'my-project' as ProjectId,
+        featureId: 'auth-flow' as FeatureId,
         roadmap,
       });
     });
@@ -207,10 +207,10 @@ describe('useFeatureState', () => {
     act(() => {
       ws.simulateMessage({
         type: 'update',
-        projectId: 'my-project',
-        featureId: 'auth-flow',
+        projectId: 'my-project' as ProjectId,
+        featureId: 'auth-flow' as FeatureId,
         roadmap: updatedRoadmap,
-        roadmapTransitions: [{ stepId: '01-02', from: 'in_progress', to: 'approved' }],
+        roadmapTransitions: [{ step_id: '01-02', from_status: 'in_progress', to_status: 'approved', teammate_id: null, timestamp: '2026-03-01T04:00:00Z' }],
       });
     });
 
@@ -236,8 +236,8 @@ describe('useFeatureState', () => {
     act(() => {
       ws.simulateMessage({
         type: 'init',
-        projectId: 'my-project',
-        featureId: 'other-feature',
+        projectId: 'my-project' as ProjectId,
+        featureId: 'other-feature' as FeatureId,
         roadmap: makeRoadmap(),
       });
     });
@@ -251,7 +251,7 @@ describe('useFeatureState', () => {
     const { useFeatureState } = await import(/* @vite-ignore */ HOOK_PATH);
     const { result, rerender } = renderHook(
       ({ featureId }: { featureId: string }) => useFeatureState('my-project', featureId, 'ws://localhost:3001'),
-      { initialProps: { featureId: 'auth-flow' } },
+      { initialProps: { featureId: 'auth-flow' as FeatureId } },
     );
 
     await waitFor(() => {
@@ -263,8 +263,8 @@ describe('useFeatureState', () => {
     act(() => {
       ws.simulateMessage({
         type: 'init',
-        projectId: 'my-project',
-        featureId: 'auth-flow',
+        projectId: 'my-project' as ProjectId,
+        featureId: 'auth-flow' as FeatureId,
         roadmap: makeRoadmap(),
       });
     });
@@ -275,7 +275,7 @@ describe('useFeatureState', () => {
 
     ws.sentMessages = [];
 
-    rerender({ featureId: 'user-profile' });
+    rerender({ featureId: 'user-profile' as FeatureId });
 
     await waitFor(() => {
       expect(ws.sentMessages.length).toBe(2);
@@ -286,13 +286,13 @@ describe('useFeatureState', () => {
 
     expect(unsubscribeMsg).toEqual({
       type: 'unsubscribe',
-      projectId: 'my-project',
-      featureId: 'auth-flow',
+      projectId: 'my-project' as ProjectId,
+      featureId: 'auth-flow' as FeatureId,
     });
     expect(subscribeMsg).toEqual({
       type: 'subscribe',
-      projectId: 'my-project',
-      featureId: 'user-profile',
+      projectId: 'my-project' as ProjectId,
+      featureId: 'user-profile' as FeatureId,
     });
 
     expect(result.current.loading).toBe(true);

@@ -1,0 +1,154 @@
+roadmap:
+  project_id: feature-description
+  created_at: '2026-03-04T16:07:05Z'
+  total_steps: 6
+  phases: 2
+  short_description: AI-generated descriptions on feature cards and board 
+    headers
+  description: Extend the roadmap data model and UI to display short 
+    descriptions on feature cards and full descriptions as headers in the board 
+    view.
+phases:
+- id: '01'
+  name: 'Types and Parser'
+  steps:
+  - id: 01-01
+    name: 'Extend RoadmapMeta with description fields'
+    files_to_modify:
+    - board/shared/types.ts
+    criteria:
+    - 'RoadmapMeta type includes optional short_description string field'
+    - 'RoadmapMeta type includes optional description string field'
+    - 'Existing roadmaps without descriptions parse without error'
+    status: approved
+    teammate_id: crafter-01-01
+    started_at: '2026-03-04T16:09:34.972551+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T16:16:30.059608+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-04T16:16:30.059608+00:00'
+      outcome: approved
+      feedback: Clean, minimal implementation matching acceptance criteria
+  - id: 01-02
+    name: 'Extend FeatureSummary with description fields'
+    files_to_modify:
+    - board/shared/types.ts
+    depends_on:
+    - 01-01
+    criteria:
+    - 'FeatureSummary type includes optional shortDescription string field'
+    - 'FeatureSummary type includes optional description string field'
+    - 'Existing code using FeatureSummary compiles without change'
+    status: approved
+    teammate_id: crafter-01-02
+    started_at: '2026-03-04T16:16:42.551124+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T16:21:32.718621+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-04T16:21:32.718621+00:00'
+      outcome: approved
+      feedback: Type extension verified, backward compatible
+  - id: 01-03
+    name: 'Update parser to extract description fields'
+    files_to_modify:
+    - board/server/parser.ts
+    depends_on:
+    - 01-01
+    criteria:
+    - 'validateRoadmapMeta extracts short_description from raw YAML'
+    - 'validateRoadmapMeta extracts description from raw YAML'
+    - 'Missing fields yield undefined (not null or empty string)'
+    status: approved
+    teammate_id: crafter-01-03
+    started_at: '2026-03-04T16:16:45.933030+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T16:21:32.877731+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-04T16:21:32.877731+00:00'
+      outcome: approved
+      feedback: Parser extracts descriptions correctly, all tests pass
+  - id: 01-04
+    name: 'Update deriveFeatureSummary to pass descriptions'
+    files_to_modify:
+    - board/server/feature-discovery.ts
+    depends_on:
+    - 01-01
+    - 01-02
+    - 01-03
+    criteria:
+    - 'deriveFeatureSummary maps roadmap.short_description to shortDescription'
+    - 'deriveFeatureSummary maps roadmap.description to description'
+    - 'Null roadmap produces undefined descriptions'
+    status: approved
+    teammate_id: crafter-01-04
+    started_at: '2026-03-04T16:21:48.557736+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T16:26:00.360169+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-04T16:26:00.360169+00:00'
+      outcome: approved
+      feedback: Clean 2-line addition, all tests pass
+- id: '02'
+  name: 'UI Display'
+  steps:
+  - id: 02-01
+    name: 'Display short description on FeatureCard'
+    files_to_modify:
+    - board/src/components/FeatureCard.tsx
+    depends_on:
+    - 01-02
+    criteria:
+    - 'Short description appears below feature name with muted styling'
+    - 'Long descriptions truncate with ellipsis via CSS'
+    - 'Empty or whitespace-only descriptions render no element'
+    - 'Cards without shortDescription display unchanged'
+    status: approved
+    teammate_id: crafter-02-01
+    started_at: '2026-03-04T16:21:51.983878+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T16:29:39.609493+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-04T16:29:39.609493+00:00'
+      outcome: approved
+      feedback: Clean implementation, all AC covered
+  - id: 02-02
+    name: 'Display description header on FeatureBoardView'
+    files_to_modify:
+    - board/src/components/FeatureBoardView.tsx
+    depends_on:
+    - 01-02
+    criteria:
+    - 'Description header appears between breadcrumb and Kanban board'
+    - 'Header is static (no collapse/expand control)'
+    - 'Empty or whitespace-only descriptions render no header'
+    - 'Boards without description display unchanged'
+    status: approved
+    teammate_id: crafter-02-02
+    started_at: '2026-03-04T16:21:55.388090+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T16:28:12.748967+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-04T16:28:12.748967+00:00'
+      outcome: approved
+      feedback: Tests well-designed, all AC covered
+implementation_scope:
+  source_directories:
+  - board/shared/
+  - board/server/
+  - board/src/components/
+  test_directories:
+  - board/src/__tests__/acceptance/feature-description/
+  excluded_patterns:
+  - __init__.py
+  - __pycache__/**
+  - node_modules/**
+validation:
+  status: pending
+  reviewer: solution-architect-reviewer
+  approved_at:

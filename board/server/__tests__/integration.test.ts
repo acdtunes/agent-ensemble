@@ -403,4 +403,84 @@ describe('Multi-project end-to-end integration', () => {
     const contentBody = await contentResponse.json();
     expect(contentBody.error).toBeDefined();
   });
+
+  it('should broadcast feature list update when a new feature directory is created', async () => {
+    // Given: a project exists with docs/feature directory
+    await addProjectDir(rootDir, 'project-alpha');
+    const featureDir = join(rootDir, 'project-alpha', 'docs', 'feature');
+    await mkdir(featureDir, { recursive: true });
+
+    server = createMultiProjectServer({
+      projectsRoot: rootDir,
+      wsPort: 0,
+      httpPort: 0,
+      pollIntervalMs: 10000, // Long poll so we know the update comes from directory watcher
+    });
+    await server.ready;
+
+    const client = await connectTestClient(server.wsPort);
+    clients.push(client);
+
+    // Wait for initial project_list
+    await client.waitForMessage(1);
+
+    const initialMsg = client.messages[0];
+    expect(initialMsg.type).toBe('project_list');
+    if (initialMsg.type !== 'project_list') return;
+    // Initially no features
+    const initialProject = initialMsg.projects.find((p) => p.projectId === 'project-alpha');
+    expect(initialProject?.featureCount).toBe(0);
+
+    // When: a new feature directory is created
+    await mkdir(join(featureDir, 'auth'));
+
+    // Then: client receives updated project_list with the new feature (within 1 second via directory watcher)
+    await client.waitForMessage(2, 3000);
+
+    const updateMsg = client.messages[1];
+    expect(updateMsg.type).toBe('project_list');
+    if (updateMsg.type !== 'project_list') return;
+    const updatedProject = updateMsg.projects.find((p) => p.projectId === 'project-alpha');
+    expect(updatedProject?.featureCount).toBe(1);
+    expect(updatedProject?.features.some((f) => f.featureId === 'auth')).toBe(true);
+  });
+
+  it('should broadcast feature list update when a feature directory is deleted', async () => {
+    // Given: a project exists with a feature directory
+    await addProjectDir(rootDir, 'project-alpha');
+    const featureDir = join(rootDir, 'project-alpha', 'docs', 'feature');
+    await mkdir(join(featureDir, 'to-delete'), { recursive: true });
+
+    server = createMultiProjectServer({
+      projectsRoot: rootDir,
+      wsPort: 0,
+      httpPort: 0,
+      pollIntervalMs: 10000, // Long poll so we know the update comes from directory watcher
+    });
+    await server.ready;
+
+    const client = await connectTestClient(server.wsPort);
+    clients.push(client);
+
+    // Wait for initial project_list
+    await client.waitForMessage(1);
+
+    const initialMsg = client.messages[0];
+    expect(initialMsg.type).toBe('project_list');
+    if (initialMsg.type !== 'project_list') return;
+    const initialProject = initialMsg.projects.find((p) => p.projectId === 'project-alpha');
+    expect(initialProject?.featureCount).toBe(1);
+
+    // When: the feature directory is deleted
+    await rm(join(featureDir, 'to-delete'), { recursive: true });
+
+    // Then: client receives updated project_list with zero features
+    await client.waitForMessage(2, 3000);
+
+    const updateMsg = client.messages[1];
+    expect(updateMsg.type).toBe('project_list');
+    if (updateMsg.type !== 'project_list') return;
+    const updatedProject = updateMsg.projects.find((p) => p.projectId === 'project-alpha');
+    expect(updatedProject?.featureCount).toBe(0);
+  });
 });

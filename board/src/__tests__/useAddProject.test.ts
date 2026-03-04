@@ -32,7 +32,7 @@ describe('useAddProject', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectPath: '/home/user/my-project' }),
+      body: JSON.stringify({ path: '/home/user/my-project' }),
     });
     expect(outcome).toEqual({ ok: true });
     expect(result.current.submitting).toBe(false);

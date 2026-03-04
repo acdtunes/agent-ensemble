@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -8,14 +9,33 @@ build/
 *.egg
 .venv/
 venv/
-.DS_Store
-.agent-ensemble/
-.claude/worktrees/
 
 # Node
 node_modules/
 
-# Local state/config
+# OS
+.DS_Store
+
+# Claude Code local state
+.claude/worktrees/
+.agent-ensemble/
+.ensemble/
+
+# Local project config (user-specific)
 .nwave/
 .nw-board-projects.json
 .mcp.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+.coverage
+htmlcov/
+
+# Lock files (keep package-lock.json but ignore uv.lock for Python)
+uv.lock

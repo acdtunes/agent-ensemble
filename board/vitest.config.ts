@@ -7,8 +7,8 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
-      // WIP: feature-archive has broken imports - re-enable when fixed
-      'src/__tests__/acceptance/feature-archive/**',
+      // WIP: feature-archive step tests use dynamic imports - re-enable when fixed
+      'src/__tests__/acceptance/feature-archive/steps/**',
     ],
   },
 });

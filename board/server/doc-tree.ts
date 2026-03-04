@@ -7,10 +7,17 @@ import { ok, err } from '../shared/types.js';
 
 const isHiddenName = (name: string): boolean => name.startsWith('.');
 
-const isMdFile = (name: string): boolean => name.endsWith('.md');
+const DOC_EXTENSIONS = ['.md', '.feature', '.yaml', '.yml'] as const;
 
-const stripMdExtension = (name: string): string =>
-  name.endsWith('.md') ? name.slice(0, -3) : name;
+const isDocFile = (name: string): boolean =>
+  DOC_EXTENSIONS.some(ext => name.endsWith(ext));
+
+const stripDocExtension = (name: string): string => {
+  for (const ext of DOC_EXTENSIONS) {
+    if (name.endsWith(ext)) return name.slice(0, -ext.length);
+  }
+  return name;
+};
 
 const parentPath = (path: string): string => {
   const lastSlash = path.lastIndexOf('/');
@@ -31,7 +38,7 @@ const filterEntries = (entries: readonly DirEntry[]): readonly DirEntry[] => {
 
   return entries.filter(entry => {
     if (isUnderHidden(entry.path)) return false;
-    if (!entry.isDirectory && !isMdFile(entry.name)) return false;
+    if (!entry.isDirectory && !isDocFile(entry.name)) return false;
     return true;
   });
 };
@@ -63,7 +70,7 @@ const buildNodes = (
           }
         : {
             type: 'file',
-            name: stripMdExtension(entry.name),
+            name: entry.name,
             path: entry.path,
           },
     ),

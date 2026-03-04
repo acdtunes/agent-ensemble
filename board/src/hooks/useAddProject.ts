@@ -36,7 +36,7 @@ export const useAddProject = (): UseAddProjectResult => {
       const response = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectPath }),
+        body: JSON.stringify({ path: projectPath }),
       });
       if (!response.ok) {
         const errorMessage = await parseErrorBody(response);

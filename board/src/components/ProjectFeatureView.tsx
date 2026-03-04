@@ -1,35 +1,47 @@
-import { useState } from 'react';
-import type { FeatureSummary } from '../../shared/types';
-import { Breadcrumb, type BreadcrumbSegment } from './Breadcrumb';
-import { FeatureCard } from './FeatureCard';
-import { StatusGroupHeader } from './StatusGroupHeader';
-import { StatusFilterControls } from './StatusFilterControls';
-import { groupFeaturesByStatus, type FeatureGroup } from '../utils/featureGrouping';
-import { filterFeaturesBySearch } from '../utils/featureSearch';
+import { useState } from "react";
+import type { FeatureSummary, ArchivedFeature } from "../../shared/types";
+import { Breadcrumb, type BreadcrumbSegment } from "./Breadcrumb";
+import { FeatureCard } from "./FeatureCard";
+import { StatusGroupHeader } from "./StatusGroupHeader";
+import { StatusFilterControls } from "./StatusFilterControls";
+import { ArchivedFeaturesSection } from "./ArchivedFeaturesSection";
+import {
+  groupFeaturesByStatus,
+  type FeatureGroup,
+} from "../utils/featureGrouping";
+import { filterFeaturesBySearch } from "../utils/featureSearch";
 import {
   filterFeaturesByStatus,
   buildStatusFilterOptions,
   type StatusFilterValue,
-} from '../utils/featureStatusFilter';
+} from "../utils/featureStatusFilter";
 
 interface ProjectFeatureViewProps {
   readonly projectId: string;
   readonly features: readonly FeatureSummary[];
+  readonly archivedFeatures?: readonly ArchivedFeature[];
   readonly onNavigateOverview: () => void;
   readonly onNavigateFeatureBoard: (featureId: string) => void;
   readonly onNavigateFeatureDocs: (featureId: string) => void;
+  readonly onRestoreFeature?: (featureId: string) => void;
+  readonly restoringFeatureId?: string | null;
+  readonly onArchiveSuccess?: () => void;
 }
 
 const EmptyState = () => (
   <div className="flex flex-col items-center justify-center py-20 text-gray-400">
     <p className="text-lg">No features discovered</p>
-    <p className="mt-2 text-sm">Features will appear here when added to the project.</p>
+    <p className="mt-2 text-sm">
+      Features will appear here when added to the project.
+    </p>
   </div>
 );
 
 // --- Pure functions ---
 
-const filterNonEmptyGroups = (groups: readonly FeatureGroup[]): readonly FeatureGroup[] =>
+const filterNonEmptyGroups = (
+  groups: readonly FeatureGroup[],
+): readonly FeatureGroup[] =>
   groups.filter((group) => group.features.length > 0);
 
 // --- Component ---
@@ -47,15 +59,19 @@ const NoSearchResults = () => (
 export const ProjectFeatureView = ({
   projectId,
   features,
+  archivedFeatures = [],
   onNavigateOverview,
   onNavigateFeatureBoard,
   onNavigateFeatureDocs,
+  onRestoreFeature,
+  restoringFeatureId = null,
+  onArchiveSuccess,
 }: ProjectFeatureViewProps) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("all");
 
   const breadcrumbSegments: BreadcrumbSegment[] = [
-    { label: 'Overview', onClick: onNavigateOverview },
+    { label: "Overview", onClick: onNavigateOverview },
     { label: projectId },
   ];
 
@@ -67,7 +83,7 @@ export const ProjectFeatureView = ({
 
   const groups = filterNonEmptyGroups(groupFeaturesByStatus(filteredFeatures));
   const hasResults = filteredFeatures.length > 0;
-  const isFiltering = searchTerm.trim() !== '' || statusFilter !== 'all';
+  const isFiltering = searchTerm.trim() !== "" || statusFilter !== "all";
 
   return (
     <div>
@@ -105,11 +121,21 @@ export const ProjectFeatureView = ({
                 <GroupSection
                   key={group.key}
                   group={group}
+                  projectId={projectId}
                   onNavigateFeatureBoard={onNavigateFeatureBoard}
                   onNavigateFeatureDocs={onNavigateFeatureDocs}
+                  onArchiveSuccess={onArchiveSuccess}
                 />
               ))
             )}
+          </div>
+
+          <div className="mt-6">
+            <ArchivedFeaturesSection
+              archivedFeatures={archivedFeatures}
+              onRestore={onRestoreFeature ?? (() => {})}
+              restoring={restoringFeatureId}
+            />
           </div>
         </>
       )}
@@ -121,21 +147,30 @@ export const ProjectFeatureView = ({
 
 interface GroupSectionProps {
   readonly group: FeatureGroup;
+  readonly projectId: string;
   readonly onNavigateFeatureBoard: (featureId: string) => void;
   readonly onNavigateFeatureDocs: (featureId: string) => void;
+  readonly onArchiveSuccess?: () => void;
 }
 
 const GroupSection = ({
   group,
+  projectId,
   onNavigateFeatureBoard,
   onNavigateFeatureDocs,
+  onArchiveSuccess,
 }: GroupSectionProps) => (
   <>
-    <StatusGroupHeader groupName={group.displayName} count={group.features.length} />
+    <StatusGroupHeader
+      groupName={group.displayName}
+      count={group.features.length}
+    />
     {group.features.map((feature) => (
       <FeatureCard
         key={feature.featureId}
         feature={feature}
+        projectId={projectId}
+        onArchiveSuccess={onArchiveSuccess}
         onClick={() =>
           feature.hasRoadmap
             ? onNavigateFeatureBoard(feature.featureId)

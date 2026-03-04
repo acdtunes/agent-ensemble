@@ -1,0 +1,66 @@
+roadmap:
+  project_id: copy-step-id
+  created_at: '2026-03-04T17:10:29Z'
+  total_steps: 2
+  phases: 1
+  short_description: Click step ID to copy to clipboard
+  description: Add click-to-copy functionality for step IDs in StepCard footer 
+    with toast feedback confirmation
+
+phases:
+- id: '01'
+  name: Copy to Clipboard with Toast
+  steps:
+  - id: 01-01
+    name: Create Toast notification component
+    criteria: |
+      - Toast component renders message and auto-dismisses after 2 seconds
+      - Toast appears in fixed position (bottom-right or top-right)
+      - Toast has subtle styling matching board theme (dark bg, light text)
+      - Multiple toasts replace previous (no stacking)
+      - useToast hook provides show() function for triggering toast
+    files_to_modify:
+    - board/src/components/Toast.tsx
+    - board/src/hooks/useToast.ts
+    - board/src/__tests__/Toast.test.tsx
+    time_estimate: 15m
+    dependencies: []
+    status: approved
+    teammate_id: crafter-01-01
+    started_at: '2026-03-04T17:14:04.909487+00:00'
+
+    review_attempts: 1
+    completed_at: '2026-03-04T17:17:27.916162+00:00'
+  - id: 01-02
+    name: Add click-to-copy on StepCard step ID
+    criteria: |
+      - Clicking step ID in StepCard footer copies ID to clipboard via navigator.clipboard.writeText()
+      - Click triggers toast "Copied {stepId}"
+      - Hover state shows pointer cursor and visual affordance (underline or color change)
+      - Click event does not propagate to card click handler
+    files_to_modify:
+    - board/src/components/StepCard.tsx
+    - board/src/__tests__/StepCard.test.tsx
+    time_estimate: 15m
+    dependencies:
+    - 01-01
+
+    status: approved
+    teammate_id: crafter-01-02
+    started_at: '2026-03-04T17:17:36.444185+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T17:21:18.272283+00:00'
+implementation_scope:
+  source_directories:
+  - board/src/components/
+  - board/src/hooks/
+  test_directories:
+  - board/src/__tests__/
+  excluded_patterns:
+  - __pycache__/**
+  - node_modules/**
+
+validation:
+  status: pending
+  reviewer: nw-software-crafter-reviewer
+  approved_at:

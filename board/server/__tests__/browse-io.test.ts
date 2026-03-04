@@ -31,12 +31,13 @@ describe('listDirectories: reads filesystem and returns filtered directory entri
     await rm(tempDir, { recursive: true });
   });
 
-  it('returns sorted non-hidden directories from a valid path', async () => {
+  it('returns sorted directories including hidden from a valid path', async () => {
     const result = await listDirectories(tempDir);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toEqual([
+        { name: '.hidden', path: path.join(tempDir, '.hidden') },
         { name: 'alpha', path: path.join(tempDir, 'alpha') },
         { name: 'zebra', path: path.join(tempDir, 'zebra') },
       ]);
@@ -56,6 +57,7 @@ describe('listDirectories: reads filesystem and returns filtered directory entri
     if (result.ok) {
       // Broken symlink should be silently skipped; valid dirs remain
       expect(result.value).toEqual([
+        { name: '.hidden', path: path.join(tempDir, '.hidden') },
         { name: 'alpha', path: path.join(tempDir, 'alpha') },
         { name: 'zebra', path: path.join(tempDir, 'zebra') },
       ]);

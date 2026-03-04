@@ -1,10 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { DocTree } from '../../shared/types';
+import type { DocTree, MultiRootDocTree } from '../../shared/types';
 
 // --- Hook return type ---
 
 export interface UseDocTreeResult {
   readonly tree: DocTree | null;
+  readonly loading: boolean;
+  readonly error: string | null;
+  readonly refetch: () => void;
+}
+
+export interface UseMultiRootDocTreeResult {
+  readonly tree: MultiRootDocTree | null;
   readonly loading: boolean;
   readonly error: string | null;
   readonly refetch: () => void;
@@ -39,6 +46,44 @@ export const useDocTree = (projectId: string, featureId?: string): UseDocTreeRes
         return;
       }
       const data = (await response.json()) as DocTree;
+      setTree(data);
+    } catch {
+      setTree(null);
+      setError('Failed to fetch documentation tree');
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, featureId]);
+
+  useEffect(() => {
+    fetchTree();
+  }, [fetchTree]);
+
+  return { tree, loading, error, refetch: fetchTree };
+};
+
+// --- Multi-root hook for feature docs ---
+
+export const useFeatureDocTree = (projectId: string, featureId: string): UseMultiRootDocTreeResult => {
+  const [tree, setTree] = useState<MultiRootDocTree | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchTree = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/features/${featureId}/docs/tree`);
+      if (!response.ok) {
+        setTree(null);
+        setError(
+          response.status === 404
+            ? 'Feature not found'
+            : 'Failed to fetch documentation tree',
+        );
+        return;
+      }
+      const data = (await response.json()) as MultiRootDocTree;
       setTree(data);
     } catch {
       setTree(null);

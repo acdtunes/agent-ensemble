@@ -15,7 +15,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, cleanup, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import type {
-  DocTree,
+  MultiRootDocTree,
   FeatureSummary,
   FeatureId,
 } from '../../shared/types';
@@ -32,29 +32,32 @@ const makeFeature = (id: string, overrides: Partial<FeatureSummary> = {}): Featu
   hasRoadmap: true,
   hasExecutionLog: true,
   totalSteps: 7,
-  completed: 3,
-  failed: 0,
+  done: 3,
   inProgress: 2,
   currentLayer: 2,
   updatedAt: '2026-03-01T12:00:00Z',
   ...overrides,
 });
 
-const makeDocTree = (folders: readonly { name: string; files: readonly string[] }[]): DocTree => ({
-  root: folders.map(folder => ({
-    type: 'directory' as const,
-    name: folder.name,
-    path: folder.name,
-    children: folder.files.map(file => ({
-      type: 'file' as const,
-      name: file,
-      path: `${folder.name}/${file}`,
+const makeMultiRootDocTree = (roots: readonly { label: string; folders: readonly { name: string; files: readonly string[] }[] }[]): MultiRootDocTree => ({
+  roots: roots.map(rootEntry => ({
+    label: rootEntry.label,
+    root: rootEntry.folders.map(folder => ({
+      type: 'directory' as const,
+      name: folder.name,
+      path: folder.name,
+      children: folder.files.map(file => ({
+        type: 'file' as const,
+        name: file,
+        path: `${folder.name}/${file}`,
+      })),
     })),
+    fileCount: rootEntry.folders.reduce((sum, f) => sum + f.files.length, 0),
   })),
-  fileCount: folders.reduce((sum, f) => sum + f.files.length, 0),
+  totalFileCount: roots.reduce((sum, r) => sum + r.folders.reduce((s, f) => s + f.files.length, 0), 0),
 });
 
-const makeEmptyDocTree = (): DocTree => ({ root: [], fileCount: 0 });
+const makeEmptyMultiRootDocTree = (): MultiRootDocTree => ({ roots: [], totalFileCount: 0 });
 
 afterEach(cleanup);
 
@@ -63,10 +66,10 @@ afterEach(cleanup);
 describe('FeatureDocsView acceptance', () => {
   it('renders doc tree scoped to feature directory', async () => {
     const { FeatureDocsView } = await import(/* @vite-ignore */ COMPONENT_PATH);
-    const tree = makeDocTree([
-      { name: 'discuss', files: ['jtbd-analysis.md', 'journey-card-monitoring.md'] },
-      { name: 'design', files: ['architecture-design.md'] },
-      { name: 'distill', files: [] },
+    const tree = makeMultiRootDocTree([
+      { label: 'feature', folders: [{ name: 'design', files: ['architecture-design.md'] }] },
+      { label: 'ux', folders: [{ name: 'discuss', files: ['jtbd-analysis.md'] }] },
+      { label: 'requirements', folders: [{ name: 'distill', files: [] }] },
     ]);
 
     render(
@@ -78,12 +81,12 @@ describe('FeatureDocsView acceptance', () => {
       />,
     );
 
-    const docViewer = screen.getByTestId('doc-viewer');
+    const docViewer = screen.getByTestId('multi-root-doc-viewer');
     expect(docViewer).toBeInTheDocument();
-    // Tree displays feature-scoped folders
-    expect(screen.getByText('discuss')).toBeInTheDocument();
-    expect(screen.getByText('design')).toBeInTheDocument();
-    expect(screen.getByText('distill')).toBeInTheDocument();
+    // Tree displays labeled sections
+    expect(screen.getByText('Design')).toBeInTheDocument();
+    expect(screen.getByText('UX & Journey')).toBeInTheDocument();
+    expect(screen.getByText('Requirements')).toBeInTheDocument();
   });
 
   it('shows empty state when feature has no documentation', async () => {
@@ -93,7 +96,7 @@ describe('FeatureDocsView acceptance', () => {
       <FeatureDocsView
         projectId="agent-ensemble"
         featureId="new-feature"
-        tree={makeEmptyDocTree()}
+        tree={makeEmptyMultiRootDocTree()}
         features={[makeFeature('new-feature')]}
       />,
     );
@@ -113,7 +116,7 @@ describe('FeatureDocsView acceptance', () => {
       <FeatureDocsView
         projectId="agent-ensemble"
         featureId="card-redesign"
-        tree={makeEmptyDocTree()}
+        tree={makeEmptyMultiRootDocTree()}
         features={features}
       />,
     );

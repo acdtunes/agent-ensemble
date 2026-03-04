@@ -1,0 +1,309 @@
+journey:
+  name: "Install agent-ensemble"
+  goal: "User discovers agent-ensemble and successfully installs it for Claude Code integration"
+  persona: "Developer who uses Claude Code daily and wants team coordination features"
+
+  emotional_arc:
+    start: "Curious but skeptical - 'Will this actually help my workflow?'"
+    middle: "Focused and committed - 'The installation process is clear'"
+    end: "Confident and productive - 'I can use this daily'"
+
+  triggers:
+    - "Colleague mentions agent-ensemble for team coordination"
+    - "Finds agent-ensemble in GitHub search or documentation"
+    - "Needs multi-agent capabilities for complex tasks"
+
+steps:
+  - id: 1
+    name: "Discover"
+    command: "Read README/documentation"
+
+    tui_mockup: |
+      +-- README.md -------------------------------------------------------+
+      |                                                                     |
+      |  # agent-ensemble                                                   |
+      |                                                                     |
+      |  Team coordination commands for Claude Code.                        |
+      |                                                                     |
+      |  ## Quick Start                                                     |
+      |                                                                     |
+      |  $ pipx install agent-ensemble                                      |
+      |  $ agent-ensemble install                                           |
+      |                                                                     |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts: []
+
+    emotional_state:
+      entry: "Curious but skeptical"
+      exit: "Interested, ready to try"
+
+    integration_checkpoint: |
+      README exists with clear installation instructions
+
+    gherkin: |
+      Scenario: Developer discovers agent-ensemble installation instructions
+        Given Carlos Mendez is browsing the agent-ensemble repository
+        When Carlos reads the README
+        Then Carlos sees a Quick Start section
+        And the Quick Start shows exactly 2 commands to install
+
+  - id: 2
+    name: "Prepare"
+    command: "pipx --version"
+
+    tui_mockup: |
+      +-- Terminal --------------------------------------------------------+
+      |                                                                     |
+      | $ pipx --version                                                    |
+      | 1.4.3                                                               |
+      |                                                                     |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "pipx_version"
+        source: "pipx installation"
+        displayed_as: "1.4.3"
+        consumers: ["prepare step verification"]
+
+    emotional_state:
+      entry: "Interested, slight anxiety about prerequisites"
+      exit: "Ready, prerequisites confirmed"
+
+    integration_checkpoint: |
+      pipx is installed and working
+
+    gherkin: |
+      Scenario: Developer verifies pipx is available
+        Given Carlos Mendez wants to install agent-ensemble
+        When Carlos runs "pipx --version"
+        Then Carlos sees the pipx version number
+        And Carlos knows pipx is ready for installation
+
+      Scenario: Developer installs pipx when missing
+        Given Carlos Mendez does not have pipx installed
+        When Carlos runs "pipx --version"
+        Then Carlos sees "command not found: pipx"
+        And Carlos installs pipx with "brew install pipx" or "pip install pipx --user"
+
+  - id: 3
+    name: "Install"
+    command: "pipx install agent-ensemble && agent-ensemble install"
+
+    tui_mockup: |
+      +-- Terminal --------------------------------------------------------+
+      |                                                                     |
+      | $ pipx install agent-ensemble                                       |
+      |   installed package agent-ensemble ${version}, installed using      |
+      |   Python 3.11.6                                                     |
+      |   These apps are now globally available                             |
+      |     - agent-ensemble                                                |
+      | done!                                                               |
+      |                                                                     |
+      | $ agent-ensemble install                                            |
+      |                                                                     |
+      | Installing agent-ensemble v${version} to ~/.claude/                 |
+      |                                                                     |
+      | [1/3] Checking existing installation...                             |
+      |       No existing installation found.                               |
+      |                                                                     |
+      | [2/3] Installing components...                                      |
+      |       commands/ensemble/  ${command_count} commands                 |
+      |       lib/python/agent_ensemble/  Python support library            |
+      |                                                                     |
+      | [3/3] Creating manifest...                                          |
+      |       ${manifest_path}                                              |
+      |                                                                     |
+      | Done! Installed ${command_count} commands and 1 library.            |
+      |                                                                     |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "version"
+        source: "pyproject.toml"
+        displayed_as: "${version}"
+        consumers: ["pipx output", "install output", "manifest file", "--version"]
+      - name: "command_count"
+        source: "len(commands/*.md)"
+        displayed_as: "${command_count}"
+        consumers: ["install output", "status output"]
+      - name: "manifest_path"
+        source: "constants.py"
+        displayed_as: "${manifest_path}"
+        consumers: ["install output", "uninstall", "status"]
+
+    emotional_state:
+      entry: "Focused, committed to installation"
+      exit: "Satisfied, relieved it worked"
+
+    integration_checkpoint: |
+      - Files copied to ~/.claude/commands/ensemble/
+      - Files copied to ~/.claude/lib/python/agent_ensemble/
+      - Manifest created at ~/.claude/ensemble-manifest.txt
+
+    gherkin: |
+      Scenario: Fresh installation from PyPI
+        Given Carlos Mendez has pipx installed
+        And agent-ensemble is not currently installed
+        When Carlos runs "pipx install agent-ensemble"
+        Then Carlos sees "installed package agent-ensemble 0.1.0"
+        And the agent-ensemble command is globally available
+
+      Scenario: Install to Claude Code integration
+        Given Carlos Mendez has installed agent-ensemble via pipx
+        And no previous ensemble installation exists in ~/.claude/
+        When Carlos runs "agent-ensemble install"
+        Then Carlos sees progress for 3 installation steps
+        And 10 commands are installed to ~/.claude/commands/ensemble/
+        And the Python library is installed to ~/.claude/lib/python/agent_ensemble/
+        And a manifest file is created at ~/.claude/ensemble-manifest.txt
+        And Carlos sees a list of available commands
+
+      Scenario: Upgrade existing installation with backup
+        Given Carlos Mendez has agent-ensemble v0.0.9 installed
+        When Carlos runs "agent-ensemble install" with v0.1.0
+        Then Carlos sees "Found existing installation: v0.0.9"
+        And a backup is created at ~/.claude/ensemble-backup-{timestamp}/
+        And the installation proceeds with updated files
+        And Carlos sees "Updated from v0.0.9 to v0.1.0"
+
+  - id: 4
+    name: "Verify"
+    command: "agent-ensemble --version && agent-ensemble status"
+
+    tui_mockup: |
+      +-- Terminal --------------------------------------------------------+
+      |                                                                     |
+      | $ agent-ensemble --version                                          |
+      | agent-ensemble ${version}                                           |
+      |                                                                     |
+      | $ agent-ensemble status                                             |
+      |                                                                     |
+      | agent-ensemble v${version}                                          |
+      |                                                                     |
+      | Installation:                                                       |
+      |   Location:    ${install_path}                                      |
+      |   Manifest:    ${manifest_path}                                     |
+      |   Installed:   ${install_timestamp}                                 |
+      |                                                                     |
+      | Components:                                                         |
+      |   commands/ensemble/           ${command_count} files    OK         |
+      |   lib/python/agent_ensemble/   12 files    OK                       |
+      |                                                                     |
+      | Status: Healthy                                                     |
+      |                                                                     |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "version"
+        source: "pyproject.toml"
+        displayed_as: "${version}"
+        consumers: ["--version output", "status output"]
+      - name: "install_path"
+        source: "constants.py"
+        displayed_as: "${install_path}"
+        consumers: ["status output"]
+      - name: "install_timestamp"
+        source: "manifest file"
+        displayed_as: "${install_timestamp}"
+        consumers: ["status output"]
+
+    emotional_state:
+      entry: "Hopeful, seeking confirmation"
+      exit: "Confident, installation confirmed"
+
+    integration_checkpoint: |
+      - Version matches pyproject.toml
+      - Status shows all components OK
+      - No missing or corrupted files
+
+    gherkin: |
+      Scenario: Verify installed version
+        Given Carlos Mendez has completed agent-ensemble installation
+        When Carlos runs "agent-ensemble --version"
+        Then Carlos sees "agent-ensemble 0.1.0"
+
+      Scenario: Check installation health
+        Given Carlos Mendez has completed agent-ensemble installation
+        When Carlos runs "agent-ensemble status"
+        Then Carlos sees the installation location
+        And Carlos sees the installation timestamp
+        And Carlos sees all components with "OK" status
+        And Carlos sees "Status: Healthy"
+
+  - id: 5
+    name: "First Use"
+    command: "/ensemble:review"
+
+    tui_mockup: |
+      +-- Claude Code -----------------------------------------------------+
+      |                                                                     |
+      | > /ensemble:review                                                  |
+      |                                                                     |
+      | Starting multi-perspective code review...                           |
+      |                                                                     |
+      | What would you like me to review?                                   |
+      |                                                                     |
+      +---------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "command_name"
+        source: "commands/review.md"
+        displayed_as: "/ensemble:review"
+        consumers: ["Claude Code command palette", "help output"]
+
+    emotional_state:
+      entry: "Ready, curious about capabilities"
+      exit: "Confident, productive"
+
+    integration_checkpoint: |
+      - Command is discoverable in Claude Code
+      - Command executes without errors
+      - User can interact with the command
+
+    gherkin: |
+      Scenario: First command execution in Claude Code
+        Given Carlos Mendez has installed agent-ensemble
+        And Carlos opens Claude Code
+        When Carlos types "/ensemble:review"
+        Then Claude Code recognizes the command
+        And the review workflow begins
+        And Carlos is prompted for what to review
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "version"
+      must_match_across: [3, 4]
+      failure_message: "Version mismatch between install output and --version"
+    - artifact: "command_count"
+      must_match_across: [3, 4]
+      failure_message: "Command count mismatch between install and status"
+    - artifact: "manifest_path"
+      must_match_across: [3, 4]
+      failure_message: "Manifest path inconsistent between install and status"
+
+error_scenarios:
+  - name: "pipx not installed"
+    trigger: "User runs 'pipx install agent-ensemble' without pipx"
+    symptom: "zsh: command not found: pipx"
+    recovery: "Install pipx: brew install pipx (macOS) or pip install pipx --user"
+
+  - name: "Python version too old"
+    trigger: "User has Python < 3.11"
+    symptom: "Requires Python 3.11 or higher"
+    recovery: "Upgrade Python installation"
+
+  - name: "Package not found on PyPI"
+    trigger: "Package not yet published or typo in name"
+    symptom: "No matching distribution found for agent-ensemble"
+    recovery: "Check spelling, verify package is published on PyPI"
+
+  - name: "Permission denied on ~/.claude/"
+    trigger: "User cannot write to ~/.claude/ directory"
+    symptom: "Error: Cannot write to ~/.claude/"
+    recovery: "Fix permissions: sudo chown -R $USER ~/.claude/"
+
+  - name: "Disk full"
+    trigger: "Not enough disk space"
+    symptom: "No space left on device"
+    recovery: "Free disk space and retry"

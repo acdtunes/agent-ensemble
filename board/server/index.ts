@@ -160,9 +160,8 @@ export const createSubscriptionServer = (
           }
 
           const roadmap = deps.getFeatureRoadmap?.(clientMessage.projectId, clientMessage.featureId);
-          if (roadmap) {
-            sendJson(ws, { type: 'init', projectId: clientMessage.projectId, featureId: clientMessage.featureId, roadmap });
-          }
+          // Always send init, even if roadmap is null (feature has no roadmap yet)
+          sendJson(ws, { type: 'init', projectId: clientMessage.projectId, featureId: clientMessage.featureId, roadmap: roadmap ?? { roadmap: {}, phases: [] } });
         } else {
           projectSubs.add(clientMessage.projectId);
           const result = deps.getProject(clientMessage.projectId);

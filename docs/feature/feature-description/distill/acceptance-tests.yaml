@@ -1,0 +1,73 @@
+# Feature Description - Acceptance Test Summary
+# Generated: 2026-03-04
+
+feature: feature-description
+description: Add AI-generated descriptions to feature cards and board headers
+
+user_stories:
+  - id: US-01
+    title: Short description on feature cards
+    scenarios: 7
+
+  - id: US-02
+    title: Detailed description in board header
+    scenarios: 6
+
+  - id: US-03
+    title: Backward compatibility for existing roadmaps
+    scenarios: 6
+
+test_structure:
+  walking_skeletons: 2
+  milestone_1_types_parser: 9
+  milestone_2_ui_display: 14
+  total_scenarios: 25
+
+error_path_ratio: 0.44  # 11 error/edge scenarios of 25 total (44%)
+
+implementation_sequence:
+  - milestone: 1
+    name: Types and Parser
+    description: Update RoadmapMeta and FeatureSummary types, modify parser
+    first_test: types_parser_steps.test.tsx - "RoadmapMeta type includes short_description field"
+
+  - milestone: 2
+    name: UI Display
+    description: Update FeatureCard and FeatureBoardView components
+    first_test: ui_display_steps.test.tsx - "FeatureCard shows short description below feature name"
+
+mandate_compliance:
+  CM-A_driving_ports:
+    evidence: |
+      All tests invoke through driving ports:
+      - FeatureCard component (rendered via props)
+      - FeatureBoardView component (rendered via props)
+      - Parser functions (parseRoadmapYaml)
+    verification: grep -r "import.*from.*components" steps/*.test.tsx
+
+  CM-B_business_language:
+    evidence: |
+      Feature files use business language exclusively:
+      - "short description" not "short_description property"
+      - "view the feature card" not "render FeatureCard component"
+      - "Kanban board" not "KanbanBoard React component"
+    verification: No technical terms in .feature files
+
+  CM-C_walking_skeleton_ratio:
+    walking_skeletons: 2
+    focused_scenarios: 23
+    target: "2-3 skeletons + 15-20 focused (achieved: 2 + 23)"
+
+files:
+  feature_files:
+    - board/src/__tests__/acceptance/feature-description/walking-skeleton.feature
+    - board/src/__tests__/acceptance/feature-description/milestone-1-types-parser.feature
+    - board/src/__tests__/acceptance/feature-description/milestone-2-ui-display.feature
+
+  step_implementations:
+    - board/src/__tests__/acceptance/feature-description/steps/walking_skeleton.test.tsx
+    - board/src/__tests__/acceptance/feature-description/steps/types_parser_steps.test.tsx
+    - board/src/__tests__/acceptance/feature-description/steps/ui_display_steps.test.tsx
+
+  test_fixtures:
+    - board/src/__tests__/acceptance/feature-description/steps/test-fixtures.ts

@@ -191,7 +191,7 @@ describe('classifyFeatureStatus', () => {
 
 describe('aggregateFeatureStatuses', () => {
   it('returns zero counts for empty features array', () => {
-    expect(aggregateFeatureStatuses([])).toEqual({ completed: 0, inProgress: 0, failed: 0 });
+    expect(aggregateFeatureStatuses([])).toEqual({ completed: 0, inProgress: 0 });
   });
 
   it('counts features by classified status', () => {
@@ -200,12 +200,12 @@ describe('aggregateFeatureStatuses', () => {
       makeFeature({ featureId: 'f2' as FeatureId, done: 5, totalSteps: 5 }),
       makeFeature({ featureId: 'f3' as FeatureId, inProgress: 3 }),
     ];
-    expect(aggregateFeatureStatuses(features)).toEqual({ completed: 2, inProgress: 1, failed: 0 });
+    expect(aggregateFeatureStatuses(features)).toEqual({ completed: 2, inProgress: 1 });
   });
 
   it('does not count pending features in any status', () => {
     const features = [makeFeature({ featureId: 'f1' as FeatureId })];
-    expect(aggregateFeatureStatuses(features)).toEqual({ completed: 0, inProgress: 0, failed: 0 });
+    expect(aggregateFeatureStatuses(features)).toEqual({ completed: 0, inProgress: 0 });
   });
 });
 

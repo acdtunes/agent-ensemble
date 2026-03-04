@@ -185,7 +185,7 @@ describe('scanFeatureDirsFs: reads feature subdirectories from project path', ()
     expect(ids).toEqual(['auth', 'multi-project']);
   });
 
-  it('skips hidden directories and invalid slugs', async () => {
+  it('skips hidden directories and invalid slugs, normalizes uppercase to lowercase', async () => {
     await makeFeatureDir(projectPath, 'valid-feature');
     await makeFeatureDir(projectPath, '.hidden');
     await makeFeatureDir(projectPath, 'UPPERCASE');
@@ -193,8 +193,9 @@ describe('scanFeatureDirsFs: reads feature subdirectories from project path', ()
 
     const featureIds = await scanFeatureDirsFs(projectPath);
 
-    expect(featureIds).toHaveLength(1);
-    expect(featureIds[0] as string).toBe('valid-feature');
+    expect(featureIds).toHaveLength(2);
+    const ids = [...featureIds].map((id) => id as string).sort();
+    expect(ids).toEqual(['uppercase', 'valid-feature']);
   });
 
   it('returns empty list when docs/feature/ does not exist', async () => {
@@ -244,15 +245,16 @@ describe('scanFeatureDirsFs: reads feature subdirectories from project path', ()
     expect(featureIds[0] as string).toBe('auth');
   });
 
-  it('skips invalid directory names across all scan directories', async () => {
+  it('skips invalid directory names across all scan directories, normalizes uppercase', async () => {
     await makeFeatureDir(projectPath, 'valid-feature');
     await makeUxDir(projectPath, '.hidden');
     await makeRequirementsDir(projectPath, 'UPPERCASE');
 
     const featureIds = await scanFeatureDirsFs(projectPath);
 
-    expect(featureIds).toHaveLength(1);
-    expect(featureIds[0] as string).toBe('valid-feature');
+    expect(featureIds).toHaveLength(2);
+    const ids = [...featureIds].map((id) => id as string).sort();
+    expect(ids).toEqual(['uppercase', 'valid-feature']);
   });
 });
 

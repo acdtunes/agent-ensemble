@@ -1,13 +1,13 @@
 import { useCallback } from 'react';
-import type { DocTree, FeatureSummary } from '../../shared/types';
+import type { MultiRootDocTree, FeatureSummary } from '../../shared/types';
 import { ContextDropdowns } from './ContextDropdowns';
-import { DocViewer } from './DocViewer';
+import { MultiRootDocViewer } from './MultiRootDocViewer';
 import { buildFeatureDocsUrl } from '../utils/featureBoardUtils';
 
 interface FeatureDocsViewProps {
   readonly projectId: string;
   readonly featureId: string;
-  readonly tree: DocTree | null;
+  readonly tree: MultiRootDocTree | null;
   readonly features: readonly FeatureSummary[];
   readonly error?: string;
 }
@@ -27,8 +27,10 @@ export const FeatureDocsView = ({
     navigateToFeatureDocs(projectId, nextFeatureId);
   };
 
-  const fetchContent = useCallback(async (path: string): Promise<string> => {
-    const response = await fetch(`/api/projects/${projectId}/features/${featureId}/docs/content?path=${encodeURIComponent(path)}`);
+  const fetchContent = useCallback(async (label: string, path: string): Promise<string> => {
+    // Backend expects path format: {label}/{relativePath}
+    const fullPath = `${label}/${path}`;
+    const response = await fetch(`/api/projects/${projectId}/features/${featureId}/docs/content?path=${encodeURIComponent(fullPath)}`);
     if (!response.ok) return '';
     return response.text();
   }, [projectId, featureId]);
@@ -44,11 +46,10 @@ export const FeatureDocsView = ({
         />
       </div>
 
-      <DocViewer
+      <MultiRootDocViewer
         projectId={projectId}
         tree={tree}
         fetchContent={fetchContent}
-        docsRoot={`docs/feature/${featureId}`}
         error={error}
       />
     </div>

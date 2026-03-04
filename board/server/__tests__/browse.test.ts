@@ -36,8 +36,9 @@ describe('browse pipeline: validate path and filter directory entries', () => {
     // When filtering entries
     const filtered = filterDirectoryEntries(rawEntries);
 
-    // Then only non-hidden directories remain, sorted alphabetically
+    // Then all directories remain (including hidden), sorted alphabetically
     expect(filtered).toEqual([
+      { name: '.hidden', path: '/projects/nw-teams/docs/.hidden' },
       { name: 'alpha', path: '/projects/nw-teams/docs/alpha' },
       { name: 'zebra', path: '/projects/nw-teams/docs/zebra' },
     ]);
@@ -154,7 +155,7 @@ describe('filterDirectoryEntries: filters and sorts directory entries', () => {
     expect(result).toEqual([{ name: 'src', path: '/project/src' }]);
   });
 
-  it('excludes hidden directories starting with dot', () => {
+  it('includes hidden directories starting with dot', () => {
     const entries = [
       { name: '.git', path: '/project/.git', isDirectory: true },
       { name: '.vscode', path: '/project/.vscode', isDirectory: true },
@@ -163,7 +164,11 @@ describe('filterDirectoryEntries: filters and sorts directory entries', () => {
 
     const result = filterDirectoryEntries(entries);
 
-    expect(result).toEqual([{ name: 'src', path: '/project/src' }]);
+    expect(result).toEqual([
+      { name: '.git', path: '/project/.git' },
+      { name: '.vscode', path: '/project/.vscode' },
+      { name: 'src', path: '/project/src' },
+    ]);
   });
 
   it('sorts entries alphabetically by name', () => {
@@ -182,10 +187,10 @@ describe('filterDirectoryEntries: filters and sorts directory entries', () => {
     ]);
   });
 
-  it('returns empty array when no directories match', () => {
+  it('returns empty array when no directories exist', () => {
     const entries = [
-      { name: '.hidden', path: '/project/.hidden', isDirectory: true },
       { name: 'file.txt', path: '/project/file.txt', isDirectory: false },
+      { name: 'another.md', path: '/project/another.md', isDirectory: false },
     ];
 
     const result = filterDirectoryEntries(entries);

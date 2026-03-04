@@ -26,7 +26,7 @@ const makeArchivedFeature = (id: string, overrides: Partial<ArchivedFeature> = {
 const createFetchSuccess = (features: readonly ArchivedFeature[]) =>
   vi.fn().mockResolvedValue({
     ok: true,
-    json: () => Promise.resolve(features),
+    json: () => Promise.resolve({ archivedFeatures: features }),
   } as Partial<Response>);
 
 const createFetchError = (status: number, body: { error: string }) =>
@@ -101,8 +101,8 @@ describe('useArchivedFeatures', () => {
     const archivedA = [makeArchivedFeature('feat-a')];
     const archivedB = [makeArchivedFeature('feat-b')];
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(archivedA) } as Partial<Response>)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(archivedB) } as Partial<Response>);
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ archivedFeatures: archivedA }) } as Partial<Response>)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ archivedFeatures: archivedB }) } as Partial<Response>);
     vi.stubGlobal('fetch', fetchMock);
 
     const { useArchivedFeatures } = await import(/* @vite-ignore */ HOOK_PATH);

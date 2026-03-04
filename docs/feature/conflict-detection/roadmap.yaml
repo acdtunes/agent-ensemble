@@ -1,0 +1,130 @@
+roadmap:
+  project_id: conflict-detection
+  created_at: '2026-03-04T11:56:11Z'
+  total_steps: 6
+  phases: 3
+phases:
+- id: '01'
+  name: 'CLI conflict data persistence'
+  steps:
+  - id: 01-01
+    name: 'Write conflicts_with on step start'
+    description: 'Extend cmd_start_step to compute and persist conflicting step IDs'
+    criteria:
+    - 'Starting step with file overlap writes conflicts_with array to YAML'
+    - 'Conflicting active steps updated with mutual conflict reference'
+    - 'No conflicts_with written when no file overlap exists'
+    files_to_modify:
+    - src/agent_ensemble/cli/team_state.py
+    - tests/test_team_state.py
+    status: approved
+    teammate_id: crafter-01-01
+    started_at: '2026-03-04T12:44:00.586759+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T12:50:09.028931+00:00'
+  - id: 01-02
+    name: 'Clear conflicts_with on step complete'
+    description: 'Extend cmd_complete_step to remove conflict references'
+    criteria:
+    - 'Completed step has conflicts_with cleared from YAML'
+    - 'Completed step ID removed from other steps conflicts_with arrays'
+    - 'Steps with no remaining conflicts have conflicts_with field removed'
+    files_to_modify:
+    - src/agent_ensemble/cli/team_state.py
+    - tests/test_team_state.py
+    depends_on:
+    - 01-01
+    status: approved
+    teammate_id: crafter-01-02
+    started_at: '2026-03-04T12:50:16.800111+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T12:54:32.702287+00:00'
+- id: '02'
+  name: 'Type and mapping passthrough'
+  steps:
+  - id: 02-01
+    name: 'Add conflict fields to RoadmapStep type'
+    description: 'Extend shared types with worktree and conflicts_with fields'
+    criteria:
+    - 'RoadmapStep interface includes optional worktree string field'
+    - 'RoadmapStep interface includes optional conflicts_with string array'
+    - 'Types compile without error'
+    files_to_modify:
+    - board/shared/types.ts
+    status: approved
+    teammate_id: crafter-02-01
+    started_at: '2026-03-04T12:44:03.818725+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T12:49:31.213945+00:00'
+  - id: 02-02
+    name: 'Map conflict fields to StepCardData'
+    description: 'Extend statusMapping to pass conflict data to display layer'
+    criteria:
+    - 'StepCardData includes conflictsWith array (empty when undefined)'
+    - 'StepCardData includes usesWorktree boolean derived from worktree field'
+    - 'Mapping preserves existing step data unchanged'
+    files_to_modify:
+    - board/src/utils/statusMapping.ts
+    - board/src/__tests__/statusMapping.test.ts
+    depends_on:
+    - 02-01
+    status: approved
+    teammate_id: crafter-02-02
+    started_at: '2026-03-04T12:49:43.763614+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T12:53:37.924811+00:00'
+- id: '03'
+  name: 'UI conflict display'
+  steps:
+  - id: 03-01
+    name: 'Display conflict and worktree badges'
+    description: 'Render badges on StepCard showing conflict count and worktree status'
+    criteria:
+    - 'Card displays "conflicts: N" badge when conflictsWith non-empty'
+    - 'Card displays "worktree" badge when usesWorktree is true'
+    - 'No badge rendered when no conflicts exist'
+    - 'Badge hidden for approved status regardless of conflict data'
+    files_to_modify:
+    - board/src/components/StepCard.tsx
+    - board/src/__tests__/StepCard.test.tsx
+    depends_on:
+    - 02-02
+    status: approved
+    teammate_id: crafter-03-01
+    started_at: '2026-03-04T12:53:46.099486+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T12:56:59.070205+00:00'
+  - id: 03-02
+    name: 'Conflict tooltip and highlight interaction'
+    description: 'Show conflict details on hover and highlight conflicting cards on
+      click'
+    criteria:
+    - 'Hovering conflict badge shows tooltip with conflicting step IDs'
+    - 'Clicking card highlights all conflicting cards visually'
+    - 'Clicking outside clears highlight state'
+    files_to_modify:
+    - board/src/components/StepCard.tsx
+    - board/src/__tests__/StepCard.test.tsx
+    depends_on:
+    - 03-01
+    status: approved
+    teammate_id: crafter-03-02
+    started_at: '2026-03-04T12:57:06.323575+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:01:04.764638+00:00'
+implementation_scope:
+  source_directories:
+  - src/agent_ensemble/cli/
+  - board/shared/
+  - board/src/utils/
+  - board/src/components/
+  test_directories:
+  - tests/
+  - board/src/__tests__/
+  excluded_patterns:
+  - __init__.py
+  - __pycache__/**
+validation:
+  status: pending
+  reviewer: solution-architect-reviewer
+  approved_at:

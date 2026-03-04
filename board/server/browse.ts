@@ -47,7 +47,7 @@ export const validateBrowsePath = (
 };
 
 /**
- * Filter raw directory entries to only visible directories, sorted alphabetically.
+ * Filter raw directory entries to directories only, sorted alphabetically.
  *
  * Pure function — no filesystem access.
  */
@@ -55,7 +55,7 @@ export const filterDirectoryEntries = (
   entries: ReadonlyArray<DirEntry>,
 ): BrowseEntry[] =>
   entries
-    .filter((entry) => entry.isDirectory && !entry.name.startsWith('.'))
+    .filter((entry) => entry.isDirectory)
     .map(({ name, path }) => ({ name, path }))
     .sort((a, b) => a.name.localeCompare(b.name));
 

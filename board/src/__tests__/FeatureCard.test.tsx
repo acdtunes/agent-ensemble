@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import {
@@ -102,7 +102,7 @@ describe("formatProgressLabel", () => {
 describe("FeatureCard", () => {
   it("displays feature name", () => {
     render(<FeatureCard feature={makeFeature()} />);
-    expect(screen.getByText("card-redesign")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "card-redesign" })).toBeInTheDocument();
   });
 
   // =================================================================
@@ -161,6 +161,55 @@ describe("FeatureCard", () => {
     render(<FeatureCard feature={makeFeature()} onClick={onClick} />);
     fireEvent.click(screen.getByRole("button"));
     expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  // =================================================================
+  // Click-to-copy feature ID - Test Budget: 4 behaviors x 2 = 8 max
+  // =================================================================
+
+  describe("click-to-copy feature ID", () => {
+    beforeEach(() => {
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: vi.fn().mockResolvedValue(undefined),
+        },
+      });
+    });
+
+    it("displays feature ID with monospace font", () => {
+      render(<FeatureCard feature={makeFeature()} />);
+      const featureId = screen.getByTestId("feature-id");
+      expect(featureId).toHaveTextContent("card-redesign");
+      expect(featureId.className).toMatch(/font-mono/);
+    });
+
+    it("copies feature ID to clipboard when clicked", async () => {
+      render(<FeatureCard feature={makeFeature()} />);
+      fireEvent.click(screen.getByTestId("feature-id"));
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("card-redesign");
+    });
+
+    it("shows toast notification after copying", async () => {
+      render(<FeatureCard feature={makeFeature()} />);
+      fireEvent.click(screen.getByTestId("feature-id"));
+      await waitFor(() => {
+        expect(screen.getByRole("status")).toHaveTextContent("Copied card-redesign");
+      });
+    });
+
+    it("does not trigger card onClick when feature ID is clicked", () => {
+      const onClick = vi.fn();
+      render(<FeatureCard feature={makeFeature()} onClick={onClick} />);
+      fireEvent.click(screen.getByTestId("feature-id"));
+      expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it("shows hover affordance (pointer cursor and underline)", () => {
+      render(<FeatureCard feature={makeFeature()} />);
+      const featureId = screen.getByTestId("feature-id");
+      expect(featureId.className).toMatch(/cursor-pointer/);
+      expect(featureId.className).toMatch(/hover:underline/);
+    });
   });
 
   it('shows only feature name for no-roadmap features', () => {

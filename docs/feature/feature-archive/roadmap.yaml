@@ -1,0 +1,249 @@
+roadmap:
+  project_id: feature-archive
+  created_at: '2026-03-04T13:06:00Z'
+  total_steps: 15
+  phases: 5
+phases:
+- id: '01'
+  name: 'Core Archive Infrastructure'
+  steps:
+  - id: 01-01
+    name: 'Archive types in shared/types.ts'
+    criteria: 'ArchivedFeature interface, ArchiveError and RestoreError discriminated
+      unions exported from shared/types.ts'
+    files_to_modify:
+    - board/shared/types.ts
+    - board/shared/__tests__/archive-types.test.ts
+    status: approved
+    teammate_id: crafter-01-01
+    started_at: '2026-03-04T13:12:48.841449+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:17:49.920693+00:00'
+  - id: 01-02
+    name: 'Pure archive path resolver'
+    criteria: 'resolveArchiveDir returns absolute path to docs/archive/{featureId}
+      given projectPath and featureId'
+    files_to_modify:
+    - board/server/archive-path-resolver.ts
+    - board/server/__tests__/archive-path-resolver.test.ts
+    status: approved
+    teammate_id: crafter-01-02
+    started_at: '2026-03-04T13:12:51.697385+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:16:58.088984+00:00'
+  - id: 01-03
+    name: 'Archive IO adapter with atomic move'
+    criteria: 'moveToArchiveFs moves directory atomically, ensureArchiveDirFs creates
+      archive directory if missing, scanArchiveDirFs lists archived features with
+      timestamps'
+    files_to_modify:
+    - board/server/archive-io.ts
+    - board/server/__tests__/archive-io.test.ts
+    status: approved
+    teammate_id: crafter-01-03
+    started_at: '2026-03-04T13:12:54.590434+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:17:38.585915+00:00'
+- id: '02'
+  name: 'Server HTTP Routes'
+  steps:
+  - id: 02-01
+    name: 'Archive endpoint with walking skeleton'
+    criteria: 'POST /api/projects/:id/features/:featureId/archive returns 204 on success,
+      feature directory moved from docs/feature/ to docs/archive/'
+    depends_on:
+    - 01-01
+    - 01-02
+    - 01-03
+    files_to_modify:
+    - board/server/archive-http.ts
+    - board/server/__tests__/archive-http.test.ts
+    - board/server/index.ts
+    status: approved
+    teammate_id: crafter-02-01
+    started_at: '2026-03-04T13:17:57.824224+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:22:46.372766+00:00'
+  - id: 02-02
+    name: 'Archive error handling'
+    criteria: '404 when feature not found, 409 when feature already archived, 500
+      with message on filesystem errors'
+    depends_on:
+    - 02-01
+    files_to_modify:
+    - board/server/archive-http.ts
+    - board/server/__tests__/archive-http.test.ts
+    status: approved
+    teammate_id: crafter-02-02
+    started_at: '2026-03-04T13:22:56.217578+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:26:39.631485+00:00'
+  - id: 02-03
+    name: 'Restore and list archived endpoints'
+    criteria: 'POST /restore returns 204 and moves feature back, GET /archive returns
+      ArchivedFeature[] with timestamps, WebSocket notification sent after archive/restore'
+    depends_on:
+    - 02-02
+    files_to_modify:
+    - board/server/archive-http.ts
+    - board/server/__tests__/archive-http.test.ts
+    - board/server/index.ts
+    status: approved
+    teammate_id: crafter-02-03
+    started_at: '2026-03-04T13:26:48.397796+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:30:46.843636+00:00'
+- id: '03'
+  name: 'Frontend Hooks'
+  steps:
+  - id: 03-01
+    name: 'useArchiveFeature hook'
+    criteria: 'Hook calls archive endpoint, exposes archiving boolean and error state,
+      returns success/failure result'
+    depends_on:
+    - 02-01
+    files_to_modify:
+    - board/src/hooks/useArchiveFeature.ts
+    - board/src/__tests__/useArchiveFeature.test.ts
+    status: approved
+    teammate_id: crafter-03-01
+    started_at: '2026-03-04T13:22:59.685033+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:26:14.748551+00:00'
+  - id: 03-02
+    name: 'useRestoreFeature hook'
+    criteria: 'Hook calls restore endpoint, exposes restoring boolean and error state,
+      returns success/failure result'
+    depends_on:
+    - 02-03
+    files_to_modify:
+    - board/src/hooks/useRestoreFeature.ts
+    - board/src/__tests__/useRestoreFeature.test.ts
+    status: approved
+    teammate_id: crafter-03-02
+    started_at: '2026-03-04T13:30:54.761789+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:34:52.900144+00:00'
+  - id: 03-03
+    name: 'useArchivedFeatures hook'
+    criteria: 'Hook fetches archived features list, exposes loading/error state, refetches
+      on project change'
+    depends_on:
+    - 02-03
+    files_to_modify:
+    - board/src/hooks/useArchivedFeatures.ts
+    - board/src/__tests__/useArchivedFeatures.test.ts
+    status: approved
+    teammate_id: crafter-03-03
+    started_at: '2026-03-04T13:30:58.418389+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:35:05.901380+00:00'
+- id: '04'
+  name: 'UI Components'
+  steps:
+  - id: 04-01
+    name: 'ArchiveConfirmDialog component'
+    criteria: 'Modal displays feature name, Cancel closes without action, Confirm
+      triggers callback, loading state shown during archive'
+    depends_on:
+    - 03-01
+    files_to_modify:
+    - board/src/components/ArchiveConfirmDialog.tsx
+    - board/src/__tests__/ArchiveConfirmDialog.test.tsx
+    status: approved
+    teammate_id: crafter-04-01
+    started_at: '2026-03-04T13:26:24.904483+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:30:15.194402+00:00'
+  - id: 04-02
+    name: 'ArchivedFeaturesSection component'
+    criteria: 'Collapsible section collapsed by default, shows archived count in header,
+      lists features with restore button and timestamp'
+    depends_on:
+    - 03-02
+    - 03-03
+    files_to_modify:
+    - board/src/components/ArchivedFeaturesSection.tsx
+    - board/src/__tests__/ArchivedFeaturesSection.test.tsx
+    status: approved
+    teammate_id: crafter-04-02
+    started_at: '2026-03-04T13:35:14.564717+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:38:42.807587+00:00'
+  - id: 04-03
+    name: 'Archive button on FeatureCard'
+    criteria: 'Archive button visible on feature cards, clicking opens confirmation
+      dialog, successful archive removes card from list'
+    depends_on:
+    - 04-01
+    files_to_modify:
+    - board/src/components/FeatureCard.tsx
+    - board/src/__tests__/FeatureCard.test.tsx
+    status: approved
+    teammate_id: crafter-04-03
+    started_at: '2026-03-04T13:30:24.616445+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:34:31.547045+00:00'
+  - id: 04-04
+    name: 'Restore button in ArchivedFeaturesSection'
+    criteria: 'Restore button triggers restore, successful restore moves feature to
+      active list, loading state shown during restore'
+    depends_on:
+    - 04-02
+    files_to_modify:
+    - board/src/components/ArchivedFeaturesSection.tsx
+    - board/src/__tests__/ArchivedFeaturesSection.test.tsx
+    status: approved
+    teammate_id: crafter-04-04
+    started_at: '2026-03-04T13:38:50.977687+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:44:12.437769+00:00'
+- id: '05'
+  name: 'Integration and Polish'
+  steps:
+  - id: 05-01
+    name: 'Wire archived section to ProjectFeatureView'
+    criteria: 'ArchivedFeaturesSection visible below active features, section refreshes
+      via WebSocket after archive/restore operations'
+    depends_on:
+    - 04-03
+    - 04-04
+    files_to_modify:
+    - board/src/components/ProjectFeatureView.tsx
+    - board/src/__tests__/ProjectFeatureView.test.tsx
+    status: approved
+    teammate_id: crafter-05-01
+    started_at: '2026-03-04T13:44:21.596488+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T13:57:44.464877+00:00'
+  - id: 05-02
+    name: 'End-to-end archive/restore flow'
+    criteria: 'Full flow from button click to UI update works, archived feature not
+      visible in active list, restored feature appears in active list'
+    depends_on:
+    - 05-01
+    files_to_modify:
+    - board/src/__tests__/acceptance/feature-archive/e2e-archive-restore.test.tsx
+    status: approved
+    teammate_id: crafter-05-02
+    started_at: '2026-03-04T13:57:49.936357+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T14:01:34.649250+00:00'
+implementation_scope:
+  source_directories:
+  - board/server/
+  - board/src/hooks/
+  - board/src/components/
+  - board/shared/
+  test_directories:
+  - board/server/__tests__/
+  - board/src/__tests__/
+  - board/src/__tests__/acceptance/feature-archive/
+  excluded_patterns:
+  - __pycache__/**
+  - node_modules/**
+  - dist/**
+validation:
+  status: pending
+  reviewer: acceptance-designer
+  approved_at:

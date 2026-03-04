@@ -125,8 +125,16 @@ ls docs/feature/{project-id}/roadmap.yaml
 ```
 
 **If roadmap does NOT exist:**
-1. Run `/nw:roadmap {project-id}` to create it
-2. After `/nw:roadmap` completes, continue to Step 0b
+1. Tell the user to create a roadmap first:
+   ```
+   Roadmap not found at docs/feature/{project-id}/roadmap.yaml.
+
+   Please create one by running:
+     /nw:roadmap @nw-solution-architect "{feature-goal-description}"
+
+   Then re-run /ensemble:execute {project-id}
+   ```
+2. **STOP. DO NOT proceed without a roadmap.**
 
 **Step 0b: Validate schema**
 
@@ -141,9 +149,14 @@ PYTHONPATH=$HOME/.claude/lib/python python3 -m des.cli.roadmap validate docs/fea
 
 **If validation fails:**
 1. Print all errors from the CLI output
-2. Ask user: "Roadmap is invalid. Recreate it? (Y/n)"
-3. If yes: run `/nw:roadmap {project-id}` to recreate, then re-validate
-4. If no: **STOP. DO NOT proceed.**
+2. Tell the user:
+   ```
+   Roadmap is invalid. Please fix the errors above, or recreate it with:
+     /nw:roadmap @nw-solution-architect "{feature-goal-description}"
+
+   Then re-run /ensemble:execute {project-id}
+   ```
+3. **STOP. DO NOT proceed with an invalid roadmap.**
 
 This gate exists because the parallel_groups CLI is lenient and will accept malformed roadmaps that will cause execution failures later.
 
@@ -417,6 +430,42 @@ This means Phases 5-7 are a continuous loop, not discrete stages.
 
 **Why fresh spawns per step**: Each crafter is spawned with a targeted prompt for one specific step. After approval, shut it down. Do NOT try to reassign a crafter to a different step — the original step context in its prompt will cause confusion.
 
+### Phase 7b: Integration Verification (MANDATORY)
+
+**After all implementation steps complete but BEFORE refactoring**, the Lead MUST verify the feature works end-to-end. Reviewer approval of individual steps does NOT guarantee the feature integrates correctly.
+
+**Why this phase exists**: Unit tests and step reviews validate individual components in isolation. They do NOT catch:
+- Missing wiring between layers (hooks → API → server → filesystem)
+- Props not threaded through component hierarchies
+- Response format mismatches between API and consumers
+- Dependency injection gaps in server bootstrapping
+
+**Verification checklist**:
+
+1. **Manual smoke test** — Actually use the feature in the running app:
+   - Start the dev server if not running
+   - Navigate to the relevant UI
+   - Exercise the happy path end-to-end
+   - Verify the expected behavior occurs
+
+2. **Check integration points** — For each layer boundary in the feature:
+   - Frontend hook → API endpoint: Does the hook call the right endpoint? Does it parse the response correctly?
+   - API route → server handler: Is the route registered? Are dependencies injected?
+   - Server handler → data layer: Are the right functions called with correct parameters?
+
+3. **Verify props threading** — For UI features:
+   - Trace required props from top-level container down to leaf components
+   - Ensure callbacks are passed through intermediate components
+   - Check that conditional rendering logic has all required data
+
+**If issues are found**:
+1. Create fix tasks describing the integration gap
+2. Assign to an available crafter (spawn a new one if needed)
+3. Review and approve the fix
+4. Re-run verification
+
+**Only proceed to Phase 8 (Refactoring) after the feature works end-to-end.**
+
 ### Phase 8: Refactoring Pass (L1-L3 RPP)
 
 **After all implementation layers complete but BEFORE final cleanup**, run a refactoring pass to clean up the code that was just written. This catches naming issues, long methods, and structural problems while the code is fresh.
@@ -682,14 +731,16 @@ Lead (you):
 6. Monitor: spawn reviewers on demand, wait for APPROVED
 7. Layer 3: spawn 1 crafter
 8. Monitor: spawn reviewer on demand, wait for APPROVED
-9. Refactoring pass: group modified files into 2 areas, spawn 2 refactoring crafters (reviewers on demand)
-10. Monitor: wait for refactoring APPROVED, run full test suite
-11. Clean up team, report summary (including refactoring improvements)
+9. Integration verification: smoke test the feature end-to-end, fix any integration gaps
+10. Refactoring pass: group modified files into 2 areas, spawn 2 refactoring crafters (reviewers on demand)
+11. Monitor: wait for refactoring APPROVED, run full test suite
+12. Clean up team, report summary (including refactoring improvements)
 ```
 
 ## Success Criteria
 
 - [ ] All steps have reviewer APPROVED
+- [ ] Integration verification passed (feature works end-to-end)
 - [ ] Refactoring pass completed (L1-L3 RPP applied to delivered code)
 - [ ] All tests pass after refactoring
 - [ ] DES integrity verification passed

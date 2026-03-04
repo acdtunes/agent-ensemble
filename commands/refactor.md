@@ -1,6 +1,6 @@
-# AGENT-ENSEMBLE:REFACTOR — Parallel Refactoring with Agent Teams
+# Parallel Refactoring with Agent Teams
 
-**Command**: `/agent-ensemble:refactor`
+**Command**: `/ensemble:refactor`
 **Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
 
 ## Overview
@@ -16,16 +16,16 @@ This command uses the same deterministic CLI scripts as deliver:
 export PYTHONPATH=$HOME/.claude/lib/python
 
 # Initialize team state (from a manual plan — no roadmap.yaml needed)
-python -m agent_ensemble.cli.team_state init --plan .agent-ensemble/plan.yaml --output .agent-ensemble/state.yaml
+python -m agent_ensemble.cli.team_state init --plan .ensemble/plan.yaml --output .ensemble/state.yaml
 
 # Check if step needs worktree (file conflicts with active steps)
-python -m agent_ensemble.cli.team_state should-worktree .agent-ensemble/state.yaml --step {step_id}
+python -m agent_ensemble.cli.team_state should-worktree .ensemble/state.yaml --step {step_id}
 
 # Track step progress
-python -m agent_ensemble.cli.team_state update .agent-ensemble/state.yaml --step {step_id} --status {status} --teammate {teammate_id} [--worktree]
+python -m agent_ensemble.cli.team_state update .ensemble/state.yaml --step {step_id} --status {status} --teammate {teammate_id} [--worktree]
 
 # Show team state
-python -m agent_ensemble.cli.team_state show .agent-ensemble/state.yaml
+python -m agent_ensemble.cli.team_state show .ensemble/state.yaml
 
 # Create worktrees for parallel steps
 python -m agent_ensemble.cli.worktree create {step_id}
@@ -34,10 +34,10 @@ python -m agent_ensemble.cli.worktree create {step_id}
 python -m agent_ensemble.cli.worktree merge-on-approve {step_id}
 
 # Dry-run preview of all remaining merges
-python -m agent_ensemble.cli.worktree merge-all --plan .agent-ensemble/plan.yaml --dry-run
+python -m agent_ensemble.cli.worktree merge-all --plan .ensemble/plan.yaml --dry-run
 
 # Merge all remaining worktree branches
-python -m agent_ensemble.cli.worktree merge-all --plan .agent-ensemble/plan.yaml [--conflict-aware]
+python -m agent_ensemble.cli.worktree merge-all --plan .ensemble/plan.yaml [--conflict-aware]
 
 # Cleanup worktrees
 python -m agent_ensemble.cli.worktree cleanup --all
@@ -116,10 +116,10 @@ Identify which targets can run in parallel:
 Create an execution plan. Since refactoring doesn't use roadmap.yaml, build the plan manually:
 
 ```bash
-mkdir -p .agent-ensemble
+mkdir -p .ensemble
 ```
 
-Write `.agent-ensemble/plan.yaml` with the target structure:
+Write `.ensemble/plan.yaml` with the target structure:
 ```yaml
 layers:
   - layer: 1
@@ -137,7 +137,7 @@ layers:
 
 Initialize state tracking:
 ```bash
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state init --plan .agent-ensemble/plan.yaml --output .agent-ensemble/state.yaml
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state init --plan .ensemble/plan.yaml --output .ensemble/state.yaml
 ```
 
 ### Phase 4: Create Team
@@ -152,14 +152,14 @@ For each target, check for file conflicts and create worktrees if needed:
 
 ```bash
 # Check each target
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state should-worktree .agent-ensemble/state.yaml --step {step_id}
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state should-worktree .ensemble/state.yaml --step {step_id}
 
 # If WORKTREE_REQUIRED:
 PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree create {step_id}
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .agent-ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id} --worktree
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id} --worktree
 
 # If NO_WORKTREE_NEEDED:
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .agent-ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id}
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id}
 ```
 
 ### Phase 6: Spawn Crafters and Reviewers
@@ -282,7 +282,7 @@ Same as deliver — incremental merge when each target is APPROVED:
 
 ```bash
 # When a crafter's target is APPROVED and used a worktree:
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .agent-ensemble/state.yaml --step {step_id} --status approved --teammate crafter-{step_id}
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .ensemble/state.yaml --step {step_id} --status approved --teammate crafter-{step_id}
 
 # Merge immediately
 PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree merge-on-approve {step_id}
@@ -296,8 +296,8 @@ After all targets are approved and merged:
 
 1. **Merge remaining branches** (fallback for any not merged incrementally):
    ```bash
-   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree merge-all --plan .agent-ensemble/plan.yaml --dry-run
-   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree merge-all --plan .agent-ensemble/plan.yaml
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree merge-all --plan .ensemble/plan.yaml --dry-run
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree merge-all --plan .ensemble/plan.yaml
    ```
 
 2. **Run full test suite** on merged result to verify no regressions
@@ -324,7 +324,7 @@ Report summary to user.
 ## Example Invocation
 
 ```
-User: /agent-ensemble:refactor "Clean up the auth module — too many god objects"
+User: /ensemble:refactor "Clean up the auth module — too many god objects"
 
 Lead (you):
 1. Analyze: auth module has 3 god objects (AuthService, AuthController, AuthMiddleware)

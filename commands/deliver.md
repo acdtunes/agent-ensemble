@@ -1,6 +1,6 @@
-# AGENT-ENSEMBLE:DELIVER — Parallel Feature Delivery with Agent Teams
+# Parallel Feature Delivery with Agent Teams
 
-**Command**: `/agent-ensemble:deliver`
+**Command**: `/ensemble:deliver`
 **Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
 
 ## Overview
@@ -19,28 +19,28 @@ export PYTHONPATH=$HOME/.claude/lib/python
 python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/roadmap.yaml
 
 # Generate execution plan
-python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .agent-ensemble/plan.yaml
+python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .ensemble/plan.yaml
 
 # Initialize team state
-python -m agent_ensemble.cli.team_state init --plan .agent-ensemble/plan.yaml --output .agent-ensemble/state.yaml
+python -m agent_ensemble.cli.team_state init --plan .ensemble/plan.yaml --output .ensemble/state.yaml
 
 # Create worktrees for parallel steps
 python -m agent_ensemble.cli.worktree create {step_id}
 
 # Check if step needs worktree (file conflicts with active steps)
-python -m agent_ensemble.cli.team_state should-worktree .agent-ensemble/state.yaml --step {step_id}
+python -m agent_ensemble.cli.team_state should-worktree .ensemble/state.yaml --step {step_id}
 
 # Track step progress (--worktree flag required when conflicts exist)
-python -m agent_ensemble.cli.team_state update .agent-ensemble/state.yaml --step {step_id} --status {status} --teammate {teammate_id} [--worktree]
+python -m agent_ensemble.cli.team_state update .ensemble/state.yaml --step {step_id} --status {status} --teammate {teammate_id} [--worktree]
 
 # Check layer completion
-python -m agent_ensemble.cli.team_state check .agent-ensemble/state.yaml --layer {layer_num}
+python -m agent_ensemble.cli.team_state check .ensemble/state.yaml --layer {layer_num}
 
 # Show team state
-python -m agent_ensemble.cli.team_state show .agent-ensemble/state.yaml
+python -m agent_ensemble.cli.team_state show .ensemble/state.yaml
 
 # Merge all worktree branches
-python -m agent_ensemble.cli.worktree merge-all --plan .agent-ensemble/plan.yaml
+python -m agent_ensemble.cli.worktree merge-all --plan .ensemble/plan.yaml
 
 # Cleanup worktrees
 python -m agent_ensemble.cli.worktree cleanup --all
@@ -89,11 +89,11 @@ Use the CLI to analyze the roadmap and generate an execution plan:
 PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/roadmap.yaml
 
 # Generate execution plan
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .agent-ensemble/plan.yaml
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .ensemble/plan.yaml
 
 # Initialize team state tracking
-mkdir -p .agent-ensemble
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state init --plan .agent-ensemble/plan.yaml --output .agent-ensemble/state.yaml
+mkdir -p .ensemble
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state init --plan .ensemble/plan.yaml --output .ensemble/state.yaml
 ```
 
 The CLI will output:
@@ -125,7 +125,7 @@ Create an agent team for parallel feature delivery.
 
 ### Phase 3: Spawn Teammates
 
-**MAXIMIZE PARALLELISM**: Spawn ALL steps in the current layer simultaneously. If a layer has 4 steps, spawn 4 crafter+reviewer pairs — not 1 or 2 "to be safe". The entire point of agent-ensemble is parallel execution. Being conservative defeats the purpose.
+**MAXIMIZE PARALLELISM**: Spawn ALL steps in the current layer simultaneously. If a layer has 4 steps, spawn 4 crafter+reviewer pairs — not 1 or 2 "to be safe". The entire point of ensemble is parallel execution. Being conservative defeats the purpose.
 
 For each parallel layer, spawn:
 
@@ -232,18 +232,18 @@ Example: Layer 2 has steps A (dep: 1-1) and B (dep: 1-2, 1-3). If 1-1 finishes f
 
 ```bash
 # 1. Check for conflicts
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state should-worktree .agent-ensemble/state.yaml --step {step_id}
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state should-worktree .ensemble/state.yaml --step {step_id}
 
 # 2. If WORKTREE_REQUIRED:
 #    a. Create worktree
 PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree create {step_id}
 #    b. Mark step with worktree flag when updating status
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .agent-ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id} --worktree
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id} --worktree
 #    c. Use the WORKTREE spawn prompt (includes worktree path in "Worktree Isolation" section)
 
 # 3. If NO_WORKTREE_NEEDED:
 #    a. Use the standard spawn prompt (shared directory)
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .agent-ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id}
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id}
 ```
 
 **IMPORTANT**: The `team_state update --status in_progress` command will BLOCK if file conflicts exist and `--worktree` is not passed. This is a hard gate — you cannot skip it. If blocked, create the worktree first, then retry with `--worktree`.
@@ -253,13 +253,13 @@ While teammates are working:
 1. **Monitor progress**: Use CLI to track state
    ```bash
    # Show current team state
-   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state show .agent-ensemble/state.yaml
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state show .ensemble/state.yaml
 
    # Update step status when teammate reports progress
-   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .agent-ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id}
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id}
 
    # Check if layer is complete
-   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state check .agent-ensemble/state.yaml --layer 1
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state check .ensemble/state.yaml --layer 1
    ```
 
 2. **Handle blockers**: If a crafter messages you "Blocked on unknown X":
@@ -340,7 +340,7 @@ If all layers complete:
 The execution plan includes per-step `conflicts_with` annotations (cross-layer):
 
 ```bash
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .agent-ensemble/plan.yaml
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .ensemble/plan.yaml
 ```
 
 Plan output for conflicting steps:
@@ -354,7 +354,7 @@ steps:
 
 At runtime, use `should-worktree` to check against currently active steps:
 ```bash
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state should-worktree .agent-ensemble/state.yaml --step {step_id}
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state should-worktree .ensemble/state.yaml --step {step_id}
 ```
 
 Output:
@@ -419,7 +419,7 @@ PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree status
 
 Output:
 ```
-=== agent-ensemble Worktree Status ===
+=== ensemble Worktree Status ===
 
 Step 01-01:
   Path: /repo/.claude/worktrees/crafter-01-01
@@ -437,7 +437,7 @@ Step 01-02:
 **Step 2: Merge all branches sequentially**
 ```bash
 # Merge all worktree branches in order (uses plan.yaml for ordering)
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree merge-all --plan .agent-ensemble/plan.yaml
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree merge-all --plan .ensemble/plan.yaml
 ```
 
 If conflicts occur, the CLI pauses and reports:
@@ -530,7 +530,7 @@ Both approaches seem valid. Which should we keep?
 
 **Step 4: Cleanup worktrees after successful merge**
 ```bash
-# Remove all agent-ensemble worktrees and branches
+# Remove all ensemble worktrees and branches
 PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree cleanup --all
 ```
 
@@ -603,7 +603,7 @@ PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree cleanu
 ## Example Invocation
 
 ```
-User: /agent-ensemble:deliver auth-feature
+User: /ensemble:deliver auth-feature
 
 Lead (you):
 1. Read docs/feature/auth-feature/roadmap.yaml

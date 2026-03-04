@@ -1,0 +1,84 @@
+journey:
+  name: conflict-visibility
+  description: Team lead discovers and investigates card conflicts on kanban board
+  persona: team-lead
+  goal: See which cards conflict due to shared files so I can plan worktree usage
+
+steps:
+  - id: discover
+    name: Discover Conflict Indicator
+    description: See conflict badge on kanban card
+    trigger: Card renders with conflict count > 0
+    artifacts:
+      - name: conflictCount
+        type: number
+        source: computed from file overlap
+      - name: needsWorktree
+        type: boolean
+        source: true if conflicts with in_progress card
+    emotional_state: awareness
+    success_criteria:
+      - Badge visible when conflicts exist
+      - Badge hidden when all conflicts are done
+
+  - id: investigate
+    name: Investigate Conflicts
+    description: Explore which cards conflict and why
+    trigger: User hovers or clicks card
+    artifacts:
+      - name: conflictingStepIds
+        type: array<string>
+        source: computed from file overlap
+      - name: sharedFiles
+        type: array<string>
+        source: intersection of files_to_modify
+    emotional_state: curiosity
+    success_criteria:
+      - Conflicting cards listed
+      - Shared files shown
+      - Visual highlighting of related cards
+
+  - id: decide
+    name: Decide on Approach
+    description: Choose whether to use worktree, wait, or proceed
+    trigger: User reviews conflict information
+    artifacts:
+      - name: conflictStatus
+        type: enum
+        values: [none, potential, active]
+        source: derived from card statuses
+    emotional_state: deliberation
+    success_criteria:
+      - User understands impact
+      - Clear path forward visible
+
+  - id: act
+    name: Act with Confidence
+    description: Start work with appropriate isolation strategy
+    trigger: User makes decision
+    emotional_state: confidence
+    success_criteria:
+      - User knows if worktree is needed
+      - Work proceeds without unexpected conflicts
+
+error_paths:
+  - id: no-conflicts
+    condition: Card has no file overlaps
+    handling: No badge shown, clean card appearance
+
+  - id: all-done
+    condition: All conflicting cards are approved
+    handling: Hide conflict badge (historical conflicts not shown)
+
+shared_artifacts_registry:
+  - name: conflictCount
+    single_source: computeConflictMap() in conflict detection module
+    consumers: [StepCard badge]
+
+  - name: conflictingStepIds
+    single_source: computeConflictMap() in conflict detection module
+    consumers: [StepCard tooltip, conflict highlight feature]
+
+  - name: needsWorktree
+    single_source: derived from conflictingStepIds + status check
+    consumers: [StepCard badge]

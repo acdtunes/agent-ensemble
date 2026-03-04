@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Roadmap, RoadmapTransition, RoadmapSummary, ServerWSMessage, ClientWSMessage, FeatureId } from '../../shared/types';
+import type { Roadmap, RoadmapTransition, RoadmapSummary, ServerWSMessage, ClientWSMessage, FeatureId, ProjectId } from '../../shared/types';
 import { computeRoadmapSummary } from '../../shared/types';
 
 // --- Connection status (exhaustive union) ---
@@ -46,7 +46,7 @@ export const useFeatureState = (
   const unmountedRef = useRef(false);
   const receivedInitRef = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
-  const projectIdRef = useRef(projectId);
+  const projectIdRef = useRef(projectId as ProjectId);
   const featureIdRef = useRef(featureId as FeatureId);
 
   const sendMessage = useCallback((ws: WebSocket, message: ClientWSMessage): void => {
@@ -159,7 +159,7 @@ export const useFeatureState = (
     const previousFeatureId = featureIdRef.current;
     if (previousProjectId === projectId && previousFeatureId === featureId) return;
 
-    projectIdRef.current = projectId;
+    projectIdRef.current = projectId as ProjectId;
     featureIdRef.current = featureId as FeatureId;
 
     setRoadmap(null);
@@ -175,7 +175,7 @@ export const useFeatureState = (
       });
       sendMessage(wsRef.current, {
         type: 'subscribe',
-        projectId,
+        projectId: projectId as ProjectId,
         featureId: featureId as FeatureId,
       });
     }

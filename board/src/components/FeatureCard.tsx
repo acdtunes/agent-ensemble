@@ -3,6 +3,8 @@ import type { FeatureSummary } from "../../shared/types";
 import { computeCompletionPercentage } from "./ProjectCard";
 import { ArchiveConfirmDialog } from "./ArchiveConfirmDialog";
 import { useArchiveFeature } from "../hooks/useArchiveFeature";
+import { Toast } from "./Toast";
+import { useToast } from "../hooks/useToast";
 
 // --- Pure functions ---
 
@@ -50,8 +52,15 @@ export const FeatureCard = ({
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { archiving, archiveFeature } = useArchiveFeature();
+  const toast = useToast();
 
   const showArchiveButton = projectId !== undefined;
+
+  const handleFeatureIdClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(feature.featureId);
+    toast.show(`Copied ${feature.featureId}`);
+  };
 
   const handleArchiveClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -87,6 +96,13 @@ export const FeatureCard = ({
             <h3 className="truncate text-sm font-semibold text-gray-100">
               {feature.name}
             </h3>
+            <span
+              data-testid="feature-id"
+              onClick={handleFeatureIdClick}
+              className="font-mono text-xs text-gray-500 cursor-pointer hover:underline hover:text-gray-300"
+            >
+              {feature.featureId}
+            </span>
             {hasValidDescription(feature.shortDescription) && (
               <p
                 data-testid="feature-description"
@@ -164,6 +180,7 @@ export const FeatureCard = ({
         onCancel={handleCancel}
         loading={archiving}
       />
+      <Toast message={toast.message} />
     </>
   );
 };

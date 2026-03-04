@@ -11,7 +11,7 @@ interface ProjectCardProps {
 export const computeCompletionPercentage = (completed: number, total: number): number =>
   total === 0 ? 0 : Math.round((completed / total) * 100);
 
-export type FeatureStatus = 'completed' | 'in-progress' | 'failed' | 'pending';
+export type FeatureStatus = 'completed' | 'in-progress' | 'pending';
 
 export const classifyFeatureStatus = (feature: FeatureSummary): FeatureStatus => {
   if (feature.totalSteps > 0 && feature.done === feature.totalSteps) return 'completed';
@@ -22,7 +22,6 @@ export const classifyFeatureStatus = (feature: FeatureSummary): FeatureStatus =>
 interface FeatureStatusCounts {
   readonly completed: number;
   readonly inProgress: number;
-  readonly failed: number;
 }
 
 export const aggregateFeatureStatuses = (
@@ -34,11 +33,10 @@ export const aggregateFeatureStatuses = (
       switch (status) {
         case 'completed': return { ...acc, completed: acc.completed + 1 };
         case 'in-progress': return { ...acc, inProgress: acc.inProgress + 1 };
-        case 'failed': return { ...acc, failed: acc.failed + 1 };
         case 'pending': return acc;
       }
     },
-    { completed: 0, inProgress: 0, failed: 0 },
+    { completed: 0, inProgress: 0 },
   );
 
 export const formatFeatureCount = (count: number): string => {
@@ -98,11 +96,6 @@ export const ProjectCard = ({ project, onNavigate, onRemove }: ProjectCardProps)
             {project.inProgress} active
           </span>
         )}
-        {project.failed > 0 && (
-          <span className="rounded-full bg-red-950/50 px-1.5 py-0.5 font-medium text-red-400">
-            {project.failed} failed
-          </span>
-        )}
       </div>
 
       {featureCount > 0 && (
@@ -115,11 +108,6 @@ export const ProjectCard = ({ project, onNavigate, onRemove }: ProjectCardProps)
           {featureStats.inProgress > 0 && (
             <span className="rounded-full bg-blue-950/50 px-1.5 py-0.5 font-medium text-blue-400">
               {featureStats.inProgress} active
-            </span>
-          )}
-          {featureStats.failed > 0 && (
-            <span className="rounded-full bg-red-950/50 px-1.5 py-0.5 font-medium text-red-400">
-              {featureStats.failed} failing
             </span>
           )}
         </div>

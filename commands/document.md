@@ -1,6 +1,6 @@
-# AGENT-ENSEMBLE:DOCUMENT — Parallel Documentation with Agent Teams
+# Parallel Documentation with Agent Teams
 
-**Command**: `/agent-ensemble:document`
+**Command**: `/ensemble:document`
 **Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
 
 ## Overview
@@ -205,7 +205,7 @@ Present the consolidated documentation to the user.
 ## Example Invocation
 
 ```
-User: /agent-ensemble:document "Document the API layer and the notification system"
+User: /ensemble:document "Document the API layer and the notification system"
 
 Lead (you):
 1. Classify: API needs Reference + How-to, Notifications needs Explanation + How-to + Reference

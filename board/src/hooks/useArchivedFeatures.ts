@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { ArchivedFeature } from '../../shared/types';
+import { useState, useEffect, useCallback } from "react";
+import type { ArchivedFeature } from "../../shared/types";
 
 // --- Hook return type ---
 
@@ -7,6 +7,7 @@ export interface UseArchivedFeaturesResult {
   readonly archivedFeatures: readonly ArchivedFeature[];
   readonly loading: boolean;
   readonly error: string | null;
+  readonly refetch: () => void;
 }
 
 // --- Pure helpers ---
@@ -17,18 +18,23 @@ const buildArchiveUrl = (projectId: string): string =>
 const parseErrorBody = async (response: Response): Promise<string> => {
   try {
     const body = (await response.json()) as { error?: string };
-    return body.error ?? 'Failed to load archived features';
+    return body.error ?? "Failed to load archived features";
   } catch {
-    return 'Failed to load archived features';
+    return "Failed to load archived features";
   }
 };
 
 // --- Hook ---
 
-export const useArchivedFeatures = (projectId: string): UseArchivedFeaturesResult => {
-  const [archivedFeatures, setArchivedFeatures] = useState<readonly ArchivedFeature[]>([]);
+export const useArchivedFeatures = (
+  projectId: string,
+): UseArchivedFeaturesResult => {
+  const [archivedFeatures, setArchivedFeatures] = useState<
+    readonly ArchivedFeature[]
+  >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fetchCount, setFetchCount] = useState(0);
 
   const fetchArchivedFeatures = useCallback(async () => {
     setLoading(true);
@@ -41,11 +47,11 @@ export const useArchivedFeatures = (projectId: string): UseArchivedFeaturesResul
         setError(errorMessage);
         return;
       }
-      const data = (await response.json()) as ArchivedFeature[];
-      setArchivedFeatures(data);
+      const data = (await response.json()) as { archivedFeatures: ArchivedFeature[] };
+      setArchivedFeatures(data.archivedFeatures);
     } catch {
       setArchivedFeatures([]);
-      setError('Failed to load archived features');
+      setError("Failed to load archived features");
     } finally {
       setLoading(false);
     }
@@ -53,7 +59,11 @@ export const useArchivedFeatures = (projectId: string): UseArchivedFeaturesResul
 
   useEffect(() => {
     fetchArchivedFeatures();
-  }, [fetchArchivedFeatures]);
+  }, [fetchArchivedFeatures, fetchCount]);
 
-  return { archivedFeatures, loading, error };
+  const refetch = useCallback(() => {
+    setFetchCount((prev) => prev + 1);
+  }, []);
+
+  return { archivedFeatures, loading, error, refetch };
 };

@@ -27,8 +27,11 @@ import { scanDocsDir } from './doc-tree.js';
 import { readDocContent } from './doc-content.js';
 import { listDirectories, defaultPath } from './browse.js';
 import { discoverFeaturesFs } from './feature-discovery.js';
+import { resolveArchiveDir } from './archive-path-resolver.js';
+import { moveToArchiveFs, scanArchiveDirFs } from './archive-io.js';
+import { createFeatureId } from '../shared/types.js';
 import { findAllFeatureDocsRoots, type LabeledRoot } from './feature-docs-root.js';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { createDirectoryWatcher, type DirectoryWatcher } from './directory-watcher.js';
 import { ok, err } from '../shared/types.js';
 
@@ -380,11 +383,19 @@ export const createMultiProjectServer = (
     getAllFeatureDocsRoots: (projectId: ProjectId, featureId: FeatureId): readonly LabeledRoot[] => {
       const projectPath = pathMap.get(projectId);
       if (!projectPath) return [];
+      const listDir = (path: string): string[] => {
+        try {
+          return readdirSync(path);
+        } catch {
+          return [];
+        }
+      };
       return findAllFeatureDocsRoots(
         projectPath,
         featureId as string,
         FEATURE_DOCS_DIRS,
         existsSync,
+        listDir,
       );
     },
     scanDocsDir,
@@ -403,7 +414,7 @@ export const createMultiProjectServer = (
 
   // Project add/remove operations
   const addProject = async (projectPath: string): Promise<Result<ProjectSummary, AddProjectError>> => {
-    const dirName = basename(projectPath);
+    const dirName = basename(projectPath).toLowerCase();
     const idResult = createProjectId(dirName);
     if (!idResult.ok) {
       return err({ type: 'invalid_path', message: idResult.error });
@@ -489,6 +500,79 @@ export const createMultiProjectServer = (
         } catch {
           return err(`Failed to read: ${path}`);
         }
+      },
+    },
+    archive: {
+      archiveFeature: async (projectId, featureId) => {
+        const projectPath = pathMap.get(projectId);
+        if (!projectPath) {
+          return err({ type: 'feature_not_found' as const, featureId });
+        }
+        // Move all related directories (feature, ux, requirements) to archive
+        const dirsToArchive = ['docs/feature', 'docs/ux', 'docs/requirements'] as const;
+        let movedAny = false;
+        for (const dir of dirsToArchive) {
+          const sourcePath = `${projectPath}/${dir}/${featureId}`;
+          const destPath = `${projectPath}/docs/archive/${featureId}/${dir.split('/')[1]}`;
+          const result = await moveToArchiveFs(sourcePath, destPath);
+          if (result.ok) {
+            movedAny = true;
+          } else if (result.error.type === 'destination_exists') {
+            return err({ type: 'already_archived' as const, featureId });
+          }
+          // Ignore source_not_found — directory may not exist for all types
+        }
+        if (!movedAny) {
+          return err({ type: 'feature_not_found' as const, featureId });
+        }
+        return ok(undefined);
+      },
+      restoreFeature: async (projectId, featureId) => {
+        const projectPath = pathMap.get(projectId);
+        if (!projectPath) {
+          return err({ type: 'feature_not_found' as const, featureId });
+        }
+        // Restore all subdirectories from archive back to their original locations
+        const dirsToRestore = ['feature', 'ux', 'requirements'] as const;
+        let restoredAny = false;
+        for (const subdir of dirsToRestore) {
+          const sourcePath = `${projectPath}/docs/archive/${featureId}/${subdir}`;
+          const destPath = `${projectPath}/docs/${subdir}/${featureId}`;
+          const result = await moveToArchiveFs(sourcePath, destPath);
+          if (result.ok) {
+            restoredAny = true;
+          } else if (result.error.type === 'destination_exists') {
+            return err({ type: 'already_exists' as const, featureId });
+          }
+          // Ignore source_not_found — subdirectory may not exist
+        }
+        // Clean up empty archive directory after restore
+        try {
+          const { rmdir } = await import('node:fs/promises');
+          await rmdir(`${projectPath}/docs/archive/${featureId}`);
+        } catch {
+          // Ignore — directory may not be empty or may not exist
+        }
+        if (!restoredAny) {
+          return err({ type: 'feature_not_found' as const, featureId });
+        }
+        return ok(undefined);
+      },
+      listArchivedFeatures: async (projectId) => {
+        const projectPath = pathMap.get(projectId);
+        if (!projectPath) {
+          return [];
+        }
+        const archiveDir = `${projectPath}/docs/archive`;
+        const result = await scanArchiveDirFs(archiveDir);
+        if (!result.ok) {
+          return [];
+        }
+        return result.value.map((entry) => ({
+          featureId: entry.featureId as FeatureId,
+          name: entry.featureId,
+          archivedAt: entry.archivedAt,
+        }));
       },
     },
   });

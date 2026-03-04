@@ -172,21 +172,25 @@ describe('buildDocTree: filters non-markdown files', () => {
   it('excludes files without .md extension', async () => {
     const { buildDocTree } = await import(/* @vite-ignore */ DOC_TREE_MODULE_PATH);
 
-    // Given entries including non-markdown files
+    // Given entries including non-doc files
     const entries: readonly DirEntry[] = [
       file('README.md', 'README.md'),
       file('diagram.png', 'diagram.png'),
       file('notes.txt', 'notes.txt'),
       file('config.yaml', 'config.yaml'),
+      file('journey.feature', 'journey.feature'),
     ];
 
     // When the tree is built
     const tree = buildDocTree(entries);
 
-    // Then only the .md file is included
-    expect(tree.fileCount).toBe(1);
-    expect(tree.root).toHaveLength(1);
-    expect(tree.root[0].name).toMatch(/README/);
+    // Then only doc files (.md, .yaml, .feature) are included with extensions
+    expect(tree.fileCount).toBe(3);
+    expect(tree.root).toHaveLength(3);
+    const names = tree.root.map((n: { name: string }) => n.name);
+    expect(names).toContain('README.md');
+    expect(names).toContain('config.yaml');
+    expect(names).toContain('journey.feature');
   });
 
   it('excludes hidden directories', async () => {
