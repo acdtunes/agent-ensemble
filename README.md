@@ -1,6 +1,8 @@
 # Agent Ensemble
 
-Team coordination commands for Claude Code. Run parallel agent workflows with automatic coordination, worktree isolation, and merge handling.
+**Ship features faster by running Claude Code agents in parallel.**
+
+Instead of sequential agent workflows, Agent Ensemble coordinates teams of specialized agents (crafters, reviewers, researchers) working simultaneously with automatic worktree isolation and merge handling.
 
 **Requires**: [nWave](https://github.com/nWave-ai/nWave) (installed automatically)
 
@@ -14,13 +16,7 @@ cd agent-ensemble
 # Install (also installs nWave if missing)
 ./install.sh
 
-# Enable agent teams in Claude Code settings
-# Add to ~/.claude/settings.json:
-# {
-#   "env": {
-#     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-#   }
-# }
+# Enable agent teams in Claude Code settings (see Configuration below)
 ```
 
 ## What You Get
@@ -53,9 +49,9 @@ npm run dev
 
 ## Prerequisites
 
-- [Claude Code](https://claude.ai/claude-code) installed
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
 - Python 3.11+
-- Node.js 18+ (for dashboard)
+- Node.js 18+ (for dashboard only)
 - `pipx` recommended (for nWave installation)
 
 ## Usage
@@ -140,10 +136,9 @@ agent-ensemble/
 
 ### Claude Code Settings
 
-Enable agent teams (required):
+Enable agent teams (required). Edit `~/.claude/settings.json`:
 
 ```json
-// ~/.claude/settings.json
 {
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
@@ -151,12 +146,13 @@ Enable agent teams (required):
 }
 ```
 
+If you already have settings, just add the `env` section to your existing file.
+
 ### Dashboard Projects
 
-Register projects for the dashboard:
+Register projects for the dashboard by creating `.nw-board-projects.json` in your home directory or project root:
 
 ```json
-// .nw-board-projects.json (in your project root)
 {
   "projects": [
     {
@@ -167,6 +163,8 @@ Register projects for the dashboard:
   ]
 }
 ```
+
+Projects need `docs/feature/*/roadmap.yaml` files to display on the dashboard.
 
 ## Updating
 
@@ -191,7 +189,7 @@ pipx uninstall nwave-ai
 ## Related
 
 - [nWave](https://github.com/nWave-ai/nWave) - Core agent framework (required dependency)
-- [Claude Code](https://claude.ai/claude-code) - Anthropic's CLI for Claude
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) - Anthropic's AI-powered CLI
 
 ## License
 
