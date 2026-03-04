@@ -17,6 +17,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
+# Install Playwright browser dependencies (must be done as root)
+RUN npx playwright install-deps chromium
+
 # Install pipx
 RUN pip install pipx && pipx ensurepath
 ENV PATH="/root/.local/bin:$PATH"
@@ -75,6 +78,13 @@ RUN echo "=== Dashboard Unit Tests ===" && \
     cd board && \
     npm test && \
     echo "=== Dashboard unit tests passed ==="
+
+# Install Playwright browser and run E2E tests
+RUN cd board && npx playwright install chromium
+RUN echo "=== Dashboard E2E Tests ===" && \
+    cd board && \
+    npm run test:e2e && \
+    echo "=== Dashboard E2E tests passed ==="
 
 # Default command shows what was installed
 CMD ["bash", "-c", "echo 'All tests passed!' && echo '' && echo 'CLI:' && cat ~/.claude/ensemble-manifest.txt && echo '' && echo 'Dashboard: dist/ built successfully'"]
