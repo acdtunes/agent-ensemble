@@ -70,11 +70,20 @@ RUN echo "=== Dashboard Build ===" && \
     echo "" && \
     echo "=== Dashboard build passed ==="
 
-# Run dashboard tests
-RUN echo "=== Dashboard Tests ===" && \
+# Run dashboard unit tests
+RUN echo "=== Dashboard Unit Tests ===" && \
     cd board && \
     npm test && \
-    echo "=== Dashboard tests passed ==="
+    echo "=== Dashboard unit tests passed ==="
+
+# Install Playwright browsers for E2E tests
+RUN cd board && npx playwright install chromium && npx playwright install-deps chromium
+
+# Run Playwright E2E smoke tests
+RUN echo "=== Dashboard E2E Smoke Tests ===" && \
+    cd board && \
+    npm run test:e2e && \
+    echo "=== Dashboard E2E tests passed ==="
 
 # Default command shows what was installed
 CMD ["bash", "-c", "echo 'All tests passed!' && echo '' && echo 'CLI:' && cat ~/.claude/ensemble-manifest.txt && echo '' && echo 'Dashboard: dist/ built successfully'"]
