@@ -1,6 +1,8 @@
 import type { FeatureSummary } from '../../shared/types';
 import { Breadcrumb, type BreadcrumbSegment } from './Breadcrumb';
 import { FeatureCard } from './FeatureCard';
+import { StatusGroupHeader } from './StatusGroupHeader';
+import { groupFeaturesByStatus, type FeatureGroup } from '../utils/featureGrouping';
 
 interface ProjectFeatureViewProps {
   readonly projectId: string;
@@ -17,6 +19,13 @@ const EmptyState = () => (
   </div>
 );
 
+// --- Pure functions ---
+
+const filterNonEmptyGroups = (groups: readonly FeatureGroup[]): readonly FeatureGroup[] =>
+  groups.filter((group) => group.features.length > 0);
+
+// --- Component ---
+
 export const ProjectFeatureView = ({
   projectId,
   features,
@@ -28,6 +37,8 @@ export const ProjectFeatureView = ({
     { label: 'Overview', onClick: onNavigateOverview },
     { label: projectId },
   ];
+
+  const groups = filterNonEmptyGroups(groupFeaturesByStatus(features));
 
   return (
     <div>
@@ -42,15 +53,12 @@ export const ProjectFeatureView = ({
           data-testid="feature-grid"
           className="grid grid-cols-1 gap-3 lg:grid-cols-4 xl:grid-cols-6"
         >
-          {features.map(feature => (
-            <FeatureCard
-              key={feature.featureId}
-              feature={feature}
-              onClick={() =>
-                feature.hasRoadmap
-                  ? onNavigateFeatureBoard(feature.featureId)
-                  : onNavigateFeatureDocs(feature.featureId)
-              }
+          {groups.map((group) => (
+            <GroupSection
+              key={group.key}
+              group={group}
+              onNavigateFeatureBoard={onNavigateFeatureBoard}
+              onNavigateFeatureDocs={onNavigateFeatureDocs}
             />
           ))}
         </div>
@@ -58,3 +66,32 @@ export const ProjectFeatureView = ({
     </div>
   );
 };
+
+// --- Internal component ---
+
+interface GroupSectionProps {
+  readonly group: FeatureGroup;
+  readonly onNavigateFeatureBoard: (featureId: string) => void;
+  readonly onNavigateFeatureDocs: (featureId: string) => void;
+}
+
+const GroupSection = ({
+  group,
+  onNavigateFeatureBoard,
+  onNavigateFeatureDocs,
+}: GroupSectionProps) => (
+  <>
+    <StatusGroupHeader groupName={group.displayName} count={group.features.length} />
+    {group.features.map((feature) => (
+      <FeatureCard
+        key={feature.featureId}
+        feature={feature}
+        onClick={() =>
+          feature.hasRoadmap
+            ? onNavigateFeatureBoard(feature.featureId)
+            : onNavigateFeatureDocs(feature.featureId)
+        }
+      />
+    ))}
+  </>
+);
