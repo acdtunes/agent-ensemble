@@ -13,7 +13,11 @@ import type { ArchivedFeature } from '../../shared/types';
 export interface ArchivedFeaturesSectionProps {
   readonly archivedFeatures: readonly ArchivedFeature[];
   readonly onRestore: (featureId: string) => void;
-  readonly restoringFeatureId: string | null;
+  /** @deprecated Use `restoring` instead */
+  readonly restoringFeatureId?: string | null;
+  /** Feature ID currently being restored (shows loading state) */
+  readonly restoring?: string | null;
+  readonly defaultExpanded?: boolean;
 }
 
 // --- Pure helpers ---
@@ -32,9 +36,14 @@ const formatTimestamp = (isoString: string): string => {
 export const ArchivedFeaturesSection = ({
   archivedFeatures,
   onRestore,
-  restoringFeatureId,
+  restoringFeatureId = null,
+  restoring = null,
+  defaultExpanded = false,
 }: ArchivedFeaturesSectionProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  // Support both prop names (restoring preferred, restoringFeatureId for backward compat)
+  const activeRestoringId = restoring ?? restoringFeatureId;
 
   if (archivedFeatures.length === 0) {
     return null;
@@ -57,7 +66,7 @@ export const ArchivedFeaturesSection = ({
       {isExpanded && (
         <ul className="mt-1 space-y-1 pl-3">
           {archivedFeatures.map((feature) => {
-            const isRestoring = restoringFeatureId === feature.featureId;
+            const isRestoring = activeRestoringId === feature.featureId;
 
             return (
               <li

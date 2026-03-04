@@ -39,6 +39,7 @@ const renderSection = (
       archivedFeatures={overrides.archivedFeatures ?? []}
       onRestore={overrides.onRestore ?? vi.fn()}
       restoringFeatureId={overrides.restoringFeatureId ?? null}
+      defaultExpanded={overrides.defaultExpanded ?? false}
     />,
   );
 
@@ -92,6 +93,13 @@ describe('ArchivedFeaturesSection', () => {
       fireEvent.click(header); // collapse
 
       expect(screen.queryByText('Auth POC')).not.toBeInTheDocument();
+    });
+
+    it('starts expanded when defaultExpanded is true', () => {
+      renderSection({ archivedFeatures, defaultExpanded: true });
+
+      expect(screen.getByText('Auth POC')).toBeInTheDocument();
+      expect(screen.getByText('Old API')).toBeInTheDocument();
     });
   });
 
@@ -159,6 +167,20 @@ describe('ArchivedFeaturesSection', () => {
       const buttons = screen.getAllByRole('button', { name: /restore/i });
       const enabledRestoreButton = buttons.find((btn) => !btn.hasAttribute('disabled'));
       expect(enabledRestoreButton).toBeInTheDocument();
+    });
+
+    it('supports restoring prop as alias for restoringFeatureId', () => {
+      render(
+        <ArchivedFeaturesSection
+          archivedFeatures={archivedFeatures}
+          onRestore={vi.fn()}
+          restoring="auth-poc"
+          defaultExpanded={true}
+        />,
+      );
+
+      const restoringButton = screen.getByRole('button', { name: /restoring/i });
+      expect(restoringButton).toBeDisabled();
     });
   });
 });
