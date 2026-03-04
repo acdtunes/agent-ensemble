@@ -1,0 +1,227 @@
+roadmap:
+  project_id: card-redesign
+  created_at: '2026-03-03T21:40:08Z'
+  total_steps: 9
+  phases: 4
+
+phases:
+- id: '01'
+  name: Foundation
+  description: Core utilities and data model changes
+  steps:
+  - id: 01-01
+    name: Create teammate emoji utility
+    description: >
+      Add getTeammateEmoji function using same hash approach as colors.
+      Palette: 🐙🦊🐢🦉🐬🦋🐺🦈🦁🐝
+    criteria:
+    - getTeammateEmoji returns deterministic emoji for any teammate ID
+    - Same ID always returns same emoji across calls
+    - Emoji comes from the 10-animal palette
+    - Pure function with no side effects
+    files_to_modify:
+    - board/src/utils/teammateEmoji.ts
+    - board/src/__tests__/teammateEmoji.test.ts
+    deps: []
+    status: approved
+    teammate_id: crafter-01-01
+    started_at: '2026-03-03T22:27:26.227274+00:00'
+    review_attempts: 2
+    completed_at: '2026-03-03T22:31:56.542812+00:00'
+  - id: 01-02
+    name: Add dependency count to StepCardData
+    description: >
+      Extend StepCardData interface with dependencyCount field.
+      Update toStepCard to populate it from step.dependencies.length.
+    criteria:
+    - StepCardData has readonly dependencyCount number field
+    - toStepCard sets dependencyCount from dependencies.length
+    - Existing tests continue to pass
+    files_to_modify:
+    - board/src/utils/statusMapping.ts
+    - board/src/__tests__/statusMapping.test.ts
+    deps: []
+    status: approved
+    teammate_id: crafter-01-02
+    started_at: '2026-03-03T22:27:31.914157+00:00'
+
+    review_attempts: 1
+    completed_at: '2026-03-03T22:33:07.246800+00:00'
+  - id: 01-03
+    name: Create status top bar color utility
+    description: >
+      Add getStatusTopBarColor function mapping DisplayColumn to Tailwind border colors.
+      pending=gray-500, in_progress=yellow-400, review=violet-400, done=green-400
+    criteria:
+    - getStatusTopBarColor returns correct color class for each DisplayColumn
+    - Returns border-t-4 format (e.g., "border-t-4 border-t-yellow-400")
+    - Pure function exhaustively handling all 4 columns
+    files_to_modify:
+    - board/src/utils/statusColors.ts
+    - board/src/__tests__/statusColors.test.ts
+    deps: []
+    status: approved
+    teammate_id: crafter-01-03
+    started_at: '2026-03-03T22:27:32.126175+00:00'
+
+    review_attempts: 1
+    completed_at: '2026-03-03T22:30:58.124567+00:00'
+- id: '02'
+  name: Card Layout
+  description: Restructure StepCard with new visual hierarchy
+  steps:
+  - id: 02-01
+    name: Implement tall card layout with top bar
+    description: >
+      Refactor StepCard to use min-h-[160px], flex-col layout,
+      and 4px colored top border instead of left border.
+      Remove text truncation on step name (allow wrap).
+    criteria:
+    - Card has min-height of approximately 160px
+    - Top border is 4px with status-appropriate color
+    - Left border is removed
+    - Step name wraps to multiple lines instead of truncating
+    - Flex-column layout with proper spacing
+    files_to_modify:
+    - board/src/components/StepCard.tsx
+    - board/src/__tests__/StepCard.test.tsx
+    deps:
+    - 01-03
+
+    status: approved
+    teammate_id: crafter-02-01
+    started_at: '2026-03-03T22:33:16.425485+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T22:36:49.432198+00:00'
+  - id: 02-02
+    name: Add metadata chips section
+    description: >
+      Add pill-shaped badges showing file count and dependency count.
+      Format: "📁 N files" and "🔗 N deps". Hide deps chip when count is 0.
+    criteria:
+    - File chip shows "📁 N files" with pill styling
+    - Dep chip shows "🔗 N deps" with pill styling
+    - Dep chip hidden when dependencyCount is 0
+    - Chips use bg-gray-800 rounded-full styling
+    files_to_modify:
+    - board/src/components/StepCard.tsx
+    - board/src/__tests__/StepCard.test.tsx
+    deps:
+    - 01-02
+    - 02-01
+
+    status: approved
+    teammate_id: crafter-02-02
+    started_at: '2026-03-03T22:36:58.370439+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T22:40:54.231605+00:00'
+  - id: 02-03
+    name: Implement teammate emoji footer
+    description: >
+      Replace current teammate indicator with emoji + colored name.
+      Move step ID to right side of footer row.
+      Show teammate in ALL columns including done.
+    criteria:
+    - Teammate row shows emoji + colored name (e.g., "🐙 alice")
+    - Step ID appears right-aligned on same row as teammate
+    - Teammate visible in done column (remove existing filter)
+    - When no teammate, only step ID shown in footer
+    files_to_modify:
+    - board/src/components/StepCard.tsx
+    - board/src/__tests__/StepCard.test.tsx
+    deps:
+    - 01-01
+    - 02-01
+
+    status: approved
+    teammate_id: crafter-02-03
+    started_at: '2026-03-03T22:37:03.129690+00:00'
+    worktree: 
+      /Users/andres.dandrea/projects/personal/nw-teams/.claude/worktrees/crafter-02-03
+    review_attempts: 1
+    completed_at: '2026-03-03T22:41:28.760052+00:00'
+- id: '03'
+  name: Hover Tooltip
+  description: Add detail tooltip on hover
+  steps:
+  - id: 03-01
+    name: Create StepCardTooltip component
+    description: >
+      New component showing full step details on hover.
+      Content: full name, file list, dependency count, review count.
+      300ms delay before showing.
+    criteria:
+    - Tooltip shows full step name without truncation
+    - Tooltip lists all files from files array
+    - Tooltip shows dependency count
+    - Tooltip shows review count
+    - Tooltip appears after 300ms hover delay
+    - Tooltip dismisses on mouse leave
+    files_to_modify:
+    - board/src/components/StepCardTooltip.tsx
+    - board/src/__tests__/StepCardTooltip.test.tsx
+    deps: []
+    status: approved
+    teammate_id: crafter-03-01
+    started_at: '2026-03-03T22:27:32.332672+00:00'
+
+    review_attempts: 1
+    completed_at: '2026-03-03T22:32:09.252644+00:00'
+  - id: 03-02
+    name: Integrate tooltip into StepCard
+    description: >
+      Wrap StepCard content with tooltip trigger.
+      Ensure click-through still works for card click handler.
+    criteria:
+    - Tooltip appears on StepCard hover after 300ms
+    - Card click still triggers onCardClick callback
+    - Tooltip does not interfere with existing interactions
+    - Tooltip positions correctly (above or beside card)
+    files_to_modify:
+    - board/src/components/StepCard.tsx
+    - board/src/__tests__/StepCard.test.tsx
+    deps:
+    - 03-01
+    - 02-03
+
+    status: approved
+    teammate_id: crafter-03-02
+    started_at: '2026-03-03T22:42:00.556340+00:00'
+    completed_at: '2026-03-03T22:57:18.482643+00:00'
+- id: '04'
+  name: Test Updates
+  description: Update existing tests for new behavior
+  steps:
+  - id: 04-01
+    name: Update StepCard tests for new layout
+    description: >
+      Modify existing StepCard.test.tsx to reflect new structure.
+      Update teammate visibility test (now shows in done).
+      Add tests for top bar, metadata chips, emoji.
+    criteria:
+    - Test confirms teammate shown in done column
+    - Test confirms top bar has status-appropriate color
+    - Test confirms metadata chips render correctly
+    - Test confirms emoji appears with teammate
+    - All existing test scenarios updated for new structure
+    files_to_modify:
+    - board/src/__tests__/StepCard.test.tsx
+    deps:
+    - 02-03
+    - 03-02
+
+    status: approved
+    completed_at: '2026-03-03T22:57:18.549441+00:00'
+implementation_scope:
+  source_directories:
+  - board/src/components/
+  - board/src/utils/
+  test_directories:
+  - board/src/__tests__/
+  excluded_patterns:
+  - __pycache__/**
+
+validation:
+  status: pending
+  reviewer:
+  approved_at:

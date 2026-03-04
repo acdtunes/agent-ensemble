@@ -11,3 +11,11 @@ venv/
 .DS_Store
 .nw-teams/
 .claude/worktrees/
+
+# Node
+node_modules/
+
+# Local state/config
+.nwave/
+.nw-board-projects.json
+.mcp.json

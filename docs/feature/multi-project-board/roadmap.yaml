@@ -1,0 +1,204 @@
+roadmap:
+  project_id: multi-project-board
+  created_at: '2026-03-01T02:42:06Z'
+  total_steps: 10
+  phases: 3
+phases:
+- id: '01'
+  title: 'Server: multi-project infrastructure'
+  steps:
+  - id: 01-01
+    title: 'Multi-project type extensions'
+    description: >
+      Extend shared types with ProjectId, ProjectSummary, ProjectEntry,
+      ClientWSMessage, ServerWSMessage, and ProjectConfig. Retain all
+      existing types unchanged.
+    acceptance_criteria:
+      - 'ProjectId validated against slug pattern rejects invalid values'
+      - 'A function derives ProjectSummary from a ProjectId and DeliveryState, producing correct name, summary stats, currentLayer, and updatedAt'
+      - 'Sending a subscribe message and receiving an init response round-trips through the ServerWSMessage and ClientWSMessage unions without loss'
+      - 'ClientWSMessage covers subscribe and unsubscribe'
+    time_estimate: '1h'
+    dependencies: []
+    files:
+      - shared/types.ts
+  - id: 01-02
+    title: 'Project registry'
+    description: >
+      Create ProjectRegistry managing Map of ProjectId to ProjectEntry
+      with add/remove/list/get operations. Manage per-project watcher
+      lifecycle and state isolation. Accept a broadcast callback port
+      for notifying downstream consumers of state changes.
+    acceptance_criteria:
+      - 'Registry add creates a file watcher and stores initial state for that project'
+      - 'Registry remove closes the watcher and deletes the entry'
+      - 'State change in one project does not affect other registered projects'
+      - 'Registry exposes a callback port for broadcasting state-change events to consumers'
+    time_estimate: '2h'
+    dependencies:
+      - 01-01
+    files:
+      - server/registry.ts
+  - id: 01-03
+    title: 'Project discovery'
+    description: >
+      Create ProjectDiscovery that scans PROJECTS_ROOT for subdirectories
+      containing state.yaml. Detect new project additions and stale
+      project removals on each poll cycle via registry add/remove.
+    acceptance_criteria:
+      - 'Discovery detects a new project directory containing state.yaml within one poll interval'
+      - 'Discovery detects removal of a project directory within one poll interval'
+      - 'Discovery ignores subdirectories that do not contain state.yaml'
+    time_estimate: '1.5h'
+    dependencies:
+      - 01-02
+    files:
+      - server/discovery.ts
+  - id: 01-04
+    title: 'Project-scoped WS handler and HTTP routes'
+    description: >
+      Replace BroadcastServer with subscription-based WS handler supporting
+      subscribe/unsubscribe per projectId. Extend HTTP routes to serve
+      /api/projects, /api/projects/:id/state, /api/projects/:id/plan.
+      Wire registry broadcast callback to push project-scoped updates and
+      overview events. Server reads PROJECTS_ROOT, creates ProjectRegistry,
+      starts ProjectDiscovery polling, and wires state-change callbacks
+      to WS handler.
+    acceptance_criteria:
+      - 'WS client receives projects_snapshot on initial connection'
+      - 'WS client subscribing to a projectId receives init with that project state and plan'
+      - 'State change broadcasts update only to clients subscribed to that projectId'
+      - 'GET /api/projects returns list of ProjectSummary for all registered projects'
+      - 'GET /api/projects/:id/state returns 404 for unknown projectId'
+    time_estimate: '3h'
+    dependencies:
+      - 01-03
+    files:
+      - server/index.ts
+      - server/registry.ts
+- id: '02'
+  title: 'Frontend: multi-project views and routing'
+  steps:
+  - id: 02-01
+    title: 'Hash router and useProjectList hook'
+    description: >
+      Create lightweight hash-based router supporting two routes:
+      overview (/) and per-project board (/projects/:id/board).
+      Create useProjectList hook that listens for projects_snapshot,
+      project_added, and project_removed WS messages.
+    acceptance_criteria:
+      - 'Navigating to #/projects/:id/board extracts projectId and renders board view'
+      - 'Navigating to #/ or empty hash renders overview view'
+      - 'useProjectList reflects live project additions without page reload'
+      - 'useProjectList reflects live project removals without page reload'
+    time_estimate: '2h'
+    dependencies:
+      - 01-04
+    files:
+      - src/hooks/useRouter.ts
+      - src/hooks/useProjectList.ts
+  - id: 02-02
+    title: 'Overview dashboard and project card'
+    description: >
+      Create OverviewDashboard rendering a grid of ProjectCard components.
+      Each card shows project name, progress summary, current layer,
+      and last updated timestamp. Cards navigate to per-project board on click.
+    acceptance_criteria:
+      - 'Dashboard displays one card per registered project'
+      - 'Each card shows completion percentage and current layer number'
+      - 'Clicking a card navigates to that project board view'
+      - 'Dashboard updates in real-time when a project is added or removed'
+    time_estimate: '2h'
+    dependencies:
+      - 02-01
+    files:
+      - src/components/OverviewDashboard.tsx
+      - src/components/ProjectCard.tsx
+  - id: 02-03
+    title: 'Project-scoped useDeliveryState'
+    description: >
+      Modify useDeliveryState to accept projectId parameter. On mount or
+      projectId change, send subscribe message. On unmount or projectId
+      change, send unsubscribe. Filter incoming messages by projectId.
+    acceptance_criteria:
+      - 'Hook sends subscribe with projectId after WS connection opens'
+      - 'Hook sends unsubscribe for previous projectId when projectId changes'
+      - 'Hook returns state and plan only for the subscribed project'
+      - 'Hook resets state to null when switching projects before new init arrives'
+    time_estimate: '2h'
+    dependencies:
+      - 02-01
+    files:
+      - src/hooks/useDeliveryState.ts
+  - id: 02-04
+    title: 'App routing wiring'
+    description: >
+      Modify App to use hash router. Render OverviewDashboard on root route
+      and existing BoardContent on project route. Add navigation back to
+      overview from board view header.
+    acceptance_criteria:
+      - 'App renders overview dashboard when URL has no project hash'
+      - 'App renders board with correct project data when URL contains project hash'
+      - 'Board view header includes navigation link back to overview'
+      - 'Browser back/forward navigates between overview and board views'
+    time_estimate: '1.5h'
+    dependencies:
+      - 02-02
+      - 02-03
+    files:
+      - src/App.tsx
+- id: '03'
+  title: 'Integration: end-to-end and resilience'
+  steps:
+  - id: 03-01
+    title: 'End-to-end multi-project flow'
+    description: >
+      Validate full pipeline: discovery detects projects, registry creates
+      watchers, WS broadcasts to subscribed clients, overview updates live,
+      board view shows correct per-project state.
+    acceptance_criteria:
+      - 'Server started with PROJECTS_ROOT discovers existing project directories'
+      - 'Adding a state.yaml to a new subdirectory surfaces that project in overview within poll interval'
+      - 'File change in project-alpha state.yaml updates only project-alpha board view'
+      - 'Two browser tabs subscribed to different projects receive independent updates'
+    time_estimate: '2h'
+    dependencies:
+      - 02-04
+    files:
+      - server/index.ts
+  - id: 03-02
+    title: 'Hot-reload resilience and error isolation'
+    description: >
+      Validate per-project error isolation and graceful lifecycle.
+      Invalid YAML in one project retains last-known-good state without
+      affecting others. Watcher cleanup on project removal prevents
+      file descriptor leaks. Graceful shutdown closes all watchers and
+      WS connections.
+    acceptance_criteria:
+      - 'Invalid YAML in one project sends error message to its subscribers without crashing others'
+      - 'Removing a project directory closes its watcher and sends project_removed to all clients'
+      - 'Server SIGTERM closes all watchers and WS connections before exiting'
+      - 'Project with missing plan.yaml renders board with plan-unavailable placeholder'
+    time_estimate: '2h'
+    dependencies:
+      - 03-01
+    files:
+      - server/registry.ts
+      - server/discovery.ts
+      - server/index.ts
+implementation_scope:
+  source_directories:
+    - shared/
+    - server/
+    - src/hooks/
+    - src/components/
+  test_directories:
+    - server/__tests__/
+    - src/__tests__/
+  excluded_patterns:
+    - node_modules/**
+    - dist/**
+validation:
+  status: pending
+  reviewer: acceptance-designer
+  approved_at: null

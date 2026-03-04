@@ -1,0 +1,154 @@
+roadmap:
+  project_id: doc-viewer
+  created_at: '2026-03-02T12:03:23Z'
+  total_steps: 15
+  phases: 5
+phases:
+- id: '01'
+  title: 'Foundation: shared types and server pure core'
+  steps:
+  - id: 01-01
+    title: 'Shared types for doc-viewer domain'
+    acceptance_criteria:
+    - 'DocNode discriminated union (file | directory) exported from shared/types.ts'
+    - 'DocTree type with readonly root and fileCount exported'
+    - 'DocTreeError and DocContentError union types exported'
+    - 'All new types use readonly modifiers matching existing codebase convention'
+  - id: 01-02
+    title: 'Doc tree pure functions (buildDocTree, sortNodes)'
+    acceptance_criteria:
+    - 'buildDocTree produces DocTree from flat DirEntry array with nested structure'
+    - 'Only .md files included; hidden directories excluded'
+    - 'sortNodes places directories before files, both alphabetically'
+    - 'Deeply nested structures (4+ levels) preserved faithfully'
+    - 'Satisfies: doc-tree.test.ts (all 9 scenarios)'
+  - id: 01-03
+    title: 'Doc content pure functions and project config extension'
+    acceptance_criteria:
+    - 'validateDocPath rejects all path traversal attempts (../, null bytes, absolute, encoded)'
+    - 'validateDocPath accepts valid relative .md paths with spaces, hyphens, underscores'
+    - 'resolveDocsRoot resolves absolute/relative docs_root from config; returns undefined when missing'
+    - 'ProjectConfig extended with optional docsRoot field'
+    - 'Satisfies: doc-content.test.ts (all 13 scenarios)'
+- id: '02'
+  title: 'Server integration: HTTP endpoints and wiring'
+  steps:
+  - id: 02-01
+    title: 'scanDocsDir effect function'
+    acceptance_criteria:
+    - 'scanDocsDir reads filesystem and produces readonly DirEntry array'
+    - 'Returns Result with error when directory does not exist'
+    - 'Respects docs root boundary (does not escape configured root)'
+  - id: 02-02
+    title: 'readDocContent effect function'
+    acceptance_criteria:
+    - 'readDocContent reads file content from validated absolute path'
+    - 'Returns Result with DocContentError on missing file or read failure'
+    - 'Returns raw markdown string on success'
+  - id: 02-03
+    title: 'HTTP endpoint handlers for doc tree and doc content'
+    acceptance_criteria:
+    - 'GET /api/projects/:id/docs/tree returns DocTree JSON for valid project'
+    - 'GET /api/projects/:id/docs/content?path=... returns markdown string for valid path'
+    - 'Returns 400 for invalid project ID or missing path parameter'
+    - 'Returns 404 for unknown project or missing docs root'
+    - 'Path traversal attempts return 400 (delegates to validateDocPath)'
+  - id: 02-04
+    title: 'Multi-project server wiring with docsRoot'
+    acceptance_criteria:
+    - 'toConfig in composition root includes docsRoot from project directory'
+    - 'Doc endpoints receive docsRoot through dependency chain'
+    - 'Projects without docs directory serve 404 gracefully on doc endpoints'
+- id: '03'
+  title: 'Client foundation: layout, tree, content, navigation'
+  steps:
+  - id: 03-01
+    title: 'Route extension and tab navigation (Board/Docs)'
+    acceptance_criteria:
+    - 'parseHash recognizes #/projects/:id/docs as docs view route'
+    - 'Route union extended with docs view variant carrying projectId'
+    - 'App.tsx dispatches to doc viewer component for docs route'
+    - 'Project header shows Board and Docs tabs; active tab visually distinguished'
+    - 'Satisfies: US-01 "Navigate from board to docs via tab" and "Navigate back to board"'
+  - id: 03-02
+    title: 'DocViewer layout with DocTree sidebar and useDocTree hook'
+    acceptance_criteria:
+    - 'DocViewer renders two-panel layout: sidebar (tree) and content area'
+    - 'useDocTree fetches tree from GET .../docs/tree and holds DocTree state'
+    - 'Tree folders expand/collapse on click; folders before files alphabetically'
+    - 'File counts shown per folder; deeply nested structures render correctly'
+    - 'Empty/missing docs shows "No documentation found" in sidebar'
+    - 'Satisfies: US-01 scenarios 2-7 and error scenarios 8-10'
+  - id: 03-03
+    title: 'DocContent panel with useDocContent hook'
+    acceptance_criteria:
+    - 'Clicking a file node in DocTree loads content via GET .../docs/content?path=...'
+    - 'useDocContent holds markdown string, loading, and error states'
+    - 'Content panel scrolls independently of sidebar'
+    - 'Failed load shows error message with retry button; retry re-fetches successfully'
+    - 'Empty document renders without error'
+    - 'Satisfies: US-01 "Select a document" and US-02 scenarios 6-7, 9-10'
+- id: '04'
+  title: 'Rich features: markdown rendering, mermaid, copy path'
+  steps:
+  - id: 04-01
+    title: 'Markdown rendering pipeline with syntax highlighting'
+    acceptance_criteria:
+    - 'Document content rendered via react-markdown with remark-gfm plugin'
+    - 'Headings render with visual hierarchy (h1 > h2 > h3 sizing)'
+    - 'Code blocks render with syntax highlighting via rehype-highlight'
+    - 'Inline code visually distinct with monospace and background'
+    - 'Tables render with header row distinction and row separators'
+    - 'Satisfies: US-02 scenarios 1-4 and boundary scenarios 11-12'
+  - id: 04-02
+    title: 'Mermaid diagram rendering'
+    acceptance_criteria:
+    - 'Mermaid code blocks render as visual diagrams within content panel'
+    - 'Invalid mermaid syntax degrades gracefully to formatted code block'
+    - 'Rest of document renders normally regardless of mermaid errors'
+    - 'Satisfies: US-02 scenarios 5 and 8'
+  - id: 04-03
+    title: 'CopyPathButton with clipboard integration'
+    acceptance_criteria:
+    - 'File path displayed above rendered content when a document is selected'
+    - 'Copy button copies relative path (no absolute prefix) to clipboard'
+    - 'Button shows "Copied!" confirmation reverting after 2 seconds'
+    - 'Keyboard accessible (Enter/Space activates copy)'
+    - 'Clipboard unavailable: path text selected with manual-copy hint'
+    - 'No copy button visible when no document selected'
+    - 'Satisfies: US-03 all 10 scenarios'
+- id: '05'
+  title: 'Search and walking skeleton integration'
+  steps:
+  - id: 05-01
+    title: 'Document search: filter tree by filename'
+    acceptance_criteria:
+    - 'Search field filters tree to show only documents matching keyword'
+    - 'Search is case-insensitive and updates as user types (no submit)'
+    - 'Matching documents show parent folder context for disambiguation'
+    - 'Clearing search restores full tree to pre-search state'
+    - 'No matches shows "No documents match your search" message'
+    - 'Satisfies: US-04 all 9 scenarios including property-based'
+  - id: 05-02
+    title: 'Walking skeleton integration tests'
+    acceptance_criteria:
+    - 'Navigate-to-docs-select-and-read skeleton passes end-to-end'
+    - 'Copy-path skeleton passes end-to-end'
+    - 'Search skeleton passes end-to-end'
+    - 'Satisfies: walking-skeleton.feature all 3 scenarios'
+implementation_scope:
+  source_directories:
+  - board/server/
+  - board/src/components/
+  - board/src/hooks/
+  - board/shared/
+  test_directories:
+  - board/server/__tests__/
+  - board/src/__tests__/acceptance/doc-viewer/
+  excluded_patterns:
+  - node_modules/**
+  - dist/**
+validation:
+  status: approved
+  reviewer: nw-software-crafter-reviewer
+  approved_at: '2026-03-02T12:10:00Z'

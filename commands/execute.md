@@ -1,0 +1,684 @@
+# NW-TEAMS:EXECUTE — Parallel Feature Execution with Agent Teams
+
+**Command**: `/nw-teams:execute`
+**Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
+
+## Overview
+
+Execute parallel feature delivery using Claude Code Agent Teams. You (the Lead) will create a team of crafter and reviewer teammates who work in parallel, messaging each other directly.
+
+## CLI Tools
+
+This command uses deterministic CLI scripts for coordination. The **atomic commands** (start-step, transition, complete-step) are the PRIMARY interface — they update BOTH state.yaml and roadmap.yaml in a single call, preventing the Lead from forgetting status updates.
+
+```bash
+# Set PYTHONPATH for all CLI commands
+export PYTHONPATH=$HOME/.claude/lib/python
+
+# --- Phase 1: Setup ---
+
+# Analyze roadmap for parallel groups
+python -m nw_teams.cli.parallel_groups analyze docs/feature/{project-id}/roadmap.yaml
+
+# Generate execution plan
+python -m nw_teams.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .nw-teams/plan.yaml
+
+# Initialize team state
+python -m nw_teams.cli.team_state init --plan .nw-teams/plan.yaml --output .nw-teams/state.yaml
+
+# --- Atomic Commands (MANDATORY — use these, not raw update) ---
+
+# Start a step: checks worktree need → creates worktree if needed → updates state.yaml + roadmap.yaml
+# Output: "STARTED {step_id} [WORKTREE]" with path, or "STARTED {step_id} [SHARED]"
+python -m nw_teams.cli.team_state start-step \
+  --state .nw-teams/state.yaml \
+  --roadmap docs/feature/{project-id}/roadmap.yaml \
+  --step {step_id} \
+  --teammate crafter-{step_id}
+
+# Transition step status (e.g. in_progress → review, review → in_progress for revision)
+# Updates BOTH state.yaml and roadmap.yaml atomically
+python -m nw_teams.cli.team_state transition \
+  --state .nw-teams/state.yaml \
+  --roadmap docs/feature/{project-id}/roadmap.yaml \
+  --step {step_id} \
+  --status {review|in_progress|failed}
+
+# Complete a step: updates BOTH files to approved + merges worktree if used
+# Output: "COMPLETED {step_id}", "COMPLETED {step_id} MERGE_OK", or "COMPLETED {step_id} MERGE_CONFLICT"
+python -m nw_teams.cli.team_state complete-step \
+  --state .nw-teams/state.yaml \
+  --roadmap docs/feature/{project-id}/roadmap.yaml \
+  --step {step_id}
+
+# --- Monitoring ---
+
+# Show roadmap progress (reads roadmap.yaml)
+python -m nw_teams.cli.team_state show docs/feature/{project-id}/roadmap.yaml
+
+# Check if a phase is complete
+python -m nw_teams.cli.team_state check docs/feature/{project-id}/roadmap.yaml --phase {phase_id}
+
+# --- Worktree fallbacks (only if complete-step merge fails) ---
+
+# Dry-run preview of all remaining merges
+python -m nw_teams.cli.worktree merge-all --plan .nw-teams/plan.yaml --dry-run
+
+# Merge all remaining worktree branches
+python -m nw_teams.cli.worktree merge-all --plan .nw-teams/plan.yaml [--conflict-aware]
+
+# Cleanup worktrees
+python -m nw_teams.cli.worktree cleanup --all
+```
+
+## Pre-Flight Check
+
+Before proceeding, verify the feature flag is enabled:
+
+1. Check if agent teams are available by attempting to describe creating a team
+2. If not available, instruct the user to enable the feature flag:
+   ```json
+   // ~/.claude/settings.json
+   {
+     "env": {
+       "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+     }
+   }
+   ```
+
+## Your Role: Team Lead
+
+You are the **Team Lead** — a Claude AI session that orchestrates but does NOT execute steps directly.
+
+**Your responsibilities**:
+- Analyze the roadmap and identify parallel groups
+- Create the team and spawn teammates
+- Populate the shared task list
+- Wait for teammates to complete
+- Synthesize results and verify quality
+- Clean up the team
+
+**You do NOT**:
+- Execute TDD steps yourself (crafters do this)
+- Review code yourself (reviewer does this)
+- Write implementation code
+
+## Workflow
+
+### Phase 0: Validate Roadmap (MANDATORY GATE)
+
+**BEFORE any other action**, validate the roadmap path and schema.
+
+**Step 0a: Verify roadmap location**
+
+The roadmap MUST be at `docs/feature/{project-id}/roadmap.yaml` (root level).
+
+```bash
+# Check roadmap exists at correct location
+ls docs/feature/{project-id}/roadmap.yaml
+```
+
+**If the file is NOT at this location** (e.g., it's at `board/docs/feature/` or `src/docs/feature/`):
+1. Tell the user: "Roadmap found at wrong location. It must be at `docs/feature/{project-id}/roadmap.yaml`."
+2. **DO NOT proceed. DO NOT attempt to execute.**
+
+**Step 0b: Validate schema**
+
+```bash
+PYTHONPATH=$HOME/.claude/lib/python python3 -m des.cli.roadmap validate docs/feature/{project-id}/roadmap.yaml
+```
+
+**Exit codes:**
+- `0` = Valid, proceed to Phase 1
+- `1` = Invalid schema, **STOP IMMEDIATELY** and report errors to user
+- `2` = Usage error
+
+**If validation fails:**
+1. Print all errors from the CLI output
+2. Tell the user: "Roadmap is invalid. Use `/nw:roadmap` to create a valid roadmap or fix the errors manually."
+3. **DO NOT proceed to Phase 1. DO NOT attempt to execute.**
+
+This gate exists because the parallel_groups CLI is lenient and will accept malformed roadmaps that will cause execution failures later.
+
+### Phase 1: Analyze Roadmap
+
+Use the CLI to analyze the roadmap and generate an execution plan:
+
+```bash
+# Analyze and display parallel groups
+PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.parallel_groups analyze docs/feature/{project-id}/roadmap.yaml
+
+# Generate execution plan
+PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .nw-teams/plan.yaml
+
+# Initialize team state tracking
+mkdir -p .nw-teams
+PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state init --plan .nw-teams/plan.yaml --output .nw-teams/state.yaml
+```
+
+The CLI will output:
+```
+=== Parallel Execution Analysis ===
+Total steps: 4
+Layers: 2
+Max parallelism: 3 steps
+Estimated speedup: 2.0x
+
+Layer 1 (parallel):
+  - 01-01: Create user model
+  - 01-02: Create user repository
+  - 01-03: Create user service
+
+Layer 2 (sequential):
+  - 02-01: Create user controller
+```
+
+Wait for user confirmation before proceeding.
+
+### Phase 2: Create Team
+
+Ask Claude Code to create an agent team. Use natural language:
+
+```
+Create an agent team for parallel feature delivery.
+```
+
+### Phase 3: Spawn Teammates
+
+**MAXIMIZE PARALLELISM**: Spawn ALL steps in the current layer simultaneously. If a layer has 4 steps, spawn 4 crafters — not 1 or 2 "to be safe". The entire point of nw-teams is parallel execution. Being conservative defeats the purpose.
+
+For each parallel layer, spawn:
+
+**Core Team** (spawn ALL steps at once):
+- **N Crafter teammates** (one per step in the layer): Execute TDD cycle
+- Reviewers are spawned lazily — see "Reviewer Spawning Protocol" below
+
+**Spawn order**: Spawn ALL crafters in a SINGLE message with multiple Task tool calls. Do NOT spawn them one at a time.
+
+**IMPORTANT — Agent Types and Model**:
+- Crafters MUST use `subagent_type: nw-software-crafter`
+- Reviewer MUST use `subagent_type: nw-software-crafter-reviewer`
+- Support agents: `nw-researcher`, `nw-troubleshooter`, `nw-platform-architect`
+- NEVER use `general-purpose` for crafters or reviewers
+- ALL teammates MUST use `model: opus` to override agent defaults that may not resolve
+
+**Naming Convention**:
+Use the **step_id** as the unique suffix for all teammate names. This avoids collisions across layers since step IDs are globally unique.
+- `crafter-{step_id}` ↔ `reviewer-{step_id}`
+- Examples: `crafter-02-01` ↔ `reviewer-02-01`, `crafter-02-04` ↔ `reviewer-02-04`
+
+**Pairing Protocol**:
+Each crafter is paired 1:1 with a reviewer via the step_id naming convention:
+- `crafter-{step_id}` always pairs with `reviewer-{step_id}`
+- The reviewer is NOT spawned at crafter spawn time — it is spawned lazily by the Lead when the crafter signals readiness for review (see "Reviewer Spawning Protocol")
+
+**Spawn prompt for Crafter**:
+
+DO NOT dictate implementation details, file contents, or code in the prompt.
+Give the crafter the step requirements and let it drive TDD autonomously.
+
+```
+Spawn a crafter teammate (subagent_type: nw-software-crafter, name: crafter-{step_id}) with this prompt:
+
+"You are crafter-{step_id} on the {team} team. Project root: {project_root}
+
+Execute step {step_id}: {step_name}
+
+Requirements:
+{step_description}
+
+Acceptance criteria:
+{acceptance_criteria}
+
+Follow your Outside-In TDD methodology. You own the full cycle:
+PREPARE → RED_ACCEPTANCE → RED_UNIT → GREEN → COMMIT
+
+When you reach COMMIT, message the Lead (NOT a reviewer directly):
+  'Step {step_id} ready for review. Files: {files_modified}'
+The Lead will spawn a reviewer and route the review to you.
+If reviewer responds NEEDS_REVISION, address feedback and re-submit to the Lead.
+Only mark your task complete after reviewer APPROVED.
+
+Check TaskList after completing for next available work."
+```
+
+**Reviewer spawning**: Reviewers are NOT spawned here. See "Reviewer Spawning Protocol" below Phase 4 for when and how the Lead spawns reviewers on demand.
+
+### Phase 4: Populate Task List and Assign
+
+Create shared task list and assign tasks at spawn time:
+
+```
+For each step in the current parallel layer:
+- Create task with subject: "Step {step_id}: {step_name}"
+- Set blockedBy based on step dependencies
+- Assign each task to the crafter spawned for it (set owner in crafter spawn)
+```
+
+**IMPORTANT**: Assign tasks to crafters at spawn time. Do NOT let them self-claim — each crafter's spawn prompt already tells it which step to execute. Set the task owner when spawning.
+
+### Reviewer Spawning Protocol
+
+Reviewers are spawned **lazily by the Lead** — only when a crafter signals it is ready for review. This avoids burning context on idle reviewers while crafters are still working.
+
+**When a crafter messages the Lead**: "Step {step_id} ready for review. Files: {files_modified}"
+
+**1st review (reviewer does not exist yet)**:
+1. Spawn `reviewer-{step_id}` using the reviewer prompt below
+2. Message the newly spawned reviewer with the crafter's review request (files to review)
+
+**On NEEDS_REVISION (reviewer already running)**:
+1. Crafter addresses feedback and messages the Lead again: "Step {step_id} ready for re-review"
+2. Lead messages the **same already-running `reviewer-{step_id}`** — do NOT re-spawn
+3. The reviewer persists across revision cycles
+
+**On APPROVED**:
+1. Crafter messages the Lead: "Step {step_id} APPROVED"
+2. Lead runs `complete-step` (marks approved + merges worktree if used), then shuts down both crafter and reviewer
+
+**Spawn prompt for Reviewer** (used by Lead when crafter signals readiness):
+```
+Spawn a reviewer teammate (subagent_type: nw-software-crafter-reviewer, name: reviewer-{step_id}, model: opus) with this prompt:
+
+"You are reviewer-{step_id} on the {team} team. Project root: {project_root}
+
+You are paired with crafter-{step_id}. ONLY review work from crafter-{step_id}.
+
+Your role:
+- Review crafter work as messages arrive from crafter-{step_id}
+- Apply Testing Theater detection (7 deadly patterns)
+- Check test quality and coverage
+- Respond with APPROVED or NEEDS_REVISION
+
+When crafter-{step_id} messages you:
+1. Read the files they mention
+2. Check for: TDD discipline (tests exist and are meaningful), type safety, validation correctness, testing theater patterns
+3. Respond with one of:
+   - 'Step {step_id} APPROVED' — work meets quality standards
+   - 'Step {step_id} NEEDS_REVISION: {specific feedback}' — issues to fix
+
+Stay available — crafter-{step_id} may re-submit after revision, or pick up additional tasks.
+You are using nw-software-crafter-reviewer methodology."
+```
+
+### Phase 5: Monitor and Coordinate
+
+**Tmux pane management**: Tmux has a pane limit. Shut down the reviewer IMMEDIATELY after approval, then shut down the crafter after merge/completion — do NOT let idle teammates accumulate. This frees panes for eager next-layer spawns.
+
+**Eager next-layer spawning**: When a crafter completes and its step unlocks steps in the NEXT layer, check if ALL dependencies for those next-layer steps are now satisfied. If so, spawn a new crafter for the unblocked step immediately — don't wait for the entire current layer to finish. Reviewers spawn on demand when the new crafter signals readiness. This maximizes throughput.
+
+Example: Layer 2 has steps A (dep: 1-1) and B (dep: 1-2, 1-3). If 1-1 finishes first, spawn crafter for A immediately while 1-2 and 1-3 are still running.
+
+**MANDATORY PRE-SPAWN — run `start-step` BEFORE every crafter spawn:**
+
+```bash
+# Single atomic command: checks worktree need → creates if needed → updates state + roadmap
+PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state start-step \
+  --state .nw-teams/state.yaml \
+  --roadmap docs/feature/{project-id}/roadmap.yaml \
+  --step {step_id} \
+  --teammate crafter-{step_id}
+```
+
+**Output determines spawn prompt**:
+- `STARTED {step_id} [SHARED]` → use standard spawn prompt (shared directory)
+- `STARTED {step_id} [WORKTREE]` + worktree path → use WORKTREE spawn prompt (see "Worktree Isolation" section)
+
+**IMPORTANT**: `start-step` updates state.yaml to `in_progress` BEFORE returning. This means the NEXT `start-step` call will see this step as active and correctly detect file conflicts. You MUST call `start-step` SEQUENTIALLY for each crafter — do NOT batch them. The order matters for conflict detection.
+
+**Sequence for spawning N crafters in a layer:**
+1. `start-step` for crafter A → read output (SHARED or WORKTREE)
+2. Spawn crafter A with appropriate prompt
+3. `start-step` for crafter B → state now shows A as active, detects conflicts correctly
+4. Spawn crafter B with appropriate prompt
+5. ... repeat for all crafters in the layer
+
+After all `start-step` calls complete, crafters run in parallel — only the startup is sequential.
+
+While teammates are working:
+
+1. **Monitor progress**: Use CLI to track state
+   ```bash
+   # Show roadmap progress
+   PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state show docs/feature/{project-id}/roadmap.yaml
+
+   # Transition step to review when crafter signals readiness
+   PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state transition \
+     --state .nw-teams/state.yaml \
+     --roadmap docs/feature/{project-id}/roadmap.yaml \
+     --step {step_id} --status review
+
+   # Check if phase is complete
+   PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state check \
+     docs/feature/{project-id}/roadmap.yaml --phase {phase_id}
+   ```
+
+2. **Handle blockers**: If a crafter messages you "Blocked on unknown X":
+   - Spawn a researcher teammate to investigate
+   - Route findings back to the blocked crafter
+
+3. **Handle failures**: If a step fails twice:
+   - Spawn a troubleshooter teammate to investigate
+   - Route root cause back to crafter or escalate to user
+
+4. **Handle infra issues**: If build/Docker/CI breaks:
+   - Spawn a platform-architect teammate to fix
+   - Notify crafters when fixed
+
+**Status Values**:
+- `pending` — Not started
+- `claimed` — Teammate has claimed the task
+- `in_progress` — Work underway
+- `review` — Submitted for review
+- `approved` — Reviewer approved
+- `failed` — Step failed
+
+### Phase 6: Convergence
+
+Wait for all teammates to complete:
+
+1. All crafters idle
+2. All steps have reviewer APPROVED
+3. All tasks marked complete
+
+Then verify quality:
+```bash
+# Verify DES integrity
+PYTHONPATH=$HOME/.claude/lib/python python -m des.cli.verify_deliver_integrity docs/feature/{project-id}/
+```
+
+### Phase 7: Next Layer or Finalize
+
+**With eager spawning, layers blur**: Because you eagerly spawn next-layer steps as soon as their deps are met, there is no clean "layer boundary". Instead of waiting for an entire layer to complete before starting the next, you continuously:
+1. Complete the step atomically (updates state + roadmap + merges worktree):
+   ```bash
+   PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state complete-step \
+     --state .nw-teams/state.yaml \
+     --roadmap docs/feature/{project-id}/roadmap.yaml \
+     --step {step_id}
+   ```
+2. Shut down the reviewer immediately after approval, then the crafter after completion
+3. Check if any new steps are unblocked by this approval
+4. If yes, use `start-step` to spawn a fresh crafter (handles worktree detection automatically)
+5. `start-step` will detect file conflicts with still-running steps and create worktrees as needed
+
+This means Phases 5-7 are a continuous loop, not discrete stages.
+
+**Why fresh spawns per step**: Each crafter is spawned with a targeted prompt for one specific step. After approval, shut it down. Do NOT try to reassign a crafter to a different step — the original step context in its prompt will cause confusion.
+
+### Phase 8: Refactoring Pass (L1-L3 RPP)
+
+**After all implementation layers complete but BEFORE final cleanup**, run a refactoring pass to clean up the code that was just written. This catches naming issues, long methods, and structural problems while the code is fresh.
+
+**RPP Levels applied**:
+- **L1 — Rename**: Unclear names, inconsistent conventions
+- **L2 — Extract**: Long methods/functions, duplicated logic
+- **L3 — Reshape**: Reorganize within modules, improve internal structure
+
+**Workflow**:
+
+1. **Identify refactoring targets** — Scan the files modified during delivery. Group by module/area:
+   ```bash
+   # List all files modified during delivery (from roadmap tracking)
+   PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state show docs/feature/{project-id}/roadmap.yaml
+   ```
+
+2. **Group independent targets** — Files that don't overlap can be refactored in parallel. Files within the same module should go to a single crafter.
+
+3. **Spawn refactoring crafters** — One `nw-software-crafter` per target group. Use the same worktree isolation protocol as delivery. Reviewers are spawned lazily when a refactoring crafter reports completion (same protocol as delivery).
+
+**Refactoring Crafter Template**:
+```
+Spawn a crafter teammate (subagent_type: nw-software-crafter, name: refactor-{area}, model: opus) with this prompt:
+
+"You are refactor-{area} on the {team} team. Project root: {project_root}
+
+Refactoring pass on recently delivered code. Apply RPP levels L1-L3 ONLY.
+
+Target files:
+{files_in_this_area}
+
+L1 — Rename: Fix unclear names, align with project conventions
+L2 — Extract: Break long methods, extract duplicated logic
+L3 — Reshape: Improve internal module structure
+
+Rules:
+1. ALL existing tests MUST continue to pass — refactoring changes structure, not behavior
+2. Do NOT add new features, change APIs, or modify behavior
+3. Do NOT apply L4+ (Relocate, Rethink, Rewrite) — only cosmetic and structural cleanup
+4. Run tests after each change
+5. Make small, incremental commits
+
+When done, message the Lead (NOT a reviewer directly):
+  'Refactoring {area} complete. Files: {files_modified}'
+The Lead will spawn a reviewer and route the review to you.
+If reviewer responds NEEDS_REVISION, address feedback and re-submit to the Lead.
+Only mark your task complete after reviewer APPROVED.
+
+You are using nw-software-crafter methodology."
+```
+
+**Refactoring Reviewer Template** (used by Lead when refactoring crafter signals completion):
+```
+Spawn a reviewer teammate (subagent_type: nw-software-crafter-reviewer, name: refactor-reviewer-{area}, model: opus) with this prompt:
+
+"You are refactor-reviewer-{area} on the {team} team. Project root: {project_root}
+
+You are paired with refactor-{area}. ONLY review work from refactor-{area}.
+
+Your role:
+- Verify refactoring is L1-L3 ONLY (no behavior changes, no new features)
+- Check that all existing tests still pass
+- Validate naming improvements are consistent
+- Ensure extractions are clean (no leaky abstractions)
+- Confirm no accidental behavior changes
+
+When refactor-{area} messages you:
+1. Read the modified files
+2. Check for: behavior preservation, L1-L3 scope compliance, test coverage, naming consistency
+3. Respond with one of:
+   - 'Refactoring {area} APPROVED' — changes are correct and tests pass
+   - 'Refactoring {area} NEEDS_REVISION: {specific feedback}' — issues to fix
+
+You are using nw-software-crafter-reviewer methodology."
+```
+
+4. **Monitor** — Same as delivery monitoring. Shut down reviewer after approval, then crafter after merge/completion.
+
+5. **Verify** — Run full test suite after all refactoring merges to confirm no regressions.
+
+**Skip conditions**: Skip the refactoring pass only if:
+- User explicitly opts out ("skip refactoring")
+- Delivery was trivial (single step, few files)
+
+### Phase 9: Finalize
+
+If all layers and refactoring pass complete:
+1. Run final verification
+2. Clean up the team:
+   ```
+   Ask all remaining teammates to shut down gracefully.
+   Then clean up the team with TeamDelete.
+   ```
+3. **If TeamDelete fails** (stale members from earlier cycles still in config):
+   ```bash
+   # Force cleanup: remove team and task directories
+   rm -rf ~/.claude/teams/{team-name} ~/.claude/tasks/{team-name}
+   ```
+4. Report summary to user (including refactoring improvements)
+
+## Worktree Isolation
+
+### When Worktrees Are Used
+
+Worktree detection and creation is handled automatically by `start-step`. The Lead does NOT manually check for conflicts or create worktrees.
+
+**How it works**: `start-step` checks the step's files against all currently active steps in state.yaml. If overlap is found, it creates a worktree before marking the step as in_progress. The output tells the Lead which spawn prompt to use:
+- `STARTED {step_id} [SHARED]` → standard spawn prompt
+- `STARTED {step_id} [WORKTREE]` + path → worktree spawn prompt (below)
+
+### Worktree Spawn Prompt
+
+When `start-step` outputs `[WORKTREE]`, use this spawn prompt instead of the standard one:
+
+```
+Spawn a crafter teammate with this prompt:
+
+"You are a crafter teammate executing step {step_id}: {step_name}.
+
+IMPORTANT: You are working in an ISOLATED WORKTREE at:
+  {worktree_path_from_start_step_output}
+
+Your working directory is this worktree, NOT the main repo.
+
+Your task:
+{step_description}
+
+Workflow:
+1. Execute the 5-phase TDD cycle in your worktree
+2. When you reach COMMIT phase:
+   - Commit your changes to your worktree branch (worktree-crafter-{step_id})
+   - Message the Lead: 'Step {step_id} ready for review. Files: {files}'
+3. The Lead will spawn a reviewer and route the review to you
+4. If reviewer responds NEEDS_REVISION, address feedback in your worktree, re-commit, and message the Lead again
+5. Only mark task complete after reviewer APPROVED
+
+You are using nw-software-crafter methodology."
+```
+
+The reviewer does NOT need a worktree. It can read files from any worktree path to review changes.
+
+### Merge Protocol (Handled by complete-step)
+
+Merges happen **automatically** when `complete-step` is called. The Lead does NOT manually call `merge-on-approve`.
+
+```bash
+# Single command: marks approved in state + roadmap, then merges worktree if used
+PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state complete-step \
+  --state .nw-teams/state.yaml \
+  --roadmap docs/feature/{project-id}/roadmap.yaml \
+  --step {step_id}
+```
+
+**Output**:
+- `COMPLETED {step_id}` — no worktree, done
+- `COMPLETED {step_id} MERGE_OK` — worktree merged and cleaned up
+- `COMPLETED {step_id} MERGE_CONFLICT` (exit 1) — step is approved but merge failed, worktree preserved
+
+**On MERGE_CONFLICT** (crafter is still alive to help):
+1. Read conflicting files — examine the conflict markers
+2. Message the crafter to help resolve (they understand their changes best)
+3. Resolve and commit:
+   ```bash
+   git add {resolved_file}
+   git merge --continue
+   ```
+4. Cleanup the worktree manually after resolution:
+   ```bash
+   PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.worktree cleanup {step_id}
+   ```
+
+**Escalate to User only if:**
+- Conflict involves complex business logic Lead cannot judge
+- Both versions seem equally valid with different trade-offs
+- Conflict affects more than 3 files (high risk)
+
+**Fallback — merge remaining branches at finalization:**
+```bash
+PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.worktree merge-all --plan .nw-teams/plan.yaml --dry-run
+PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.worktree merge-all --plan .nw-teams/plan.yaml [--conflict-aware]
+PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.worktree cleanup --all
+```
+
+### Step Lifecycle Summary
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    STEP LIFECYCLE (3 atomic commands)            │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. START-STEP (atomic)                                          │
+│     ├── Checks file conflicts with active steps in state.yaml    │
+│     ├── Creates worktree if conflicts found                      │
+│     ├── Updates state.yaml → in_progress                         │
+│     ├── Updates roadmap.yaml → in_progress                       │
+│     └── Output: STARTED [SHARED] or STARTED [WORKTREE] + path   │
+│                                                                  │
+│  2. SPAWN CRAFTER (Lead uses output to choose prompt)            │
+│     └── Standard prompt (shared) or worktree prompt              │
+│                                                                  │
+│  3. CRAFTER WORKS → signals Lead "ready for review"              │
+│                                                                  │
+│  4. TRANSITION (atomic) → review                                 │
+│     ├── Updates state.yaml → review                              │
+│     └── Updates roadmap.yaml → review                            │
+│                                                                  │
+│  5. LEAD SPAWNS REVIEWER → APPROVED or NEEDS_REVISION            │
+│     └── On NEEDS_REVISION: transition back to in_progress        │
+│                                                                  │
+│  6. COMPLETE-STEP (atomic)                                       │
+│     ├── Updates state.yaml → approved                            │
+│     ├── Updates roadmap.yaml → approved                          │
+│     ├── Merges worktree branch if used (automatic)               │
+│     └── Output: COMPLETED, COMPLETED MERGE_OK, or MERGE_CONFLICT│
+│                                                                  │
+│  7. SHUTDOWN crafter + reviewer                                  │
+│                                                                  │
+│  8. CHECK UNBLOCKED STEPS → back to step 1 for next step        │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Worktree Trade-offs
+
+| Aspect | Shared Directory | Worktree per Crafter |
+|--------|------------------|----------------------|
+| File conflicts | Immediate overwrites (BAD) | Deferred to merge (SAFE) |
+| Setup time | None | ~5s per worktree |
+| Disk space | Minimal | ~N × repo size |
+| Merge complexity | None | Must merge N branches |
+| True parallelism | Only different files | ANY files |
+
+## Support Team Triggers
+
+| Situation | Action |
+|-----------|--------|
+| Crafter says "Blocked on unknown X" | Spawn nw-researcher teammate |
+| Step fails twice | Spawn nw-troubleshooter teammate |
+| Build/Docker/CI broken | Spawn nw-platform-architect teammate |
+
+## Error Recovery
+
+| Error | Recovery |
+|-------|----------|
+| Teammate timeout | Resume or spawn replacement |
+| Step fails 3+ times | Escalate to user |
+| Merge conflict | Pause team, alert user |
+| DES verification fails | Report failed steps, re-execute |
+
+## Example Invocation
+
+```
+User: /nw-teams:execute auth-feature
+
+Lead (you):
+1. Read docs/feature/auth-feature/roadmap.yaml
+2. Analyze: 3 layers (3 steps, 2 steps, 1 step)
+3. Layer 1: spawn 3 crafters (all at once), assign tasks
+4. Monitor: as each crafter signals readiness, spawn reviewer on demand, wait for APPROVED
+5. Layer 2: spawn 2 new crafters, assign tasks
+6. Monitor: spawn reviewers on demand, wait for APPROVED
+7. Layer 3: spawn 1 crafter
+8. Monitor: spawn reviewer on demand, wait for APPROVED
+9. Refactoring pass: group modified files into 2 areas, spawn 2 refactoring crafters (reviewers on demand)
+10. Monitor: wait for refactoring APPROVED, run full test suite
+11. Clean up team, report summary (including refactoring improvements)
+```
+
+## Success Criteria
+
+- [ ] All steps have reviewer APPROVED
+- [ ] Refactoring pass completed (L1-L3 RPP applied to delivered code)
+- [ ] All tests pass after refactoring
+- [ ] DES integrity verification passed
+- [ ] Team cleaned up properly

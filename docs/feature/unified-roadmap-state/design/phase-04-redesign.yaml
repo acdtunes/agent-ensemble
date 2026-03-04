@@ -1,0 +1,231 @@
+# Phase 04 Redesign — Frontend Migration and Legacy Cleanup
+#
+# Replaces the original 2-step phase 04 with 3 phases (04, 05, 06)
+# totaling 9 dependency-ordered steps.
+#
+# Migration strategy: Strangler fig with backward-compat WS layer.
+# 1. Server internals migrate to Roadmap (differ, registry)
+# 2. WS protocol adds roadmap alongside old fields (no client breakage)
+# 3. Client hook switches to read roadmap field
+# 4. Components migrate one-by-one from legacy to Roadmap props
+# 5. Cleanup removes backward-compat, bridge module, and legacy types
+#
+# Constraint: app compiles and stays functional after every step.
+
+phases:
+- id: '04'
+  name: Server-side Roadmap-native data path
+  description: >
+    Migrate server from DeliveryState/ExecutionPlan pipeline to direct Roadmap.
+    WS protocol uses backward-compat (additive fields) to avoid client breakage.
+  steps:
+  - id: 04-01
+    name: Roadmap-native differ and registry internals
+    description: >
+      Add RoadmapTransition type. Rewrite computeTransitions for Roadmap.
+      Remove bridge function ports from RegistryDeps. onStateChange passes Roadmap.
+    criteria:
+    - RoadmapTransition type has step_id, from_status, to_status, teammate_id, timestamp
+    - computeTransitions accepts two Roadmap objects, returns RoadmapTransition[]
+    - RegistryDeps has no bridge function ports; onStateChange passes Roadmap pair
+    - Multi-project-server stops injecting bridge into RegistryDeps
+    dependencies: []
+    files_to_modify:
+    - board/shared/types.ts
+    - board/server/differ.ts
+    - board/server/registry.ts
+    - board/server/multi-project-server.ts
+    - board/server/__tests__/differ.test.ts
+    - board/server/__tests__/registry.test.ts
+
+  - id: 04-02
+    name: Backward-compatible WS protocol with Roadmap
+    description: >
+      Add roadmap field to ProjectEntry and ServerWSMessage alongside
+      existing state/plan fields. Server sends both formats. Client
+      continues reading old fields — no client changes needed.
+    criteria:
+    - ProjectEntry gains roadmap field alongside existing state and plan
+    - ServerWSMessage init/update include roadmap and roadmapTransitions fields
+    - Subscription server populates both old and new fields in WS messages
+    - Existing client hook continues working (reads old fields)
+    - deriveProjectSummary accepts Roadmap via computeRoadmapSummary
+    dependencies:
+    - 04-01
+    files_to_modify:
+    - board/shared/types.ts
+    - board/server/registry.ts
+    - board/server/index.ts
+    - board/server/multi-project-server.ts
+    - board/server/__tests__/registry.test.ts
+    - board/server/__tests__/subscription.test.ts
+    - board/server/__tests__/websocket.test.ts
+    - board/shared/__tests__/multiproject-types.test.ts
+
+  - id: 04-03
+    name: Roadmap-native client data path
+    description: >
+      Replace useDeliveryState with useRoadmapState that reads roadmap
+      from WS messages. App.tsx BoardContent receives Roadmap and bridges
+      to legacy types temporarily for child components.
+    criteria:
+    - useRoadmapState returns roadmap, transitions (RoadmapTransition[]), connectionStatus, error
+    - BoardView uses useRoadmapState instead of useDeliveryState
+    - BoardContent receives Roadmap, derives legacy types via bridge for children
+    - FeatureBoardView passes Roadmap to BoardContent without double-bridge
+    - useDeliveryState hook file deleted
+    dependencies:
+    - 04-02
+    files_to_modify:
+    - board/src/hooks/useRoadmapState.ts
+    - board/src/hooks/useDeliveryState.ts
+    - board/src/App.tsx
+    - board/src/__tests__/useDeliveryState.test.ts
+    - board/src/__tests__/useRoadmapState.test.ts
+    - board/src/__tests__/App.test.tsx
+
+- id: '05'
+  name: Component migration to Roadmap-native props
+  description: >
+    Migrate UI components from legacy StepState/ExecutionLayer/PlanStep props
+    to RoadmapStep/RoadmapPhase. Each step updates both component and its
+    caller in BoardContent/App.tsx to maintain compilation.
+  steps:
+  - id: 05-01
+    name: Migrate KanbanBoard pipeline to Roadmap types
+    description: >
+      KanbanBoard and LayerLane accept Roadmap/RoadmapPhase. statusMapping
+      uses RoadmapStep. Update BoardContent to pass Roadmap to KanbanBoard.
+    criteria:
+    - KanbanBoard takes Roadmap instead of DeliveryState + ExecutionPlan
+    - LayerLane takes RoadmapPhase instead of ExecutionLayer
+    - expandStepToFileCards accepts RoadmapStep instead of StepState
+    - BoardContent passes roadmap to KanbanBoard (bridge call removed for board)
+    dependencies:
+    - 04-03
+    files_to_modify:
+    - board/src/utils/statusMapping.ts
+    - board/src/components/KanbanBoard.tsx
+    - board/src/components/LayerLane.tsx
+    - board/src/App.tsx
+    - board/src/__tests__/KanbanBoard.test.tsx
+    - board/src/__tests__/statusMapping.test.ts
+    - board/src/__tests__/acceptance/card-redesign/steps/test-fixtures.ts
+    - board/src/__tests__/acceptance/card-redesign/steps/walking_skeleton.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/card_layout_steps.test.tsx
+
+  - id: 05-02
+    name: Migrate FeatureBoardView to Roadmap props
+    description: >
+      FeatureBoardView takes Roadmap directly. Remove synthesizeQueuedState.
+      Required now because FeatureBoardView calls KanbanBoard (changed in 05-01).
+    criteria:
+    - FeatureBoardView props use Roadmap instead of DeliveryState + ExecutionPlan
+    - synthesizeQueuedState removed from featureBoardUtils
+    - FeatureBoardView passes Roadmap to KanbanBoard without bridge
+    dependencies:
+    - 05-01
+    files_to_modify:
+    - board/src/components/FeatureBoardView.tsx
+    - board/src/utils/featureBoardUtils.ts
+    - board/src/__tests__/FeatureBoardView.test.tsx
+
+  - id: 05-03
+    name: Migrate detail modal and team panel
+    description: >
+      StepDetailModal takes RoadmapStep. TeamPanel derives teammate data
+      from Roadmap. Update stepDetailUtils and BoardContent wiring.
+    criteria:
+    - StepDetailModal takes RoadmapStep instead of StepState + PlanStep
+    - TeamPanel takes Roadmap, derives teammates from step teammate_id fields
+    - buildPlanStepLookup takes Roadmap, returns Map<string, RoadmapStep>
+    - BoardContent passes Roadmap-native data to modal and panel
+    dependencies:
+    - 05-01
+    files_to_modify:
+    - board/src/utils/stepDetailUtils.ts
+    - board/src/components/StepDetailModal.tsx
+    - board/src/components/TeamPanel.tsx
+    - board/src/App.tsx
+    - board/src/__tests__/stepDetailUtils.test.ts
+    - board/src/__tests__/TeamPanel.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/modal_steps.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/teammate_steps.test.tsx
+
+  - id: 05-04
+    name: Migrate header, feed, and remove all bridge calls
+    description: >
+      ProgressHeader takes RoadmapSummary. ActivityFeed takes RoadmapTransition[].
+      Remove ALL remaining bridge calls and imports from App.tsx and BoardContent.
+    criteria:
+    - ProgressHeader takes RoadmapSummary instead of StateSummary
+    - ActivityFeed takes RoadmapTransition[] instead of StateTransition[]
+    - BoardContent computes summary via computeRoadmapSummary
+    - App.tsx has zero bridge function imports or calls
+    dependencies:
+    - 05-02
+    - 05-03
+    files_to_modify:
+    - board/src/components/ProgressHeader.tsx
+    - board/src/components/ActivityFeed.tsx
+    - board/src/App.tsx
+    - board/src/__tests__/ProgressHeader.test.tsx
+    - board/src/__tests__/ActivityFeed.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/phase_indicator_steps.test.tsx
+
+- id: '06'
+  name: Legacy cleanup
+  description: >
+    Remove WS backward-compat fields, delete bridge module, remove all
+    legacy types. Pure deletion — no new behavior.
+  steps:
+  - id: 06-01
+    name: Remove backward-compat and delete bridge module
+    description: >
+      Remove old state/plan fields from ProjectEntry and ServerWSMessage.
+      Remove legacy HTTP endpoints. Delete roadmap-bridge.ts; move
+      computeRoadmapSummary to shared/types.ts. Remove bridge re-exports.
+    criteria:
+    - ProjectEntry holds only projectId and roadmap (state/plan removed)
+    - ServerWSMessage carries only Roadmap and RoadmapTransition (old fields removed)
+    - Legacy /state and /plan HTTP endpoints removed
+    - roadmap-bridge.ts deleted; computeRoadmapSummary moved to shared/types.ts
+    - Bridge re-export line removed from parser.ts
+    dependencies:
+    - 05-04
+    files_to_modify:
+    - board/shared/types.ts
+    - board/shared/roadmap-bridge.ts
+    - board/server/registry.ts
+    - board/server/index.ts
+    - board/server/parser.ts
+    - board/server/multi-project-server.ts
+    - board/server/feature-discovery.ts
+    - board/src/App.tsx
+    - board/server/__tests__/roadmap-bridge.test.ts
+    - board/server/__tests__/index.test.ts
+    - board/server/__tests__/multiproject-http.test.ts
+    - board/server/__tests__/feature-http.test.ts
+    - board/server/__tests__/registry.test.ts
+    - board/server/__tests__/subscription.test.ts
+    - board/server/__tests__/websocket.test.ts
+    - board/shared/__tests__/project-summary.test.ts
+
+  - id: 06-02
+    name: Remove all legacy type definitions
+    description: >
+      Remove legacy types from shared/types.ts. Verify no remaining imports
+      across entire codebase.
+    criteria:
+    - StateSummary, StepState, TeammateState, DeliveryState removed
+    - PlanSummary, PlanStep, ExecutionLayer, ExecutionPlan removed
+    - StateTransition, WSMessage, deriveProjectSummary removed
+    - No file in the codebase imports any removed type
+    dependencies:
+    - 06-01
+    files_to_modify:
+    - board/shared/types.ts
+    - board/server/multi-project-server.ts
+    - board/shared/__tests__/roadmap-types.test.ts
+    - board/shared/__tests__/multiproject-types.test.ts
+    - board/src/__tests__/useProjectList.test.ts

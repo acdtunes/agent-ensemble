@@ -1,0 +1,309 @@
+roadmap:
+  project_id: multi-project-selector
+  created_at: '2026-03-02T16:24:00Z'
+  total_steps: 19
+  phases: 6
+phases:
+- id: '01'
+  title: 'Foundation Types, Path Resolution, and Manifest Store'
+  steps:
+  - id: 01-01
+    title: 'Foundation types and feature path resolver'
+    description: 'Add FeatureId, FeatureSummary, ManifestEntry, ProjectManifest types. Extend ProjectSummary with featureCount/features and ProjectConfig with projectPath. Create pure feature-path-resolver module.'
+    acceptance_criteria:
+      - 'FeatureId branded type accepts lowercase slugs, rejects leading/trailing hyphens'
+      - 'resolveFeatureDir, resolveFeatureRoadmap, resolveFeatureExecutionLog, resolveFeatureDocsRoot produce correct absolute paths from projectPath + featureId'
+      - 'ProjectSummary includes featureCount and features fields'
+      - 'ProjectConfig includes projectPath field'
+    time_estimate: '2h'
+    dependencies: []
+    files:
+      - board/shared/types.ts
+      - board/server/feature-path-resolver.ts
+  - id: 01-02
+    title: 'Manifest store pure core'
+    description: 'Pure functions for manifest validation, entry add/remove, duplicate detection. Immutable transforms returning new manifest values.'
+    acceptance_criteria:
+      - 'validateManifest rejects malformed data with descriptive error'
+      - 'addEntry returns new manifest with entry appended'
+      - 'removeEntry returns new manifest without target entry'
+      - 'findDuplicate detects existing path in manifest'
+    time_estimate: '2h'
+    dependencies:
+      - 01-01
+    files:
+      - board/server/manifest-store.ts
+  - id: 01-03
+    title: 'Manifest store IO adapters'
+    description: 'IO functions for loading/saving manifest JSON file. Ensure ~/.nwave/ directory creation and atomic write.'
+    acceptance_criteria:
+      - 'loadManifest reads and validates JSON from disk, returns Result'
+      - 'saveManifest writes manifest atomically'
+      - 'ensureManifestDir creates ~/.nwave/ if missing'
+      - 'Missing manifest file returns empty manifest (first-use)'
+    time_estimate: '1.5h'
+    dependencies:
+      - 01-02
+    files:
+      - board/server/manifest-store.ts
+  - id: 01-04
+    title: 'Project add/remove HTTP endpoints and manifest wiring'
+    description: 'POST /api/projects and DELETE /api/projects/:id endpoints. Wire manifest store into multi-project-server composition root. Load manifest on startup.'
+    acceptance_criteria:
+      - 'POST /api/projects with valid path registers project and returns 201 with ProjectSummary'
+      - 'POST with invalid path returns 400, duplicate returns 409'
+      - 'DELETE /api/projects/:id removes project and returns 204'
+      - 'Manifest persists across server restarts'
+      - 'WebSocket project_list updates after add/remove'
+    time_estimate: '3h'
+    dependencies:
+      - 01-03
+    files:
+      - board/server/index.ts
+      - board/server/multi-project-server.ts
+- id: '02'
+  title: 'Feature Discovery'
+  steps:
+  - id: 02-01
+    title: 'Feature discovery pure functions'
+    description: 'Pure deriveFeatureSummary and isFeatureDir functions. Compute FeatureSummary from optional plan/state artifacts.'
+    acceptance_criteria:
+      - 'deriveFeatureSummary with plan and state produces correct metrics'
+      - 'deriveFeatureSummary with no execution log shows 0 completed/inProgress/failed'
+      - 'deriveFeatureSummary with no roadmap shows 0 totalSteps and hasRoadmap false'
+      - 'isFeatureDir filters valid directory names'
+    time_estimate: '1.5h'
+    dependencies:
+      - 01-01
+    files:
+      - board/server/feature-discovery.ts
+  - id: 02-02
+    title: 'Feature discovery IO adapters'
+    description: 'IO functions to scan docs/feature/ subdirectories, load feature YAML artifacts, and orchestrate full discovery pipeline.'
+    acceptance_criteria:
+      - 'scanFeatureDirs reads docs/feature/ subdirectories from project path'
+      - 'loadFeatureArtifacts reads roadmap.yaml and execution-log.yaml per feature'
+      - 'discoverFeatures returns FeatureSummary[] for all features in a project'
+      - 'Missing docs/feature/ directory returns empty list without error'
+    time_estimate: '2h'
+    dependencies:
+      - 02-01
+    files:
+      - board/server/feature-discovery.ts
+  - id: 02-03
+    title: 'Feature discovery HTTP endpoint'
+    description: 'GET /api/projects/:id/features endpoint. Wire feature discovery into server. Extended ProjectSummary includes features in WS messages.'
+    acceptance_criteria:
+      - 'GET /api/projects/:id/features returns FeatureSummary[] with correct metrics'
+      - 'Feature with roadmap reports hasRoadmap true and correct step count'
+      - 'Feature without roadmap reports hasRoadmap false and 0 steps'
+      - 'Project not found returns 404'
+      - 'WebSocket project_list messages include featureCount and features per project'
+    time_estimate: '2h'
+    dependencies:
+      - 02-02
+      - 01-04
+    files:
+      - board/server/index.ts
+      - board/server/multi-project-server.ts
+- id: '03'
+  title: 'Extended Route Parsing'
+  steps:
+  - id: 03-01
+    title: 'Extend Route type with new views and legacy compatibility'
+    description: 'Add project, feature-board, feature-docs variants to Route union. Add regex patterns for new hash formats. Preserve legacy board/docs routes. Fallback to overview for unrecognized/incomplete hashes.'
+    acceptance_criteria:
+      - 'Route type includes project, feature-board, feature-docs variants'
+      - '#/projects/{id} parses to project view with projectId'
+      - '#/projects/{id}/features/{fId}/board parses to feature-board with both IDs'
+      - '#/projects/{id}/features/{fId}/docs parses to feature-docs with both IDs'
+      - 'Legacy #/projects/{id}/board and /docs still parse correctly'
+      - 'Unrecognized and incomplete hashes fall back to overview'
+    time_estimate: '2h'
+    dependencies: []
+    files:
+      - board/src/hooks/useRouter.ts
+  - id: 03-02
+    title: 'Route parsing robustness (property-based)'
+    description: 'Property test: parseHash never throws for any string input. Always returns valid Route value.'
+    acceptance_criteria:
+      - 'parseHash returns valid Route for any arbitrary string input'
+      - 'No input causes parseHash to throw an exception'
+    time_estimate: '1h'
+    dependencies:
+      - 03-01
+    files:
+      - board/src/hooks/useRouter.ts
+- id: '04'
+  title: 'Project Overview and Feature Cards'
+  steps:
+  - id: 04-01
+    title: 'Extended ProjectCard with feature count and status'
+    description: 'Display featureCount and aggregated feature status on project cards. Navigate to #/projects/{projectId} on click. Handle empty and error states.'
+    acceptance_criteria:
+      - 'Project card displays feature count (e.g., "4 features")'
+      - 'Card shows aggregated completed, in-progress, failed counts'
+      - 'Card with 0 features shows "No features" graceful state'
+      - 'Click navigates to project feature view'
+    time_estimate: '2h'
+    dependencies:
+      - 03-01
+    files:
+      - board/src/components/ProjectCard.tsx
+  - id: 04-02
+    title: 'FeatureCard and ProjectFeatureView components'
+    description: 'FeatureCard shows feature name, progress, Board/Docs links. ProjectFeatureView renders feature grid for a project with breadcrumb.'
+    acceptance_criteria:
+      - 'Feature card displays name and progress metrics'
+      - 'Feature with roadmap shows Board action link'
+      - 'Feature without roadmap shows "Docs only" indicator'
+      - 'Feature not started shows "Planned" state with 0 of N completed'
+      - 'Breadcrumb shows "Overview / {project}" with clickable segments'
+    time_estimate: '3h'
+    dependencies:
+      - 04-01
+    files:
+      - board/src/components/FeatureCard.tsx
+      - board/src/components/ProjectFeatureView.tsx
+      - board/src/components/Breadcrumb.tsx
+  - id: 04-03
+    title: 'useFeatureList hook'
+    description: 'HTTP hook to fetch feature list for a project. Returns FeatureSummary[], loading, error, refetch.'
+    acceptance_criteria:
+      - 'Hook fetches GET /api/projects/{projectId}/features on mount'
+      - 'Returns FeatureSummary array on success'
+      - 'Returns error on 404 or network failure'
+      - 'Refetch re-fetches on demand'
+    time_estimate: '1.5h'
+    dependencies:
+      - 02-03
+    files:
+      - board/src/hooks/useFeatureList.ts
+  - id: 04-04
+    title: 'App routing for project feature view'
+    description: 'Wire project route to ProjectFeatureView in App. Add AddProjectDialog for overview empty state. Connect useFeatureList to feature view.'
+    acceptance_criteria:
+      - 'Route view=project renders ProjectFeatureView with feature data'
+      - 'Overview shows "Add Project" button and dialog for adding projects'
+      - 'Empty overview shows onboarding guidance with add action'
+      - 'Each project card provides a remove action that unregisters the project'
+    time_estimate: '2h'
+    dependencies:
+      - 04-02
+      - 04-03
+    files:
+      - board/src/App.tsx
+      - board/src/components/AddProjectDialog.tsx
+      - board/src/components/OverviewDashboard.tsx
+      - board/src/hooks/useAddProject.ts
+      - board/src/hooks/useRemoveProject.ts
+- id: '05'
+  title: 'Feature Board View'
+  steps:
+  - id: 05-01
+    title: 'useFeatureState hook'
+    description: 'HTTP hook that fetches feature-level state and plan. Handles 404 for missing execution log (returns null state, plan still loaded).'
+    acceptance_criteria:
+      - 'Hook fetches plan and state for a feature via HTTP'
+      - 'Missing execution log returns null state (not an error)'
+      - 'Missing roadmap returns error'
+      - 'Returns loading and error states'
+    time_estimate: '2h'
+    dependencies:
+      - 02-03
+    files:
+      - board/src/hooks/useFeatureState.ts
+  - id: 05-02
+    title: 'Feature-level state and plan HTTP endpoints'
+    description: 'GET /api/projects/:id/features/:featureId/state and /plan endpoints. Use path resolver to locate artifacts, parser to read them.'
+    acceptance_criteria:
+      - 'GET .../state returns parsed execution-log.yaml as DeliveryState'
+      - 'GET .../plan returns parsed roadmap.yaml as ExecutionPlan'
+      - 'Missing execution-log returns 404 (not an error for client)'
+      - 'Malformed roadmap returns error diagnostic'
+    time_estimate: '2h'
+    dependencies:
+      - 01-01
+      - 02-03
+    files:
+      - board/server/index.ts
+  - id: 05-03
+    title: 'FeatureBoardView with context dropdowns and tabs'
+    description: 'FeatureBoardView wraps KanbanBoard with project/feature dropdowns, breadcrumb, Board/Docs tabs. ContextDropdowns shared component. Feature dropdown filters board-capable features only.'
+    acceptance_criteria:
+      - 'Board loads and displays delivery data for selected feature'
+      - 'Feature without execution state shows all steps as queued'
+      - 'Breadcrumb shows "Overview / {project} / {feature}"'
+      - 'Board-to-Docs tab preserves project and feature context'
+      - 'Feature dropdown shows only board-capable features'
+    time_estimate: '3h'
+    dependencies:
+      - 05-01
+      - 04-02
+    files:
+      - board/src/components/FeatureBoardView.tsx
+      - board/src/components/ContextDropdowns.tsx
+      - board/src/App.tsx
+- id: '06'
+  title: 'Feature Documentation View'
+  steps:
+  - id: 06-01
+    title: 'Feature-scoped doc tree and content HTTP endpoints'
+    description: 'GET /api/projects/:id/features/:featureId/docs/tree and /docs/content endpoints. Scope doc tree and content reading to feature directory.'
+    acceptance_criteria:
+      - 'Doc tree endpoint returns tree scoped to docs/feature/{featureId}/'
+      - 'Doc content endpoint reads files within feature directory only'
+      - 'Path traversal outside feature directory is rejected'
+      - 'Missing feature docs directory returns appropriate empty/error response'
+    time_estimate: '2h'
+    dependencies:
+      - 01-01
+      - 02-03
+    files:
+      - board/server/index.ts
+  - id: 06-02
+    title: 'Feature-scoped useDocTree and useDocContent hooks'
+    description: 'Extend useDocTree and useDocContent with optional featureId parameter. Feature-scoped URL construction when featureId is provided.'
+    acceptance_criteria:
+      - 'useDocTree with featureId fetches feature-scoped tree endpoint'
+      - 'useDocContent with featureId fetches feature-scoped content endpoint'
+      - 'Without featureId, existing project-level behavior is unchanged'
+    time_estimate: '1.5h'
+    dependencies:
+      - 06-01
+    files:
+      - board/src/hooks/useDocTree.ts
+      - board/src/hooks/useDocContent.ts
+  - id: 06-03
+    title: 'FeatureDocsView with context dropdowns and tabs'
+    description: 'FeatureDocsView wraps DocViewer with project/feature dropdowns, breadcrumb, Board/Docs tabs. Feature dropdown lists all features including docs-only.'
+    acceptance_criteria:
+      - 'Doc tree shows only files within selected feature directory'
+      - 'Feature with no documentation shows empty state with guidance'
+      - 'Board-Docs tab switching preserves project and feature context'
+      - 'Feature dropdown lists all features including docs-only'
+      - 'Project dropdown switching navigates to feature list for new project'
+    time_estimate: '3h'
+    dependencies:
+      - 06-02
+      - 05-03
+    files:
+      - board/src/components/FeatureDocsView.tsx
+      - board/src/App.tsx
+implementation_scope:
+  source_directories:
+  - board/server/
+  - board/src/components/
+  - board/src/hooks/
+  - board/shared/
+  test_directories:
+  - board/src/__tests__/acceptance/multi-project-selector/
+  - board/server/__tests__/
+  - board/src/__tests__/
+  excluded_patterns:
+  - node_modules/**
+  - dist/**
+validation:
+  status: approved
+  reviewer: atlas
+  approved_at: '2026-03-02T16:30:00Z'

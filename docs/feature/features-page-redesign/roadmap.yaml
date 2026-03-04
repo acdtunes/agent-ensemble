@@ -1,0 +1,227 @@
+roadmap:
+  project_id: features-page-redesign
+  created_at: '2026-03-03T23:34:04Z'
+  total_steps: 10
+  phases: 3
+phases:
+- id: '01'
+  name: 'Foundation - Remove Docs Only and Narrow Cards'
+  steps:
+  - id: 01-01
+    name: 'Update classifyFeatureDisplayState to exclude docs-only'
+    description: 'Modify classification to return null/undefined for no-roadmap features
+      instead of docs-only'
+    criteria:
+    - 'classifyFeatureDisplayState returns null when hasRoadmap is false'
+    - 'Function returns active/planned/completed unchanged for features with roadmap'
+    - 'STATE_LABELS map no longer contains docs-only entry'
+    time_estimate: '2h'
+    dependencies: []
+    files_to_modify:
+    - 'board/src/components/FeatureCard.tsx'
+    - 'board/src/__tests__/FeatureCard.test.tsx'
+    status: approved
+    teammate_id: crafter-01-01
+    started_at: '2026-03-03T23:38:56.713603+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T23:42:27.067962+00:00'
+  - id: 01-02
+    name: 'Render no-roadmap feature cards without status elements'
+    description: 'Update FeatureCard to hide status label, progress bar, and badges
+      when no roadmap'
+    criteria:
+    - 'Cards for no-roadmap features show only the feature name'
+    - 'No status label text appears on no-roadmap cards'
+    - 'No progress bar or step count renders for no-roadmap features'
+    - 'Features with roadmaps retain Active/Planned/Completed labels'
+    time_estimate: '2h'
+    dependencies:
+    - '01-01'
+    files_to_modify:
+    - 'board/src/components/FeatureCard.tsx'
+    - 'board/src/__tests__/FeatureCard.test.tsx'
+    status: approved
+    teammate_id: crafter-01-02
+    started_at: '2026-03-03T23:42:37.865668+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T23:48:53.342240+00:00'
+  - id: 01-03
+    name: 'Increase grid column count for higher density'
+    description: 'Update CSS grid breakpoints to show 6+ cards per row on XL screens'
+    criteria:
+    - 'Viewports 1280px+ display at least 6 cards per row'
+    - 'Viewports 1024px display at least 4 cards per row'
+    - 'Viewports below 640px stack cards one per row'
+    - 'No horizontal scrolling at any viewport width'
+    time_estimate: '2h'
+    dependencies: []
+    files_to_modify:
+    - 'board/src/components/ProjectFeatureView.tsx'
+    - 'board/src/__tests__/ProjectFeatureView.test.tsx'
+    status: approved
+    teammate_id: crafter-01-03
+    started_at: '2026-03-03T23:39:00.140991+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T23:42:14.748076+00:00'
+  - id: 01-04
+    name: 'Ensure card content readability at narrower width'
+    description: 'Verify and adjust card padding/font to maintain visibility at reduced
+      width'
+    criteria:
+    - 'Feature name displays without truncation'
+    - 'Status label, progress count, and progress bar remain visible'
+    - 'Badge text fully visible without wrapping'
+    time_estimate: '1h'
+    dependencies:
+    - '01-03'
+    files_to_modify:
+    - 'board/src/components/FeatureCard.tsx'
+    - 'board/src/__tests__/FeatureCard.test.tsx'
+    status: approved
+    teammate_id: crafter-01-04
+    started_at: '2026-03-03T23:42:41.402188+00:00'
+    worktree: 
+      /Users/andres.dandrea/projects/personal/nw-teams/.claude/worktrees/crafter-01-04
+    review_attempts: 1
+    completed_at: '2026-03-03T23:47:11.853011+00:00'
+- id: '02'
+  name: 'Status Grouping with Headers'
+  steps:
+  - id: 02-01
+    name: 'Create groupFeaturesByStatus pure function'
+    description: 'Implement sorting logic to group features by status and sort alphabetically
+      within groups'
+    criteria:
+    - 'Features grouped in order: Active > Planned > Completed > No Roadmap'
+    - 'Features sorted alphabetically (case-insensitive) within each group'
+    - 'Function returns grouped structure with group name and feature count'
+    - 'Sorting is deterministic across calls'
+    time_estimate: '3h'
+    dependencies:
+    - '01-02'
+    files_to_modify:
+    - 'board/src/utils/featureGrouping.ts'
+    - 'board/src/__tests__/featureGrouping.test.ts'
+    status: approved
+    teammate_id: crafter-02-01
+    started_at: '2026-03-03T23:49:03.616311+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T00:09:09.143905+00:00'
+  - id: 02-02
+    name: 'Create StatusGroupHeader component'
+    description: 'Implement group header UI element displaying group name and feature
+      count'
+    criteria:
+    - 'Header displays group name and count in format "Active (3)"'
+    - 'Header spans full grid row'
+    - 'Header visually distinguishes group sections'
+    time_estimate: '2h'
+    dependencies: []
+    files_to_modify:
+    - 'board/src/components/StatusGroupHeader.tsx'
+    - 'board/src/__tests__/StatusGroupHeader.test.tsx'
+    status: approved
+    teammate_id: crafter-02-02
+    started_at: '2026-03-03T23:38:53.427124+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T23:41:57.875397+00:00'
+  - id: 02-03
+    name: 'Integrate grouped layout into ProjectFeatureView'
+    description: 'Update grid to render features by group with headers, hiding empty
+      groups'
+    criteria:
+    - 'Non-empty groups display header above their features'
+    - 'Empty groups do not display headers or empty space'
+    - 'Features without roadmaps appear after status groups'
+    - 'Grid layout accommodates full-row group headers'
+    time_estimate: '3h'
+    dependencies:
+    - '02-01'
+    - '02-02'
+    files_to_modify:
+    - 'board/src/components/ProjectFeatureView.tsx'
+    - 'board/src/__tests__/ProjectFeatureView.test.tsx'
+    status: approved
+    teammate_id: crafter-02-03
+    started_at: '2026-03-04T00:09:29.775538+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T00:13:09.246146+00:00'
+- id: '03'
+  name: 'Search and Filter Controls'
+  steps:
+  - id: 03-01
+    name: 'Add search input with real-time filtering'
+    description: 'Implement search box that filters features by name substring match'
+    criteria:
+    - 'Search input visible above feature grid with placeholder "Search features..."'
+    - 'Typing filters features in real-time without submit button'
+    - 'Filtering is case-insensitive substring match on feature name'
+    - 'Clearing search restores full feature list'
+    - 'No matches displays "No features match your search" message'
+    time_estimate: '3h'
+    dependencies:
+    - '02-03'
+    files_to_modify:
+    - 'board/src/components/ProjectFeatureView.tsx'
+    - 'board/src/__tests__/ProjectFeatureView.test.tsx'
+    status: approved
+    teammate_id: crafter-03-01
+    started_at: '2026-03-04T00:14:20.374019+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T00:18:07.570985+00:00'
+  - id: 03-02
+    name: 'Update group headers for filtered results'
+    description: 'Group headers reflect filtered counts and hide when empty after
+      search'
+    criteria:
+    - 'Group headers update counts to reflect filtered results'
+    - 'Groups with zero matches after filtering hide their headers'
+    time_estimate: '2h'
+    dependencies:
+    - '03-01'
+    files_to_modify:
+    - 'board/src/components/ProjectFeatureView.tsx'
+    - 'board/src/__tests__/ProjectFeatureView.test.tsx'
+    status: approved
+    teammate_id: crafter-03-01
+    started_at: '2026-03-04T00:18:15.908618+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T00:20:09.723275+00:00'
+  - id: 03-03
+    name: 'Add status filter control with counts'
+    description: 'Implement toggle buttons for All/Active/Planned/Completed with dynamic
+      counts'
+    criteria:
+    - 'Status filter visible near search with options: All, Active, Planned, Completed'
+    - '"All" selected by default on page load'
+    - 'Selecting filter shows only features in that status'
+    - 'Each filter option displays count in parentheses'
+    - 'Selected filter visually distinct from unselected'
+    - 'Status filter and search compose as intersection'
+    - 'Filter counts update when search text changes'
+    time_estimate: '4h'
+    dependencies:
+    - '03-02'
+    files_to_modify:
+    - 'board/src/components/ProjectFeatureView.tsx'
+    - 'board/src/__tests__/ProjectFeatureView.test.tsx'
+    - 'board/src/components/StatusFilterControls.tsx'
+    - 'board/src/__tests__/StatusFilterControls.test.tsx'
+    status: approved
+    teammate_id: crafter-03-01
+    started_at: '2026-03-04T00:20:17.545258+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T00:24:09.636555+00:00'
+implementation_scope:
+  source_directories:
+  - board/src/components/
+  - board/src/utils/
+  test_directories:
+  - board/src/__tests__/
+  excluded_patterns:
+  - __init__.py
+  - __pycache__/**
+validation:
+  status: approved
+  reviewer: nw-software-crafter-reviewer
+  approved_at: '2026-03-03T23:40:00Z'

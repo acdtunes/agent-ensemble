@@ -1,0 +1,161 @@
+roadmap:
+  project_id: board-ui-cleanup
+  created_at: '2026-03-03T16:30:00Z'
+  total_steps: 7
+  phases: 5
+phases:
+- id: '01'
+  title: 'Feature discovery extension'
+  steps:
+  - id: 01-01
+    title: 'Extend scanFeatureDirsFs to scan docs/ux and docs/requirements'
+    files_to_modify:
+    - board/server/feature-discovery.ts
+    dependencies: []
+    acceptance_criteria:
+    - 'scanFeatureDirsFs scans docs/feature/, docs/ux/, and docs/requirements/ directories'
+    - 'Feature IDs found in multiple directories are deduplicated (returned once)'
+    - 'Features discovered from docs/ux/ or docs/requirements/ without a roadmap.yaml
+      return hasRoadmap: false'
+    - 'Invalid directory names (not valid feature slugs) are ignored across all scan
+      directories'
+    - 'Missing scan directories (e.g. docs/ux/ does not exist) are silently skipped
+      without error'
+    status: approved
+    teammate_id: crafter-01-01
+    started_at: '2026-03-03T17:17:07.807859+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T17:21:51.179833+00:00'
+- id: '02'
+  title: 'Remove Activity section and review badge'
+  steps:
+  - id: 02-01
+    title: 'Remove ActivityFeed component and Activity section from sidebar'
+    files_to_modify:
+    - board/src/App.tsx
+    - board/src/components/ActivityFeed.tsx
+    dependencies: []
+    acceptance_criteria:
+    - 'ActivityFeed component file is deleted'
+    - 'ActivityFeed test file is deleted'
+    - 'No Activity section renders in the board sidebar'
+    - 'BoardContent no longer accepts a transitions prop'
+    - 'All BoardContent call sites no longer pass transitions'
+    status: approved
+    teammate_id: crafter-02-01
+    started_at: '2026-03-03T17:17:11.313969+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T17:23:04.113170+00:00'
+  - id: 02-02
+    title: 'Remove review count badge from StepCard'
+    files_to_modify:
+    - board/src/components/StepCard.tsx
+    dependencies: []
+    acceptance_criteria:
+    - 'StepCard does not render a review count badge'
+    - 'Worktree and blocked badges still render when applicable'
+    - 'StepCardData.reviewCount field is retained (used by modal)'
+    - 'StepDetailModal still displays review_attempts in the timing section'
+    status: approved
+    teammate_id: crafter-02-02
+    started_at: '2026-03-03T17:17:14.587058+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T17:21:15.173686+00:00'
+- id: '03'
+  title: 'Active-only teammates panel'
+  steps:
+  - id: 03-01
+    title: 'Filter deriveTeammates to return only active teammates'
+    files_to_modify:
+    - board/src/components/TeamPanel.tsx
+    dependencies: []
+    acceptance_criteria:
+    - 'deriveTeammates returns only teammates with at least one step in claimed, in_progress,
+      or review status'
+    - 'Teammates whose only steps are pending or approved do not appear'
+    - 'Empty state displays "No active teammates" when no teammates have active steps'
+    - 'Active teammate entries still show current step name and completed count'
+    status: approved
+    teammate_id: crafter-03-01
+    started_at: '2026-03-03T17:17:17.935905+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T17:23:52.498568+00:00'
+- id: '04'
+  title: 'Verify done card teammate behavior'
+  steps:
+  - id: 04-01
+    title: 'Verify StepCard hides teammate indicator when teammateId is null'
+    files_to_modify:
+    - board/src/components/StepCard.tsx
+    dependencies:
+    - 02-02
+    acceptance_criteria:
+    - 'A step card with teammateId null renders no teammate indicator regardless of
+      status'
+    - 'A step card with teammateId set and status approved still shows the teammate
+      indicator'
+    - 'Existing conditional rendering (card.teammateId !== null) is confirmed correct
+      via test'
+    status: approved
+    teammate_id: crafter-04-01
+    started_at: '2026-03-03T17:21:28.025365+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T17:25:04.445231+00:00'
+- id: '05'
+  title: 'Review history in step detail modal'
+  steps:
+  - id: 05-01
+    title: 'Add ReviewEntry type and review_history field to RoadmapStep'
+    files_to_modify:
+    - board/shared/types.ts
+    - board/server/parser.ts
+    dependencies: []
+    acceptance_criteria:
+    - 'ReviewEntry interface has readonly fields: cycle (number), timestamp (string),
+      outcome (approved or rejected), feedback (string)'
+    - 'RoadmapStep has optional review_history field typed as readonly ReviewEntry[]'
+    - 'Parser validates review_history entries when present in YAML'
+    - 'Parser skips invalid review_history entries without failing the entire step'
+    - 'Missing review_history field parses as undefined (backward compatible)'
+    status: approved
+    teammate_id: crafter-05-01
+    started_at: '2026-03-03T17:17:21.034687+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T17:22:27.142441+00:00'
+  - id: 05-02
+    title: 'Render review history section in StepDetailModal'
+    files_to_modify:
+    - board/src/components/StepDetailModal.tsx
+    dependencies:
+    - 05-01
+    acceptance_criteria:
+    - 'When review_history is present and non-empty, a Review History section renders
+      in the modal'
+    - 'Review entries display newest-first (highest cycle number first)'
+    - 'Each entry shows cycle number, timestamp, outcome label, and feedback text'
+    - 'When review_history is absent, the existing review_attempts count in timing
+      section is still shown'
+    - 'When review_attempts is 0 and review_history is absent, no review-related content
+      renders'
+    status: approved
+    teammate_id: crafter-05-02
+    started_at: '2026-03-03T17:22:35.198191+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-03T17:26:22.835300+00:00'
+implementation_scope:
+  source_directories:
+  - board/src/components/
+  - board/src/utils/
+  - board/shared/
+  - board/server/
+  test_directories:
+  - board/src/__tests__/
+  - board/server/__tests__/
+  excluded_patterns:
+  - node_modules/**
+  - dist/**
+validation:
+  status: pending
+  review_iteration: 0
+  reviewer:
+  approved_at:

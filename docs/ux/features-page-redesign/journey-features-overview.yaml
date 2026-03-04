@@ -1,0 +1,155 @@
+journey:
+  name: "Features Overview Page"
+  goal: "Quickly find and assess feature status across a multi-feature project"
+  persona: "Project maintainer managing 10+ features"
+
+  emotional_arc:
+    start: "Curious but potentially overwhelmed (many features)"
+    middle: "Oriented and focused (grouping + search narrows scope)"
+    end: "Confident and purposeful (clear next action identified)"
+
+steps:
+  - id: 1
+    name: "Arrive at Features Page"
+    action: "Navigate to project features overview"
+
+    shared_artifacts:
+      - name: "feature_list"
+        source: "GET /api/projects/{projectId}/features"
+        displayed_as: "${features}"
+        consumers:
+          - "feature grid"
+          - "search filter"
+          - "status group headers"
+          - "status filter counts"
+
+      - name: "feature_display_state"
+        source: "classifyFeatureDisplayState(feature)"
+        displayed_as: "${displayState}"
+        consumers:
+          - "card status label"
+          - "status group assignment"
+          - "status filter logic"
+
+    emotional_state:
+      entry: "Curious -- what's the state of my project?"
+      exit: "Oriented -- status groups show what needs attention"
+
+    integration_checkpoint: |
+      Features are loaded and classified into status groups.
+      Group headers show correct counts.
+      Cards are ordered: Active > Planned > Completed, alphabetical within each.
+
+    gherkin: |
+      Scenario: Features displayed in status-grouped order
+        Given the project "acme-platform" has 12 features with mixed statuses
+        When Elena Ruiz opens the features overview
+        Then features are grouped by status: Active first, Planned second, Completed third
+        And within each group, features are sorted alphabetically by name
+        And each group header shows the group name and feature count
+
+  - id: 2
+    name: "Search or Filter Features"
+    action: "Type in search box or click status filter"
+
+    shared_artifacts:
+      - name: "search_query"
+        source: "search input field value"
+        displayed_as: "${searchQuery}"
+        consumers:
+          - "feature name filter"
+          - "search input display"
+
+      - name: "active_status_filter"
+        source: "status filter toggle state"
+        displayed_as: "${statusFilter}"
+        consumers:
+          - "feature visibility filter"
+          - "status toggle active state"
+
+    emotional_state:
+      entry: "Focused -- I know what I'm looking for"
+      exit: "Efficient -- results narrowed instantly"
+
+    integration_checkpoint: |
+      Search filters cards by name in real-time (no submit needed).
+      Status filter toggles visibility of entire groups.
+      Search and status filter work together (intersection).
+      Empty result shows helpful message.
+
+    gherkin: |
+      Scenario: Search filters features by name
+        Given Elena Ruiz is viewing 12 features for "acme-platform"
+        When she types "pay" in the search box
+        Then only features with "pay" in their name are visible
+        And the status group headers update to reflect filtered counts
+
+      Scenario: Status filter shows only selected group
+        Given Elena Ruiz is viewing 12 features for "acme-platform"
+        When she selects the "Active" status filter
+        Then only Active features are visible
+        And the Active filter button appears selected
+
+  - id: 3
+    name: "Assess Feature Card"
+    action: "Scan card for status, progress, and badges"
+
+    shared_artifacts:
+      - name: "feature_progress"
+        source: "FeatureSummary.completed / FeatureSummary.totalSteps"
+        displayed_as: "${completed} of ${totalSteps}"
+        consumers:
+          - "progress label"
+          - "progress bar width"
+
+    emotional_state:
+      entry: "Scanning -- which features need attention?"
+      exit: "Informed -- I understand this feature's state"
+
+    integration_checkpoint: |
+      Card displays correct status label (Active, Planned, Completed -- not "Docs only").
+      Progress bar percentage matches completed/total ratio.
+      In-progress and failed badges show correct counts.
+      Features without roadmap show no status label and no progress bar.
+
+    gherkin: |
+      Scenario: Feature without roadmap shows no status tag
+        Given "api-documentation" has no roadmap file
+        When Elena Ruiz views the features overview
+        Then the card for "api-documentation" shows only the feature name
+        And no status label is displayed on that card
+        And no progress bar is shown
+
+  - id: 4
+    name: "Navigate to Feature Detail"
+    action: "Click feature card"
+
+    emotional_state:
+      entry: "Purposeful -- I've decided which feature to work on"
+      exit: "Engaged -- I'm in the detail view and ready to act"
+
+    integration_checkpoint: |
+      Features with roadmap navigate to Feature Board view.
+      Features without roadmap navigate to Feature Docs view.
+      Navigation preserves project context.
+
+    gherkin: |
+      Scenario: Click feature with roadmap opens board view
+        Given Elena Ruiz sees "auth-service" with status Active
+        When she clicks the "auth-service" card
+        Then the Feature Board view opens for "auth-service"
+
+      Scenario: Click feature without roadmap opens docs view
+        Given Elena Ruiz sees "api-documentation" with no status label
+        When she clicks the "api-documentation" card
+        Then the Feature Docs view opens for "api-documentation"
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "feature_display_state"
+      must_match_across: [1, 2, 3]
+      failure_message: "Feature status classification must be consistent between group assignment, card label, and filter logic"
+
+    - artifact: "feature_list"
+      must_match_across: [1, 2]
+      failure_message: "Feature list used for display must be the same list used for filtering"

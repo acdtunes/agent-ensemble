@@ -1,0 +1,127 @@
+roadmap:
+  project_id: realtime-feature-board-updates
+  created_at: '2026-03-03T16:17:24Z'
+  total_steps: 5
+  phases: 3
+phases:
+- id: '01'
+  name: 'Shared types and server subscription'
+  steps:
+  - id: 01-01
+    name: 'Extend WebSocket protocol types for feature subscriptions'
+    description: >
+      Add optional featureId to ClientWSMessage and ServerWSMessage variants.
+      Feature init reuses the existing init ServerWSMessage variant with featureId
+      populated, not a new variant type.
+    criteria:
+    - 'Subscribe message with featureId is representable in ClientWSMessage type'
+    - 'Unsubscribe message with featureId is representable in ClientWSMessage type'
+    - 'Init and update ServerWSMessage variants carry optional featureId'
+    - 'parse_error ServerWSMessage variant carries optional featureId'
+    dependencies: []
+    files:
+    - board/shared/types.ts
+    status: approved
+    teammate_id: crafter-01-01
+    completed_at: '2026-03-03T17:07:11.863125+00:00'
+  - id: 01-02
+    name: 'Update subscription server for feature-scoped messages'
+    description: >
+      Extend message parsing to extract optional featureId.
+      Track feature-scoped subscriptions alongside project subscriptions.
+      Broadcast feature updates only to clients subscribed to that feature.
+    criteria:
+    - 'parseClientMessage returns featureId when present in valid message'
+    - 'parseClientMessage returns null for malformed featureId'
+    - 'Existing project-only subscriptions still work without featureId'
+    - 'notifyFeatureUpdate delivers update only to clients subscribed to that feature'
+    - 'Feature unsubscribe removes only the feature subscription, not the project
+      subscription'
+    dependencies:
+    - 01-01
+    files:
+    - board/server/index.ts
+    status: approved
+    teammate_id: crafter-01-02
+    completed_at: '2026-03-03T17:14:25.106950+00:00'
+- id: '02'
+  name: 'Server watcher lifecycle and client hook'
+  steps:
+  - id: 02-01
+    name: 'Add feature watcher lifecycle in composition root'
+    description: >
+      Create on-demand feature file watchers in multi-project-server.
+      Watch feature roadmap.yaml via createFileWatcher and resolveFeatureRoadmap.
+      Tear down watcher when last subscriber disconnects.
+      HTTP endpoint remains available for non-WebSocket consumers.
+    criteria:
+    - 'First feature subscription creates a file watcher for that feature roadmap.yaml'
+    - 'Feature roadmap.yaml change triggers notifyFeatureUpdate with computed transitions'
+    - 'Watcher is torn down when last subscriber for that feature disconnects'
+    - 'Feature subscription sends init message with current feature roadmap on subscribe'
+    - 'Multiple clients subscribing to the same feature share a single file watcher'
+    dependencies:
+    - 01-02
+    files:
+    - board/server/multi-project-server.ts
+    status: approved
+    teammate_id: crafter-02-01
+    completed_at: '2026-03-03T17:24:02.715933+00:00'
+  - id: 02-02
+    name: 'Rewrite useFeatureState hook and guard useRoadmapState'
+    description: >
+      Replace one-shot HTTP fetch with WebSocket subscribe/unsubscribe
+      matching useRoadmapState pattern. Include transitions accumulation,
+      auto-reconnect with exponential backoff, and connection status.
+      Add backward-compat guard to useRoadmapState so it ignores
+      feature-scoped messages on the shared WebSocket connection.
+    criteria:
+    - 'Hook sends subscribe with projectId and featureId on WebSocket open'
+    - 'Hook sends unsubscribe on unmount or featureId change'
+    - 'Init message populates roadmap state; update messages append transitions'
+    - 'useFeatureState returns { roadmap, transitions, connectionStatus, error }'
+    - 'useRoadmapState ignores messages that carry a featureId'
+    dependencies:
+    - 01-01
+    - 01-02
+    files:
+    - board/src/hooks/useFeatureState.ts
+    - board/src/hooks/useRoadmapState.ts
+    status: approved
+    teammate_id: crafter-02-02
+    completed_at: '2026-03-03T17:25:42.692637+00:00'
+- id: '03'
+  name: 'Feature board integration'
+  steps:
+  - id: 03-01
+    name: 'Wire FeatureBoardView to WebSocket hook and transitions'
+    description: >
+      Update FeatureBoardView in App.tsx to use the rewritten useFeatureState
+      hook. BoardContent already passes data to ActivityFeed — pass real
+      transitions instead of empty array, and expose connectionStatus.
+    criteria:
+    - 'FeatureBoardView passes real transitions from useFeatureState to BoardContent'
+    - 'FeatureBoardView displays connectionStatus from useFeatureState hook'
+    - 'ActivityFeed in feature board view shows live transition entries'
+    dependencies:
+    - 02-02
+    files:
+    - board/src/App.tsx
+    status: approved
+    teammate_id: crafter-03-01
+    completed_at: '2026-03-03T17:43:24.933018+00:00'
+implementation_scope:
+  source_directories:
+  - board/src/
+  - board/server/
+  - board/shared/
+  test_directories:
+  - board/src/__tests__/
+  - board/server/__tests__/
+  excluded_patterns:
+  - node_modules/**
+  - dist/**
+validation:
+  status: approved
+  reviewer: crafty
+  approved_at: '2026-03-03'

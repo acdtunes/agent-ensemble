@@ -1,0 +1,315 @@
+journey:
+  name: "Multi-Project Selection and Navigation"
+  goal: "Register projects from arbitrary filesystem paths, browse them on an overview dashboard, select a project, and drill into feature-level boards and documentation"
+  persona: "Andres Dandrea -- solo developer managing multiple personal projects at scattered filesystem locations"
+
+  emotional_arc:
+    start: "Constrained / frustrated -- projects at different paths, tool cannot see them"
+    middle: "Oriented / empowered -- projects registered, overview shows everything, features are navigable"
+    end: "Fluid / satisfied -- navigating freely between projects and features"
+
+steps:
+  - id: 1
+    name: "Configure -- Add Projects from UI"
+    action: "Click 'Add Project' button and select a folder"
+
+    ui_mockup: |
+      +---------------------------------------------------------------+
+      | nWave Board                                    [Connected]    |
+      +---------------------------------------------------------------+
+      |                                                               |
+      |  No projects yet. Click "Add Project" to get started.        |
+      |                                                               |
+      |         [ + Add Project ]                                     |
+      +---------------------------------------------------------------+
+
+      (clicks "Add Project" -> folder picker opens)
+
+      +---------------------------------------------------------------+
+      | Add Project                                             [X]  |
+      +---------------------------------------------------------------+
+      |  Select a project folder:                                     |
+      |  [ Browse... ] /Users/andres.dandrea/.../karateka             |
+      |                                     [ Cancel ]  [ Add ]      |
+      +---------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "projectPaths"
+        source: "User-selected folders, persisted internally by server"
+        displayed_as: "Absolute filesystem paths"
+        consumers:
+          - "Server project registration"
+          - "Project card subtitle (path display)"
+          - "Feature discovery (scans docs/feature/ within each path)"
+      - name: "projectIds"
+        source: "Derived from folder name (slugified)"
+        displayed_as: "${projectId}"
+        consumers:
+          - "URL routing"
+          - "Project registry keys"
+          - "WebSocket subscription keys"
+
+    emotional_state:
+      entry: "Constrained -- projects at different paths, tool cannot access them"
+      exit: "Empowered -- clicked a button, picked a folder, projects are registered"
+
+    integration_checkpoint: |
+      Selected folder path is validated by server before registration.
+      Project ID is derived from folder name and validated as slug.
+      Registered projects persist across server restarts.
+      Duplicate paths are rejected with clear message.
+
+    gherkin: |
+      Scenario: User adds a project via folder selection
+        Given the overview is empty
+        When Andres clicks "Add Project" and selects folder "/Users/andres.dandrea/.../karateka"
+        Then "karateka" is registered in the project registry
+        And appears as a project card on the overview
+
+      Scenario: Adding an invalid path shows validation error
+        Given Andres is on the overview
+        When he attempts to add a project with path "/nonexistent/path"
+        Then a validation error is shown: "Directory not found"
+        And no project is added
+
+  - id: 2
+    name: "Orient -- Project Overview Dashboard"
+    action: "Open the board app and view the overview page"
+    url_pattern: "#/"
+
+    ui_mockup: |
+      +---------------------------------------------------------------+
+      | nWave Board                                    [Connected]    |
+      +---------------------------------------------------------------+
+      |                                                               |
+      |  Projects (2)                                                 |
+      |                                                               |
+      |  +-- karateka ---------+  +-- nw-teams ---------+            |
+      |  |                     |  |                      |            |
+      |  |  Features: 1        |  |  Features: 4         |            |
+      |  |  No active delivery |  |  3 features active   |            |
+      |  |  Updated: 2026-02-28|  |  Updated: 2026-03-01 |            |
+      |  +---------------------+  +----------------------+            |
+      |                                                               |
+      +---------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "projectSummary"
+        source: "GET /api/projects (aggregated from registry + feature scan)"
+        displayed_as: "Project cards with feature count and status"
+        consumers:
+          - "Overview page"
+          - "Project card component"
+      - name: "featureCount"
+        source: "Derived from scanning docs/feature/ within each project path"
+        displayed_as: "Feature count on project card"
+        consumers:
+          - "Project card"
+
+    emotional_state:
+      entry: "Curious -- opening board to check project status"
+      exit: "Oriented -- I see all my projects and which need attention"
+
+    integration_checkpoint: |
+      All registered projects appear as cards.
+      Feature counts match actual docs/feature/ subdirectories.
+      Projects with errors show error state, not missing cards.
+
+    gherkin: |
+      Scenario: Overview shows all registered projects
+        Given projects "karateka" and "nw-teams" are registered
+        When Andres opens the board app
+        Then the overview shows 2 project cards
+        And the "nw-teams" card shows "Features: 4"
+        And the "karateka" card shows "Features: 1"
+
+      Scenario: Project with no features shows graceful state
+        Given project "new-idea" is registered with an empty docs/feature/ directory
+        When Andres views the overview
+        Then the "new-idea" card shows "No features"
+
+  - id: 3
+    name: "Select -- Enter a Project"
+    action: "Click a project card to see its features"
+    url_pattern: "#/projects/{projectId}"
+
+    ui_mockup: |
+      +---------------------------------------------------------------+
+      | < Overview / nw-teams                          [Connected]    |
+      +---------------------------------------------------------------+
+      |                                                               |
+      |  Features (4)                                                 |
+      |                                                               |
+      |  +-- kanban-board ---+  +-- card-redesign ---+               |
+      |  |  12/12 100%       |  |  26/26 100%        |               |
+      |  |  Board  Docs      |  |  Board  Docs       |               |
+      |  +-------------------+  +--------------------+               |
+      |                                                               |
+      |  +-- doc-viewer -----+  +-- multi-project ---+               |
+      |  |  8/14 57%         |  |  No roadmap yet    |               |
+      |  |  2 active         |  |  Docs              |               |
+      |  |  Board  Docs      |  +--------------------+               |
+      |  +-------------------+                                        |
+      +---------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "featureId"
+        source: "Directory name under docs/feature/"
+        displayed_as: "${featureId}"
+        consumers:
+          - "Feature card title"
+          - "URL routing"
+          - "Feature board data loading"
+      - name: "featureList"
+        source: "GET /api/projects/{projectId}/features"
+        displayed_as: "Feature cards with status"
+        consumers:
+          - "Project feature view"
+      - name: "hasRoadmap"
+        source: "Existence check of docs/feature/{featureId}/roadmap.yaml"
+        displayed_as: "Board link present or absent on feature card"
+        consumers:
+          - "Feature card (conditional Board link)"
+
+    emotional_state:
+      entry: "Focused -- I chose a project, want to see its features"
+      exit: "Oriented -- I see all features and their status, I know where to go"
+
+    integration_checkpoint: |
+      Feature list matches docs/feature/ subdirectories in the project.
+      Features with roadmap.yaml show "Board" link.
+      Features without roadmap.yaml show "Docs" only.
+
+    gherkin: |
+      Scenario: Project view shows all discovered features
+        Given Andres has selected project "nw-teams"
+        And "nw-teams" has features "kanban-board", "card-redesign", "doc-viewer", "multi-project-board" in docs/feature/
+        When the project view loads
+        Then 4 feature cards are displayed
+        And each card shows the feature name derived from directory name
+
+      Scenario: Feature with roadmap shows Board link
+        Given feature "doc-viewer" has a valid roadmap.yaml
+        When Andres views the features for "nw-teams"
+        Then the "doc-viewer" card shows both "Board" and "Docs" links
+
+      Scenario: Feature without roadmap shows Docs only
+        Given feature "multi-project-board" has no roadmap.yaml
+        When Andres views the features for "nw-teams"
+        Then the "multi-project-board" card shows only a "Docs" link
+        And no "Board" link is displayed
+
+  - id: 4
+    name: "Drill Down -- Feature Board or Docs (with project/feature selectors)"
+    action: "Click Board or Docs on a feature card, then switch project/feature via dropdowns"
+    url_pattern: "#/projects/{projectId}/features/{featureId}/board or .../docs"
+
+    ui_mockup: |
+      +---------------------------------------------------------------+
+      | < Overview / [nw-teams v] / [doc-viewer v]     [Connected]    |
+      +---------------------------------------------------------------+
+      | Board   Docs                                                  |
+      +---------------------------------------------------------------+
+      |                                                               |
+      |  doc-viewer delivery                                          |
+      |  [======            ] 8/14 (57%)    Phase 2 of 3              |
+      |                                                               |
+      |  Queued   |  Active    |  Review   |  Done                    |
+      |  -------  |  --------  |  -------  |  --------                |
+      |  [card]   |  [card]    |  [card]   |  [card]                  |
+      |  [card]   |  [card]    |           |  [card]                  |
+      |                                                               |
+      +---------------------------------------------------------------+
+
+      [nw-teams v]   = project dropdown (all registered projects)
+      [doc-viewer v] = feature dropdown (board: only roadmap features; docs: all features)
+
+    shared_artifacts:
+      - name: "featureRoadmap"
+        source: "docs/feature/{featureId}/roadmap.yaml within project path"
+        displayed_as: "Board columns and cards"
+        consumers:
+          - "Feature board (kanban view)"
+          - "Progress header"
+      - name: "featureState"
+        source: "docs/feature/{featureId}/execution-log.yaml within project path"
+        displayed_as: "Card statuses and teammate assignments"
+        consumers:
+          - "Feature board (card statuses)"
+          - "Progress header (completion metrics)"
+      - name: "projectList"
+        source: "GET /api/projects"
+        displayed_as: "Project dropdown options"
+        consumers:
+          - "Project dropdown in board/docs header"
+      - name: "featureList"
+        source: "GET /api/projects/{projectId}/features"
+        displayed_as: "Feature dropdown options (filtered by view type)"
+        consumers:
+          - "Feature dropdown in board header (roadmap-only)"
+          - "Feature dropdown in docs header (all features)"
+
+    emotional_state:
+      entry: "Focused -- I selected a feature, I want to see its delivery"
+      exit: "Fluid / productive -- I can switch project or feature without navigating back"
+
+    integration_checkpoint: |
+      Board data comes from feature-level roadmap.yaml and execution-log.yaml.
+      Project and feature dropdowns in header enable switching without leaving board/docs.
+      Feature dropdown in board view only shows features with roadmaps.
+      Feature dropdown in docs view shows all features.
+      Board and Docs tabs switch views within the same feature context.
+
+    gherkin: |
+      Scenario: Feature board loads from feature-level artifacts
+        Given Andres has selected feature "doc-viewer" in project "nw-teams"
+        And "doc-viewer" has roadmap.yaml with 14 steps and execution-log.yaml with 8 completed
+        When Andres clicks "Board"
+        Then the URL changes to "#/projects/nw-teams/features/doc-viewer/board"
+        And the board shows 14 cards organized by status
+        And the progress header shows "8/14 (57%)"
+
+      Scenario: Feature docs loads feature documentation
+        Given Andres has selected feature "doc-viewer" in project "nw-teams"
+        When Andres clicks "Docs"
+        Then the URL changes to "#/projects/nw-teams/features/doc-viewer/docs"
+        And the doc viewer shows documentation from docs/feature/doc-viewer/
+
+      Scenario: Switch feature via dropdown in board view
+        Given Andres is viewing the board for "doc-viewer" in "nw-teams"
+        When he selects "card-redesign" from the feature dropdown
+        Then the URL changes to "#/projects/nw-teams/features/card-redesign/board"
+        And the board reloads with "card-redesign" data
+
+      Scenario: Switch project via dropdown in board view
+        Given Andres is viewing the board for "doc-viewer" in "nw-teams"
+        When he selects "karateka" from the project dropdown
+        Then the URL changes to "#/projects/karateka"
+
+      Scenario: Switch feature via dropdown in docs view
+        Given Andres is viewing docs for "doc-viewer" in "nw-teams"
+        When he selects "card-redesign" from the feature dropdown
+        Then the URL changes to "#/projects/nw-teams/features/card-redesign/docs"
+
+      Scenario: Breadcrumb navigation works at feature level
+        Given Andres is viewing the board for feature "doc-viewer" in project "nw-teams"
+        When he clicks "Overview" in the breadcrumb
+        Then the URL changes to "#/"
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "projectId"
+      must_match_across: [1, 2, 3, 4]
+      failure_message: "Project ID from manifest must match URL routing and registry keys across all views"
+
+    - artifact: "featureId"
+      must_match_across: [3, 4]
+      failure_message: "Feature ID from directory name must match URL parameter and board data loading"
+
+    - artifact: "featureList"
+      must_match_across: [2, 3]
+      failure_message: "Feature count on project card must match actual features shown in project view"
+
+    - artifact: "projectPaths"
+      must_match_across: [1, 2, 3, 4]
+      failure_message: "Project paths from UI registration must be used consistently for feature discovery and doc serving"

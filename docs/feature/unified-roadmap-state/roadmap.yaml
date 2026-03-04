@@ -1,0 +1,414 @@
+roadmap:
+  project_id: unified-roadmap-state
+  created_at: '2026-03-03T00:00:00Z'
+  total_steps: 16
+  phases: 6
+phases:
+- id: '01'
+  title: Unified types and parser
+  description: >
+    Add Roadmap types and parser. Pure additive -- no existing code modified yet.
+  steps:
+  - id: 01-01
+    title: Add Roadmap domain types to shared/types.ts
+    description: >
+      Add RoadmapStep, RoadmapPhase, RoadmapMeta, Roadmap, and RoadmapSummary types.
+      RoadmapStep embeds both plan fields and execution-state fields with defaults.
+    acceptance_criteria:
+    - RoadmapStep has id, name, status (default pending), files_to_modify, 
+      dependencies, criteria, teammate_id, started_at, completed_at, 
+      review_attempts
+    - RoadmapPhase has id, name, steps array
+    - Roadmap has roadmap metadata and phases array
+    - RoadmapSummary has total_steps, total_phases, completed, failed, 
+      in_progress, pending
+    - All fields use readonly modifier
+    dependencies: []
+    files:
+    - board/shared/types.ts
+
+    status: approved
+    completed_at: '2026-03-03T04:09:29.128993+00:00'
+  - id: 01-02
+    title: Create parseRoadmap parser with dual-format support
+    description: >
+      Pure parser: YAML string -> Result<Roadmap, ParseError>. Uses 'id' field
+      consistently. Applies defaults for absent status fields.
+    acceptance_criteria:
+    - Parses roadmap.yaml with phases[].steps[] structure into Roadmap type
+    - Uses 'id' field directly (no normalization)
+    - Missing status defaults to 'pending'
+    - Missing teammate_id/started_at/completed_at default to null, 
+      review_attempts to 0
+    - Invalid YAML returns ParseError with type 'invalid_yaml'
+    - Missing phases array returns ParseError with type 'invalid_schema'
+    dependencies:
+    - 01-01
+    files:
+    - board/server/parser.ts
+
+    status: approved
+    completed_at: '2026-03-03T04:09:29.183811+00:00'
+  - id: 01-03
+    title: Add computeRoadmapSummary and bridge functions
+    description: >
+      Pure functions: Roadmap -> RoadmapSummary (count statuses), Roadmap -> ExecutionPlan,
+      Roadmap -> DeliveryState. Bridge functions enable incremental consumer migration.
+    acceptance_criteria:
+    - computeRoadmapSummary counts step statuses across all phases
+    - Pending count includes steps with no status field
+    - roadmapToExecutionPlan maps phases to layers and strips execution fields
+    - roadmapToDeliveryState maps steps to StepState records with summary
+    - All functions are pure with no side effects
+    dependencies:
+    - 01-02
+    files:
+    - board/server/parser.ts
+
+    status: approved
+    completed_at: '2026-03-03T04:09:29.235449+00:00'
+- id: '02'
+  title: Unified server endpoint and feature discovery
+  description: >
+    Add /roadmap endpoint, update feature discovery to read only roadmap.yaml.
+  steps:
+  - id: 02-01
+    title: Add GET /features/:fid/roadmap endpoint
+    description: >
+      New endpoint reads roadmap.yaml, parses with parseRoadmap, returns Roadmap with
+      computed summary. Coexists with existing plan/state endpoints during migration.
+    acceptance_criteria:
+    - GET /projects/:id/features/:fid/roadmap returns parsed Roadmap with 
+      summary
+    - Returns 404 when roadmap.yaml not found
+    - Returns 422 when roadmap.yaml is malformed
+    - Summary is computed from step statuses, not stored
+    - Existing plan and state endpoints continue working unchanged
+    dependencies:
+    - 01-03
+    files:
+    - board/server/index.ts
+
+    status: approved
+    completed_at: '2026-03-03T04:09:29.291276+00:00'
+  - id: 02-02
+    title: Simplify feature discovery to roadmap-only
+    description: >
+      Feature discovery reads only roadmap.yaml per feature. Derives FeatureSummary
+      from Roadmap instead of joining ExecutionPlan + DeliveryState.
+    acceptance_criteria:
+    - Feature discovery reads roadmap.yaml only (not execution-log.yaml)
+    - FeatureSummary derived from Roadmap via computeRoadmapSummary
+    - Features with no roadmap.yaml are still discovered with zero counts
+    - hasExecutionLog reflects whether any step has non-pending status
+    - Feature list endpoint returns same FeatureSummary shape
+    dependencies:
+    - 01-03
+    files:
+    - board/server/feature-discovery.ts
+
+    status: approved
+    completed_at: '2026-03-03T04:09:29.348868+00:00'
+- id: '03'
+  title: CLI unification and watcher changes
+  description: >
+    CLI writes directly to roadmap.yaml. Watcher monitors roadmap.yaml instead of
+    state.yaml.
+  steps:
+  - id: 03-01
+    title: Rewrite team_state.py to read/write roadmap.yaml
+    description: >
+      Update command reads roadmap.yaml, finds step across phases, updates status
+      fields,
+      writes back preserving YAML structure. Remove init command. Use ruamel.yaml
+      for
+      round-trip preservation.
+    acceptance_criteria:
+    - update command reads roadmap.yaml and writes status to the step in-place
+    - Step found by searching across all phases (not flat dict lookup)
+    - show command reads roadmap.yaml and computes summary from step statuses
+    - check command reads roadmap.yaml and checks phase completion
+    - init command removed
+    - YAML comments and formatting preserved on write
+    dependencies:
+    - 01-01
+    files:
+    - src/nw_teams/cli/team_state.py
+
+    status: approved
+    completed_at: '2026-03-03T04:09:29.407612+00:00'
+  - id: 03-02
+    title: Update registry to watch roadmap.yaml per feature
+    description: >
+      Registry watches roadmap.yaml instead of state.yaml. On change, re-parses with
+      parseRoadmap, computes transitions via differ, notifies WebSocket subscribers.
+    acceptance_criteria:
+    - Registry loads and watches roadmap.yaml per feature
+    - File change triggers re-parse and transition computation
+    - Transitions computed by comparing step statuses between old and new 
+      Roadmap
+    - WebSocket subscribers notified of roadmap changes
+    - Project discovery checks for roadmap.yaml presence instead of state.yaml
+    dependencies:
+    - 02-01
+    - 02-02
+    files:
+    - board/server/registry.ts
+    - board/server/discovery.ts
+    - board/server/multi-project-server.ts
+
+    status: approved
+    completed_at: '2026-03-03T04:09:29.470102+00:00'
+- id: '04'
+  title: Server-side Roadmap-native data path
+  description: >
+    Migrate server from DeliveryState/ExecutionPlan pipeline to direct Roadmap.
+    WS protocol uses backward-compat (additive fields) to avoid client breakage.
+  steps:
+  - id: 04-01
+    title: Roadmap-native differ and registry internals
+    description: >
+      Add RoadmapTransition type. Rewrite computeTransitions for Roadmap.
+      Remove bridge function ports from RegistryDeps. onStateChange passes Roadmap.
+    acceptance_criteria:
+    - RoadmapTransition type has step_id, from_status, to_status, teammate_id, 
+      timestamp
+    - computeTransitions accepts two Roadmap objects, returns 
+      RoadmapTransition[]
+    - RegistryDeps has no bridge function ports; onStateChange passes Roadmap 
+      pair
+    - Multi-project-server stops injecting bridge into RegistryDeps
+    dependencies: []
+    files:
+    - board/shared/types.ts
+    - board/server/differ.ts
+    - board/server/registry.ts
+    - board/server/multi-project-server.ts
+    - board/server/__tests__/differ.test.ts
+    - board/server/__tests__/registry.test.ts
+
+    status: approved
+    teammate_id: crafter-04-01
+    started_at: '2026-03-03T08:07:42.835515+00:00'
+    completed_at: '2026-03-03T08:18:04.487168+00:00'
+  - id: 04-02
+    title: Backward-compatible WS protocol with Roadmap
+    description: >
+      Add roadmap field to ProjectEntry and ServerWSMessage alongside
+      existing state/plan fields. Server sends both formats. Client
+      continues reading old fields — no client changes needed.
+    acceptance_criteria:
+    - ProjectEntry gains roadmap field alongside existing state and plan
+    - ServerWSMessage init/update include roadmap and roadmapTransitions fields
+    - Subscription server populates both old and new fields in WS messages
+    - Existing client hook continues working (reads old fields)
+    - deriveProjectSummary accepts Roadmap via computeRoadmapSummary
+    dependencies:
+    - 04-01
+    files:
+    - board/shared/types.ts
+    - board/server/registry.ts
+    - board/server/index.ts
+    - board/server/multi-project-server.ts
+    - board/server/__tests__/registry.test.ts
+    - board/server/__tests__/subscription.test.ts
+    - board/server/__tests__/websocket.test.ts
+    - board/shared/__tests__/multiproject-types.test.ts
+
+    status: approved
+    teammate_id: crafter-04-02
+    started_at: '2026-03-03T08:18:09.995049+00:00'
+    completed_at: '2026-03-03T08:32:15.170627+00:00'
+  - id: 04-03
+    title: Roadmap-native client data path
+    description: >
+      Replace useDeliveryState with useRoadmapState that reads roadmap
+      from WS messages. App.tsx BoardContent receives Roadmap and bridges
+      to legacy types temporarily for child components.
+    acceptance_criteria:
+    - useRoadmapState returns roadmap, transitions (RoadmapTransition[]), 
+      connectionStatus, error
+    - BoardView uses useRoadmapState instead of useDeliveryState
+    - BoardContent receives Roadmap, derives legacy types via bridge for 
+      children
+    - FeatureBoardView passes Roadmap to BoardContent without double-bridge
+    - useDeliveryState hook file deleted
+    dependencies:
+    - 04-02
+    files:
+    - board/src/hooks/useRoadmapState.ts
+    - board/src/hooks/useDeliveryState.ts
+    - board/src/App.tsx
+    - board/src/__tests__/useDeliveryState.test.ts
+    - board/src/__tests__/useRoadmapState.test.ts
+    - board/src/__tests__/App.test.tsx
+
+    status: approved
+    teammate_id: crafter-04-03
+    started_at: '2026-03-03T08:32:20.226540+00:00'
+    completed_at: '2026-03-03T08:45:01.484103+00:00'
+- id: '05'
+  title: Component migration to Roadmap-native props
+  description: >
+    Migrate UI components from legacy StepState/ExecutionLayer/PlanStep props
+    to RoadmapStep/RoadmapPhase. Each step updates both component and its
+    caller in BoardContent/App.tsx to maintain compilation.
+  steps:
+  - id: 05-01
+    title: Migrate KanbanBoard pipeline to Roadmap types
+    description: >
+      KanbanBoard and LayerLane accept Roadmap/RoadmapPhase. statusMapping
+      uses RoadmapStep. Update BoardContent to pass Roadmap to KanbanBoard.
+    acceptance_criteria:
+    - KanbanBoard takes Roadmap instead of DeliveryState + ExecutionPlan
+    - LayerLane takes RoadmapPhase instead of ExecutionLayer
+    - expandStepToFileCards accepts RoadmapStep instead of StepState
+    - BoardContent passes roadmap to KanbanBoard (bridge call removed for board)
+    dependencies:
+    - 04-03
+    files:
+    - board/src/utils/statusMapping.ts
+    - board/src/components/KanbanBoard.tsx
+    - board/src/components/LayerLane.tsx
+    - board/src/App.tsx
+    - board/src/__tests__/KanbanBoard.test.tsx
+    - board/src/__tests__/statusMapping.test.ts
+    - board/src/__tests__/acceptance/card-redesign/steps/test-fixtures.ts
+    - board/src/__tests__/acceptance/card-redesign/steps/walking_skeleton.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/card_layout_steps.test.tsx
+
+    status: approved
+    teammate_id: crafter-05-01
+    completed_at: '2026-03-03T09:15:26.075435+00:00'
+  - id: 05-02
+    title: Migrate FeatureBoardView to Roadmap props
+    description: >
+      FeatureBoardView takes Roadmap directly. Remove synthesizeQueuedState.
+      Required now because FeatureBoardView calls KanbanBoard (changed in 05-01).
+    acceptance_criteria:
+    - FeatureBoardView props use Roadmap instead of DeliveryState + 
+      ExecutionPlan
+    - synthesizeQueuedState removed from featureBoardUtils
+    - FeatureBoardView passes Roadmap to KanbanBoard without bridge
+    dependencies:
+    - 05-01
+    files:
+    - board/src/components/FeatureBoardView.tsx
+    - board/src/utils/featureBoardUtils.ts
+    - board/src/__tests__/FeatureBoardView.test.tsx
+
+    status: approved
+    teammate_id: crafter-05-02
+    completed_at: '2026-03-03T09:29:31.603763+00:00'
+  - id: 05-03
+    title: Migrate detail modal and team panel
+    description: >
+      StepDetailModal takes RoadmapStep. TeamPanel derives teammate data
+      from Roadmap. Update stepDetailUtils and BoardContent wiring.
+    acceptance_criteria:
+    - StepDetailModal takes RoadmapStep instead of StepState + PlanStep
+    - TeamPanel takes Roadmap, derives teammates from step teammate_id fields
+    - buildPlanStepLookup takes Roadmap, returns Map<string, RoadmapStep>
+    - BoardContent passes Roadmap-native data to modal and panel
+    dependencies:
+    - 05-01
+    files:
+    - board/src/utils/stepDetailUtils.ts
+    - board/src/components/StepDetailModal.tsx
+    - board/src/components/TeamPanel.tsx
+    - board/src/App.tsx
+    - board/src/__tests__/stepDetailUtils.test.ts
+    - board/src/__tests__/TeamPanel.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/modal_steps.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/teammate_steps.test.tsx
+
+    status: approved
+    teammate_id: crafter-05-03
+    completed_at: '2026-03-03T09:33:25.532528+00:00'
+  - id: 05-04
+    title: Migrate header, feed, and remove all bridge calls
+    description: >
+      ProgressHeader takes RoadmapSummary. ActivityFeed takes RoadmapTransition[].
+      Remove ALL remaining bridge calls and imports from App.tsx and BoardContent.
+    acceptance_criteria:
+    - ProgressHeader takes RoadmapSummary instead of StateSummary
+    - ActivityFeed takes RoadmapTransition[] instead of StateTransition[]
+    - BoardContent computes summary via computeRoadmapSummary
+    - App.tsx has zero bridge function imports or calls
+    dependencies:
+    - 05-02
+    - 05-03
+    files:
+    - board/src/components/ProgressHeader.tsx
+    - board/src/components/ActivityFeed.tsx
+    - board/src/App.tsx
+    - board/src/__tests__/ProgressHeader.test.tsx
+    - board/src/__tests__/ActivityFeed.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/phase_indicator_steps.test.tsx
+
+    status: approved
+    teammate_id: crafter-05-04
+    completed_at: '2026-03-03T09:43:04.104883+00:00'
+- id: '06'
+  title: Legacy cleanup
+  description: >
+    Remove WS backward-compat fields, delete bridge module, remove all
+    legacy types. Pure deletion — no new behavior.
+  steps:
+  - id: 06-01
+    title: Remove backward-compat and delete bridge module
+    description: >
+      Remove old state/plan fields from ProjectEntry and ServerWSMessage.
+      Remove legacy HTTP endpoints. Delete roadmap-bridge.ts; move
+      computeRoadmapSummary to shared/types.ts. Remove bridge re-exports.
+    acceptance_criteria:
+    - ProjectEntry holds only projectId and roadmap (state/plan removed)
+    - ServerWSMessage carries only Roadmap and RoadmapTransition (old fields 
+      removed)
+    - Legacy /state and /plan HTTP endpoints removed
+    - roadmap-bridge.ts deleted; computeRoadmapSummary moved to shared/types.ts
+    - Bridge re-export line removed from parser.ts
+    dependencies:
+    - 05-04
+    files:
+    - board/shared/types.ts
+    - board/shared/roadmap-bridge.ts
+    - board/server/registry.ts
+    - board/server/index.ts
+    - board/server/parser.ts
+    - board/server/multi-project-server.ts
+    - board/server/feature-discovery.ts
+    - board/src/App.tsx
+    - board/server/__tests__/roadmap-bridge.test.ts
+    - board/server/__tests__/index.test.ts
+    - board/server/__tests__/multiproject-http.test.ts
+    - board/server/__tests__/feature-http.test.ts
+    - board/server/__tests__/registry.test.ts
+    - board/server/__tests__/subscription.test.ts
+    - board/server/__tests__/websocket.test.ts
+    - board/shared/__tests__/project-summary.test.ts
+
+    status: approved
+    teammate_id: crafter-06-01
+    completed_at: '2026-03-03T10:14:34.155839+00:00'
+  - id: 06-02
+    title: Remove all legacy type definitions
+    description: >
+      Remove legacy types from shared/types.ts. Verify no remaining imports
+      across entire codebase.
+    acceptance_criteria:
+    - StateSummary, StepState, TeammateState, DeliveryState removed
+    - PlanSummary, PlanStep, ExecutionLayer, ExecutionPlan removed
+    - StateTransition, WSMessage, deriveProjectSummary removed
+    - No file in the codebase imports any removed type
+    dependencies:
+    - 06-01
+    files:
+    - board/shared/types.ts
+    - board/server/multi-project-server.ts
+    - board/shared/__tests__/roadmap-types.test.ts
+    - board/shared/__tests__/multiproject-types.test.ts
+    - board/src/__tests__/useProjectList.test.ts
+    status: approved
+    teammate_id: crafter-06-02
+    completed_at: '2026-03-03T10:23:25.150469+00:00'

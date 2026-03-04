@@ -1,0 +1,132 @@
+roadmap:
+  feature: board-ui-polish
+  title: "Board UI Polish"
+  created_at: "2026-03-03"
+  paradigm: functional
+  estimated_production_files: 7
+
+phases:
+- id: "01"
+  title: "Card density and add-project layout"
+  steps:
+  - id: "01-01"
+    title: "Compact project cards and grid density"
+    description: "Reduce ProjectCard padding/spacing and increase grid column count
+      for denser overview layout"
+    acceptance_criteria:
+    - "Project cards display with reduced vertical height (roughly half current)"
+    - "Grid shows 4+ columns on large screens"
+    - "All card content (name, progress, badges, remove) remains visible"
+    dependencies: []
+    files:
+    - board/src/components/ProjectCard.tsx
+    - board/src/components/OverviewDashboard.tsx
+
+    status: approved
+    teammate_id: crafter-01-01
+    review_attempts: 1
+    completed_at: '2026-03-03T15:07:48.542751+00:00'
+  - id: "01-02"
+    title: "Add Project button icon and alignment"
+    description: "Left-align Add Project button with '+' icon prefix. Constrain AddProjectDialog
+      to compact width."
+    acceptance_criteria:
+    - "Add Project button shows '+' icon before text"
+    - "Button is left-aligned (not right-aligned)"
+    - "Add project panel has constrained max-width, not full container width"
+    dependencies: []
+    files:
+    - board/src/components/OverviewDashboard.tsx
+    - board/src/components/AddProjectDialog.tsx
+
+    status: approved
+    teammate_id: crafter-01-02
+    review_attempts: 1
+    completed_at: '2026-03-03T15:10:30.411951+00:00'
+  - id: "01-03"
+    title: "Fix step card ID layout wrapping"
+    description: "Step ID (e.g. 02-01) wraps to a second line when step name is long.
+      Add whitespace-nowrap to ID and min-w-0/truncate to name."
+    acceptance_criteria:
+    - "Step ID displays on a single line without wrapping"
+    - "Long step names truncate with ellipsis rather than pushing the ID"
+    dependencies: []
+    files:
+    - board/src/components/StepCard.tsx
+
+    status: approved
+    teammate_id: crafter-01-03
+    review_attempts: 1
+    completed_at: '2026-03-03T14:56:37.000536+00:00'
+- id: "02"
+  title: "Feature card redesign"
+  steps:
+  - id: "02-01"
+    title: "Clickable compact feature cards without action buttons"
+    description: "Remove Board/Docs buttons from FeatureCard. Make entire card clickable,
+      navigating to feature board (or docs if no roadmap). Reduce card density."
+    acceptance_criteria:
+    - "Feature card has no Board/Docs buttons"
+    - "Clicking card navigates to feature board when roadmap exists"
+    - "Clicking card navigates to feature docs when no roadmap"
+    - "Feature grid shows 4+ columns on large screens"
+    - "Cards show cursor-pointer on hover"
+    dependencies: []
+    files:
+    - board/src/components/FeatureCard.tsx
+    - board/src/components/ProjectFeatureView.tsx
+
+    status: approved
+    teammate_id: crafter-02-01
+    review_attempts: 1
+    completed_at: '2026-03-03T14:58:40.798871+00:00'
+- id: "03"
+  title: "Unified navigation header"
+  steps:
+  - id: "03-01"
+    title: "Unify feature docs route header with feature board route"
+    description: "Move FeatureNavHeader into PageShell header for feature-docs route.
+      Remove breadcrumb and Board/Docs tabs from FeatureDocsView content area."
+    acceptance_criteria:
+    - "Feature docs page has same sticky header breadcrumb+tabs as feature board page"
+    - "Switching Board/Docs tabs preserves breadcrumb context"
+    - "No duplicate navigation controls visible"
+    dependencies: []
+    files:
+    - board/src/App.tsx
+    - board/src/components/FeatureDocsView.tsx
+
+    status: approved
+    teammate_id: crafter-03-01
+    review_attempts: 1
+    completed_at: '2026-03-03T14:59:27.329804+00:00'
+  - id: "03-02"
+    title: "Remove duplicate nav from DocViewer"
+    description: "Remove onNavigateToBoard prop and internal Board/Docs nav from DocViewer.
+      ProjectTabs in PageShell header already provides this navigation."
+    acceptance_criteria:
+    - "DocViewer renders no Board/Docs navigation of its own"
+    - "Project docs page shows single Board/Docs tab set in header"
+    - "Doc tree and content display unchanged"
+    dependencies: ["03-01"]
+    files:
+    - board/src/components/DocViewer.tsx
+    - board/src/App.tsx
+
+    status: approved
+    teammate_id: crafter-03-02
+    review_attempts: 1
+    completed_at: '2026-03-03T15:04:44.354502+00:00'
+validation:
+  status: "approved"
+  reviewed_at: "2026-03-03"
+  reviewer: "atlas"
+  step_count: 6
+  production_files: 8
+  step_ratio: 0.75
+  critical_issues: 0
+  high_issues: 0
+  quality_gates:
+  - "All routes show consistent navigation header pattern"
+  - "No duplicate navigation controls on any route"
+  - "Card interactions are keyboard accessible (Enter/Space)"

@@ -1,0 +1,61 @@
+journey:
+  name: rebranding-to-agent-ensemble
+  persona: developer
+  job: instantly understand tool purpose from name
+
+  steps:
+    - id: discovery
+      action: Hear or read the tool name
+      current: "NW Teams — unclear, requires explanation"
+      rebranded: "Agent Ensemble — self-explanatory"
+      emotion: curiosity
+      artifacts: [display-name]
+
+    - id: install
+      action: Run install script, see paths created
+      current: "~/.claude/commands/nw-teams/"
+      rebranded: "~/.claude/commands/agent-ensemble/"
+      emotion: confidence
+      artifacts: [package-name, module-name]
+
+    - id: first-command
+      action: Invoke CLI command
+      current: "/nw-teams:execute"
+      rebranded: "/agent-ensemble:execute"
+      emotion: recognition
+      artifacts: [command-prefix]
+
+    - id: open-board
+      action: Open web dashboard
+      current: "NW Teams Board — generic"
+      rebranded: "Agent Ensemble — purposeful"
+      emotion: trust
+      artifacts: [display-name, html-title]
+
+    - id: share
+      action: Tell someone about the tool
+      current: "It's called NW Teams, it does..."
+      rebranded: "It's Agent Ensemble — agents performing together"
+      emotion: pride
+      artifacts: [display-name]
+
+  artifacts:
+    display-name:
+      value: "Agent Ensemble"
+      sources: [App.tsx, index.html, OverviewDashboard.tsx]
+
+    package-name:
+      value: "agent-ensemble"
+      sources: [pyproject.toml, package.json]
+
+    module-name:
+      value: "agent_ensemble"
+      sources: [src/agent_ensemble/__init__.py]
+
+    command-prefix:
+      value: "agent-ensemble:"
+      sources: [commands/*.md]
+
+    html-title:
+      value: "Agent Ensemble"
+      sources: [board/index.html]

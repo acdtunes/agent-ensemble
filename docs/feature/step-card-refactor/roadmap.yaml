@@ -1,0 +1,142 @@
+roadmap:
+  project_id: step-card-refactor
+  created_at: '2026-03-03T03:27:42Z'
+  total_steps: 5
+  phases: 3
+phases:
+- id: '01'
+  title: Data model transformation
+  steps:
+  - id: 01-01
+    title: Rename FileCardData to StepCardData and rewrite toStepCard
+    description: >
+      Replace FileCardData interface with StepCardData (add fileCount + files,
+      remove filename). Rename expandStepToFileCards to toStepCard returning
+      single object instead of array. No fallback to step name for empty files.
+    acceptance_criteria:
+    - toStepCard returns single StepCardData (not array)
+    - StepCardData has fileCount (number) and files (readonly string[]) instead 
+      of filename
+    - fileCount equals files.length, both derived from files_to_modify
+    - Empty files_to_modify produces fileCount 0 and files [] (no fallback)
+    - All other field mappings unchanged (stepId, stepName, displayColumn, 
+      reviewCount, worktree, isBlocked, teammateId)
+    dependencies: []
+    files:
+    - board/src/utils/statusMapping.ts
+    - board/src/__tests__/statusMapping.test.ts
+
+    status: approved
+    teammate_id: crafter-01-01
+    review_attempts: 1
+    completed_at: '2026-03-03T10:40:18.315288+00:00'
+- id: '02'
+  title: Component rename and update
+  steps:
+  - id: 02-01
+    title: Git-rename FileCard files to StepCard
+    description: >
+      git mv FileCard.tsx to StepCard.tsx and FileCard.test.tsx to
+      StepCard.test.tsx. No code changes in this step -- only file renames.
+    acceptance_criteria:
+    - board/src/components/StepCard.tsx exists (FileCard.tsx removed)
+    - board/src/__tests__/StepCard.test.tsx exists (FileCard.test.tsx removed)
+    - File contents unchanged (imports still reference old names)
+    dependencies:
+    - 01-01
+    files:
+    - board/src/components/FileCard.tsx
+    - board/src/__tests__/FileCard.test.tsx
+
+    status: approved
+    teammate_id: crafter-02-01
+    review_attempts: 1
+    completed_at: '2026-03-03T10:41:10.412731+00:00'
+  - id: 02-02
+    title: Update StepCard component and test-fixtures for step-level display
+    description: >
+      Rename FileCard to StepCard, FileCardProps to StepCardProps. Replace
+      filename subtitle with file count subtitle ("N files"). Update
+      data-testid from file-card to step-card. Update test fixtures to use
+      createStepCardData with fileCount + files instead of filename.
+    acceptance_criteria:
+    - Card subtitle shows file count (e.g. "3 files", "1 file", "0 files") 
+      instead of filename
+    - data-testid is step-card (not file-card)
+    - StepCard accepts StepCardData via StepCardProps
+    - createStepCardData builder requires fileCount + files, no filename field
+    - All StepCard unit tests pass with updated assertions
+    dependencies:
+    - 02-01
+    files:
+    - board/src/components/StepCard.tsx
+    - board/src/__tests__/StepCard.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/test-fixtures.ts
+
+    status: approved
+    teammate_id: crafter-02-02
+    review_attempts: 1
+    completed_at: '2026-03-03T10:44:17.749910+00:00'
+- id: '03'
+  title: Consumer wiring and acceptance tests
+  steps:
+  - id: 03-01
+    title: Update LayerLane to use toStepCard with 1:1 step-to-card mapping
+    description: >
+      Replace FileCard/FileCardData/expandStepToFileCards imports with
+      StepCard/StepCardData/toStepCard. Change flatMap to map for 1:1
+      mapping. Simplify key to stepId. Rename groupFileCardsByColumn
+      to groupStepCardsByColumn.
+    acceptance_criteria:
+    - LayerLane produces exactly one card per step (N steps = N cards)
+    - Card key uses stepId (not stepId-filename composite)
+    - Column count badge reflects step count per column
+    - groupStepCardsByColumn operates on StepCardData[]
+    dependencies:
+    - 02-02
+    files:
+    - board/src/components/LayerLane.tsx
+
+    status: approved
+    teammate_id: crafter-03-01
+    review_attempts: 1
+    completed_at: '2026-03-03T10:46:00.400786+00:00'
+  - id: 03-02
+    title: Update acceptance tests for step-level cards
+    description: >
+      Batch update all acceptance tests: replace FileCard/createFileCardData
+      imports with StepCard/createStepCardData, replace filename assertions
+      with file count assertions, remove multi-card-same-step scenarios
+      (Scenario 2 in teammate, Scenario 4-5 in card_layout).
+    acceptance_criteria:
+    - walking_skeleton.test.tsx uses StepCard with file count subtitle
+    - teammate_steps.test.tsx uses StepCard; multi-card-same-step scenario 
+      removed
+    - card_layout_steps.test.tsx uses StepCard; multi-card and filename-conflict
+      scenarios removed or rewritten as file-count tests
+    - All acceptance tests pass
+    dependencies:
+    - 03-01
+    files:
+    - board/src/__tests__/acceptance/card-redesign/steps/walking_skeleton.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/teammate_steps.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/card_layout_steps.test.tsx
+
+    status: approved
+    teammate_id: crafter-03-02
+    review_attempts: 1
+    completed_at: '2026-03-03T10:50:09.696003+00:00'
+implementation_scope:
+  source_directories:
+  - board/src/utils/
+  - board/src/components/
+  test_directories:
+  - board/src/__tests__/
+  - board/src/__tests__/acceptance/card-redesign/steps/
+  excluded_patterns:
+  - node_modules/**
+  - dist/**
+validation:
+  status: pending
+  reviewer: atlas
+  approved_at:

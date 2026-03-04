@@ -1,0 +1,374 @@
+roadmap:
+  project_id: test-consolidation
+  created_at: '2026-03-03T03:46:44Z'
+  total_steps: 16
+  phases: 4
+phases:
+- id: '01'
+  title: Delete outright (Tier 1)
+  steps:
+  - id: 01-01
+    title: Delete websocket.test.ts after migrating unique tests
+    description: >
+      websocket.test.ts is a complete duplicate of subscription.test.ts.
+      Migrate 2 unique tests (invalid JSON handling, cleanup on disconnect)
+      into subscription.test.ts, then delete websocket.test.ts entirely (~343 lines).
+    acceptance_criteria:
+    - subscription.test.ts contains invalid JSON handling test
+    - subscription.test.ts contains cleanup on disconnect test
+    - websocket.test.ts no longer exists
+    - All subscription tests pass
+    dependencies: []
+    files:
+    - board/server/__tests__/websocket.test.ts
+    - board/server/__tests__/subscription.test.ts
+
+    status: approved
+    teammate_id: crafter-01-01
+    completed_at: '2026-03-03T11:44:44.814084+00:00'
+  - id: 01-02
+    title: Delete roadmap-types.test.ts
+    description: >
+      All 6 tests assert type fixtures matching literal values
+      (e.g. expect(summary.total_steps).toBe(8)). TypeScript compiler
+      already guarantees these structures. Zero behavioral value. Delete entirely
+      (~126 lines).
+    acceptance_criteria:
+    - roadmap-types.test.ts no longer exists
+    - No test references to roadmap-types.test.ts remain
+    - TypeScript compilation still succeeds
+    dependencies: []
+    files:
+    - board/shared/__tests__/roadmap-types.test.ts
+
+    status: approved
+    teammate_id: crafter-01-02
+    completed_at: '2026-03-03T11:44:21.462125+00:00'
+  - id: 01-03
+    title: Delete duplicate tests from multiproject-types.test.ts
+    description: >
+      Delete ProjectId validation test (duplicate of project-id.test.ts)
+      and ClientWSMessage coverage test (type assertion with no behavior).
+      Keep WebSocket round-trip and ProjectSummary derivation tests.
+    acceptance_criteria:
+    - ProjectId validation test removed (was duplicate of project-id.test.ts)
+    - ClientWSMessage type-only test removed
+    - WebSocket round-trip test preserved and passes
+    - ProjectSummary derivation test preserved and passes
+    dependencies: []
+    files:
+    - board/shared/__tests__/multiproject-types.test.ts
+
+    status: approved
+    teammate_id: crafter-01-03
+    completed_at: '2026-03-03T11:44:32.179770+00:00'
+  - id: 01-04
+    title: Delete redundant Python tests
+    description: >
+      Delete 3 duplicate tests: test_show_computes_counts_from_step_statuses
+      (duplicate of lines 108-142), test_yaml_roundtrip_preserves_comments
+      (duplicate of lines 73-103), test_step_without_description_defaults_to_empty
+      (covered by lines 38-57).
+    acceptance_criteria:
+    - test_show_computes_counts_from_step_statuses at line ~295 removed from 
+      test_team_state.py
+    - test_yaml_roundtrip_preserves_comments at line ~360 removed from 
+      test_team_state.py
+    - test_step_without_description_defaults_to_empty removed from 
+      test_parallel_groups.py
+    - All remaining Python tests pass
+    dependencies: []
+    files:
+    - tests/test_team_state.py
+    - tests/test_parallel_groups.py
+
+    status: approved
+    teammate_id: crafter-01-04
+    completed_at: '2026-03-03T11:44:44.217187+00:00'
+- id: '02'
+  title: Consolidate acceptance tests (Tier 2)
+  steps:
+  - id: 02-01
+    title: Consolidate phase_indicator_steps (5 scenarios to 1)
+    description: >
+      All 5 scenarios test computePhaseIndicator via component render,
+      already unit-tested in ProgressHeader.test.tsx. Merge into
+      walking_skeleton.test.tsx as single "user understands delivery progress" scenario.
+      Delete phase_indicator_steps.test.tsx.
+    acceptance_criteria:
+    - walking_skeleton.test.tsx contains "user understands delivery progress" 
+      scenario
+    - phase_indicator_steps.test.tsx no longer exists
+    - Walking skeleton tests pass
+    dependencies:
+    - 01-01
+    files:
+    - board/src/__tests__/acceptance/card-redesign/steps/phase_indicator_steps.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/walking_skeleton.test.tsx
+
+    status: approved
+    teammate_id: crafter-02-01
+    completed_at: '2026-03-03T11:47:32.684451+00:00'
+  - id: 02-02
+    title: Consolidate card_layout_steps (5 scenarios to 1)
+    description: >
+      5 scenarios test individual CSS class/prop on FileCard, already
+      unit-tested in KanbanBoard.test.tsx. Merge into walking skeleton
+      as "user can identify a task at a glance" (title + subtitle + ID).
+      Delete card_layout_steps.test.tsx.
+    acceptance_criteria:
+    - walking_skeleton.test.tsx contains "user can identify a task at a glance" 
+      scenario
+    - card_layout_steps.test.tsx no longer exists
+    - Walking skeleton tests pass
+    dependencies:
+    - 02-01
+    files:
+    - board/src/__tests__/acceptance/card-redesign/steps/card_layout_steps.test.tsx
+    - board/src/__tests__/acceptance/card-redesign/steps/walking_skeleton.test.tsx
+
+    status: approved
+    teammate_id: crafter-02-02
+    completed_at: '2026-03-03T11:49:16.374072+00:00'
+  - id: 02-03
+    title: Consolidate teammate_steps (6 scenarios to 2)
+    description: >
+      6 scenarios for color determinism already unit-tested in
+      teammateColors.test.ts. Keep 2 acceptance scenarios: (1) teammate
+      visible on active card, (2) teammate colors differ. Delete remaining 4.
+    acceptance_criteria:
+    - teammate_steps.test.tsx contains exactly 2 scenarios
+    - teammate visible on active card scenario present and passes
+    - teammate colors differ scenario present and passes
+    - 4 redundant color determinism scenarios removed
+    dependencies:
+    - 01-01
+    files:
+    - board/src/__tests__/acceptance/card-redesign/steps/teammate_steps.test.tsx
+
+    status: approved
+    teammate_id: crafter-02-03
+    completed_at: '2026-03-03T11:47:17.860864+00:00'
+  - id: 02-04
+    title: Update .feature files to match consolidated scenarios
+    description: >
+      Remove Gherkin scenarios that no longer have step implementations.
+      Update walking-skeleton.feature with new consolidated scenarios.
+      Align milestone feature files with reduced step counts.
+    acceptance_criteria:
+    - walking-skeleton.feature lists consolidated scenarios from 02-01 and 02-02
+    - milestone-1-schema-and-phase.feature aligned with remaining phase 
+      indicator tests
+    - milestone-2-card-layout.feature aligned with single card layout scenario
+    - milestone-3-teammate-visibility.feature aligned with 2 teammate scenarios
+    dependencies:
+    - 02-01
+    - 02-02
+    - 02-03
+    files:
+    - board/src/__tests__/acceptance/card-redesign/walking-skeleton.feature
+    - board/src/__tests__/acceptance/card-redesign/milestone-1-schema-and-phase.feature
+    - board/src/__tests__/acceptance/card-redesign/milestone-2-card-layout.feature
+    - board/src/__tests__/acceptance/card-redesign/milestone-3-teammate-visibility.feature
+
+    status: approved
+    teammate_id: crafter-02-04
+    completed_at: '2026-03-03T11:51:04.325110+00:00'
+- id: '03'
+  title: Consolidate client unit tests (Tier 3)
+  steps:
+  - id: 03-01
+    title: Strip reconnection tests from useProjectList.test.ts
+    description: >
+      Delete 4 reconnection tests (lines ~237-266) that duplicate
+      identical logic already tested in useDeliveryState.test.ts.
+      Reduce from 22 to ~18 tests.
+    acceptance_criteria:
+    - Reconnection tests removed from useProjectList.test.ts
+    - useProjectList.test.ts has ~18 tests
+    - Reconnection behavior still covered by useDeliveryState.test.ts
+    - All remaining useProjectList tests pass
+    dependencies:
+    - 01-01
+    files:
+    - board/src/__tests__/useProjectList.test.ts
+
+    status: approved
+    teammate_id: crafter-03-01
+    completed_at: '2026-03-03T11:46:43.004059+00:00'
+  - id: 03-02
+    title: Reduce useDeliveryState.test.ts backoff and subscription tests
+    description: >
+      Reduce backoff tests from 4 to 2 (keep "increases on failure" +
+      "resets after init"). Consolidate project subscription tests
+      from 9 to 5. Reduce from 26 to ~18 tests.
+    acceptance_criteria:
+    - Backoff tests reduced to 2 (increases on failure, resets after init)
+    - Project subscription tests reduced to 5
+    - useDeliveryState.test.ts has ~18 tests total
+    - All remaining tests pass
+    dependencies:
+    - 03-01
+    files:
+    - board/src/__tests__/useDeliveryState.test.ts
+
+    status: approved
+    teammate_id: crafter-03-02
+    completed_at: '2026-03-03T11:49:01.565377+00:00'
+  - id: 03-03
+    title: Gut App.test.tsx (13 to 3 tests)
+    description: >
+      Delete state/plan availability + routing tests (lines ~183-312),
+      better served by acceptance tests. Keep only 3 tests: error message
+      display, connecting placeholder, overview grid rendering.
+    acceptance_criteria:
+    - App.test.tsx has exactly 3 tests
+    - Error message display test preserved and passes
+    - Connecting placeholder test preserved and passes
+    - Overview grid rendering test preserved and passes
+    - State/plan availability and routing tests removed
+    dependencies:
+    - 01-01
+    files:
+    - board/src/__tests__/App.test.tsx
+
+    status: approved
+    teammate_id: crafter-03-03
+    completed_at: '2026-03-03T11:48:12.052790+00:00'
+  - id: 03-04
+    title: Parametrize trivial utility tests
+    description: >
+      Batch reduction across 5 utility test files: ProjectCard (7 to 2),
+      ProgressHeader (10 to 5), statusColors (6 to 3), animationClasses
+      (6 to 4), teammateColors (7 to 4).
+    acceptance_criteria:
+    - ProjectCard.test.tsx: computeCompletionPercentage and formatFeatureCount 
+        each collapsed to 1 test
+    - ProgressHeader.test.tsx: standalone utility tests removed, reduced to 5 
+        tests
+    - statusColors.test.ts: implementation detail tests (color uniqueness, tone)
+        removed, 3 tests remain
+    - animationClasses.test.ts: transition class checks consolidated, 4 tests 
+        remain
+    - teammateColors.test.ts: TEAMMATE_PALETTE constant validation removed, 4 
+        tests remain
+    dependencies:
+    - 01-01
+    files:
+    - board/src/__tests__/ProjectCard.test.tsx
+    - board/src/__tests__/ProgressHeader.test.tsx
+    - board/src/__tests__/statusColors.test.ts
+    - board/src/__tests__/animationClasses.test.ts
+    - board/src/__tests__/teammateColors.test.ts
+
+    status: approved
+    teammate_id: crafter-03-04
+    completed_at: '2026-03-03T11:48:11.929818+00:00'
+  - id: 03-05
+    title: Consolidate component test redundancies
+    description: >
+      Batch reduction across 4 component test files: KanbanBoard (12 to 9),
+      FileCard (12 to 9), DirectoryBrowser (13 to 11), AddProjectDialog
+      (14 to 11). Remove tests covered by statusMapping or duplicated states.
+    acceptance_criteria:
+    - KanbanBoard.test.tsx: column header count/legacy + file card expansion 
+        tests removed, 9 tests remain
+    - FileCard.test.tsx: badge display consolidated (7 to 3), teammate 
+        color/icon DOM tests removed, 9 tests remain
+    - DirectoryBrowser.test.tsx: navigateUp tests consolidated, 11 tests remain
+    - AddProjectDialog.test.tsx: duplicate cancel/error/disabled states 
+        consolidated, 11 tests remain
+    dependencies:
+    - 03-04
+    files:
+    - board/src/__tests__/KanbanBoard.test.tsx
+    - board/src/__tests__/FileCard.test.tsx
+    - board/src/__tests__/DirectoryBrowser.test.tsx
+    - board/src/__tests__/AddProjectDialog.test.tsx
+
+    status: approved
+    teammate_id: crafter-03-05
+    completed_at: '2026-03-03T11:53:07.047375+00:00'
+- id: '04'
+  title: Server test consolidation (Tier 4)
+  steps:
+  - id: 04-01
+    title: Merge multiproject-http.test.ts into index.test.ts
+    description: >
+      Move unique POST/DELETE project tests from multiproject-http.test.ts
+      into index.test.ts. Delete duplicate GET /api/projects tests.
+      Delete multiproject-http.test.ts after merge.
+    acceptance_criteria:
+    - index.test.ts contains POST and DELETE project tests
+    - Duplicate GET /api/projects tests not carried over
+    - multiproject-http.test.ts no longer exists
+    - All index.test.ts tests pass
+    dependencies:
+    - 01-01
+    files:
+    - board/server/__tests__/multiproject-http.test.ts
+    - board/server/__tests__/index.test.ts
+
+    status: approved
+    teammate_id: crafter-04-01
+    completed_at: '2026-03-03T11:48:11.993272+00:00'
+  - id: 04-02
+    title: Remove manifest-store.test.ts redundant unit tests
+    description: >
+      Delete unit tests subsumed by property-based tests: addEntry
+      (lines ~274-295), removeEntry (lines ~372-391), preserveProjectId
+      (lines ~319-326). Keep all fast-check tests + validation edge cases.
+    acceptance_criteria:
+    - addEntry unit test removed (covered by property-based test)
+    - removeEntry unit test removed (covered by property-based test)
+    - preserveProjectId unit test removed (covered by property-based test)
+    - All property-based (fast-check) tests preserved and pass
+    - All validation edge case tests preserved and pass
+    dependencies:
+    - 01-01
+    files:
+    - board/server/__tests__/manifest-store.test.ts
+
+    status: approved
+    teammate_id: crafter-04-02
+    completed_at: '2026-03-03T11:47:32.617144+00:00'
+  - id: 04-03
+    title: Parametrize doc-content.test.ts path traversal tests
+    description: >
+      Consolidate 9 path traversal tests into 6 using it.each(): group
+      parent directory escapes together, group null byte vectors together.
+      Security-critical but internally redundant.
+    acceptance_criteria:
+    - Path traversal tests use it.each() with grouped test vectors
+    - Parent directory escape vectors grouped in one parametrized test
+    - Null byte vectors grouped in one parametrized test
+    - Total path traversal tests reduced from 9 to 6
+    - All security test vectors still exercised (no vector dropped)
+    dependencies:
+    - 01-01
+    files:
+    - board/server/__tests__/doc-content.test.ts
+
+    status: approved
+    teammate_id: crafter-04-03
+    completed_at: '2026-03-03T11:49:01.640479+00:00'
+implementation_scope:
+  source_directories:
+  - board/server/__tests__/
+  - board/src/__tests__/
+  - board/src/__tests__/acceptance/card-redesign/
+  - board/shared/__tests__/
+  - tests/
+  test_directories:
+  - board/server/__tests__/
+  - board/src/__tests__/
+  - board/src/__tests__/acceptance/card-redesign/
+  - board/shared/__tests__/
+  - tests/
+  excluded_patterns:
+  - node_modules/**
+  - .stryker-tmp/**
+validation:
+  status: pending
+  reviewer: atlas
+  approved_at:

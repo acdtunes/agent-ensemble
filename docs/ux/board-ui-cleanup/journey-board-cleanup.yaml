@@ -1,0 +1,179 @@
+journey:
+  name: "Board UI Cleanup"
+  goal: "Andres monitors multi-agent delivery with a focused, noise-free board interface"
+  persona: "Andres -- project owner monitoring 3 concurrent features with 5-8 AI agents"
+
+  emotional_arc:
+    start: "Overwhelmed -- sidebar noise, idle teammates, review badges without meaning"
+    middle: "Focused -- only active teammates visible, no activity log distraction, clean cards"
+    end: "Informed -- review history in modal provides full quality audit capability"
+
+steps:
+  - id: 1
+    name: "Remove Activity Section"
+    action: "Delete ActivityFeed component usage from BoardContent sidebar in App.tsx"
+
+    current_state: |
+      The BoardContent component renders a sidebar section with:
+        <section aria-label="Activity">
+          <h2>Activity</h2>
+          <ActivityFeed transitions={transitions} />
+        </section>
+      This shows up to 50 raw RoadmapTransition entries (step_id, from/to status, timestamp).
+
+    target_state: |
+      The Activity section is removed from the BoardContent sidebar.
+      The Teammates section becomes the sole sidebar content.
+      The sidebar vertical space is reclaimed.
+
+    shared_artifacts:
+      - name: "transitions"
+        source: "useRoadmapState hook (WebSocket)"
+        displayed_as: "ActivityFeed entries"
+        consumers: ["BoardContent sidebar (REMOVED)"]
+        note: "transitions data continues to flow via WebSocket but is no longer rendered"
+
+    emotional_state:
+      entry: "Overwhelmed by raw transition data that adds no decision value"
+      exit: "Focused -- sidebar shows only team status"
+
+    integration_checkpoint: |
+      - ActivityFeed component file can remain in codebase (unused) or be deleted
+      - transitions prop can remain on BoardContent (unused) or be removed
+      - No other consumers of ActivityFeed exist in the codebase
+
+  - id: 2
+    name: "Filter Teammates to Active Only"
+    action: "Modify deriveTeammates() in TeamPanel.tsx to exclude teammates with no active steps"
+
+    current_state: |
+      deriveTeammates() collects ALL teammates who have ever been assigned to any step.
+      Teammates with only completed (approved) steps show as "Idle" with a completed count.
+      The ACTIVE_STATUSES set is: claimed, in_progress, review.
+
+    target_state: |
+      deriveTeammates() returns only teammates who have at least one step in an active status.
+      Teammates with only completed/pending/failed steps are excluded from the panel.
+      When no teammates are active, the empty state "No active teammates" is shown.
+
+    shared_artifacts:
+      - name: "roadmap"
+        source: "useRoadmapState hook (WebSocket) / useFeatureState hook (HTTP)"
+        displayed_as: "TeamPanel teammate cards"
+        consumers: ["KanbanBoard", "TeamPanel", "ProgressHeader"]
+
+    emotional_state:
+      entry: "Scanning past idle teammates to find who is currently working"
+      exit: "Instant clarity about current team engagement"
+
+    integration_checkpoint: |
+      - TeamPanel still receives full Roadmap -- filtering is internal
+      - Empty state text should change from "No teammates" to "No active teammates"
+      - Completed count still shown for active teammates
+
+  - id: 3
+    name: "Clean Done Card Appearance"
+    action: "Conditionally hide teammate indicator on StepCard when card is done and teammate is unassigned"
+
+    current_state: |
+      StepCard shows teammate indicator (person icon + colored name) whenever
+      card.teammateId !== null, regardless of card status (displayColumn).
+
+    target_state: |
+      StepCard hides teammate indicator when:
+        - card.displayColumn === 'done' AND card.teammateId === null
+      This matches the user request: "When tickets are done AND teammates are unassigned."
+      Note: If a done card still has a teammate_id (teammate not unassigned), the indicator
+      remains visible. The condition is about unassignment, not about done status alone.
+
+    shared_artifacts:
+      - name: "StepCardData"
+        source: "toStepCard() in statusMapping.ts"
+        displayed_as: "StepCard component"
+        consumers: ["LayerLane column rendering"]
+
+    emotional_state:
+      entry: "Distracted by teammate names on completed cards"
+      exit: "Done column feels clean and resolved"
+
+    integration_checkpoint: |
+      - StepDetailModal still shows full teammate info regardless of card appearance
+      - The teammate_id field on the step data is not modified, only the display is conditional
+
+  - id: 4
+    name: "Remove Review Badge from Cards"
+    action: "Remove review count badge rendering from StepCard component"
+
+    current_state: |
+      StepCard renders a badge when card.reviewCount > 0:
+        <Badge bg="bg-orange-950/50" text="text-orange-400">
+          {card.reviewCount} {card.reviewCount === 1 ? 'review' : 'reviews'}
+        </Badge>
+
+    target_state: |
+      The review count badge is removed from StepCard.
+      Review information is only accessible via the StepDetailModal.
+      The reviewCount field remains on StepCardData (used by modal via step lookup).
+
+    shared_artifacts:
+      - name: "reviewCount / review_attempts"
+        source: "RoadmapStep.review_attempts in roadmap YAML"
+        displayed_as: "Previously: card badge. Now: modal only."
+        consumers: ["StepDetailModal timing section"]
+
+    emotional_state:
+      entry: "Card badges add noise without explaining what happened"
+      exit: "Cards show only essential info: name, ID, files, teammate (if active)"
+
+    integration_checkpoint: |
+      - StepCardData.reviewCount field remains (no schema change)
+      - StepDetailModal continues to show review_attempts in timing section
+      - Badge component itself may still be used for worktree/blocked badges
+
+  - id: 5
+    name: "Add Review History to Step Detail Modal"
+    action: "Extend StepDetailModal to show review feedback history when data is available"
+
+    current_state: |
+      StepDetailModal shows review_attempts as a count in the Timing section:
+        "2 review attempts"
+      No review feedback content or history is displayed.
+      RoadmapStep type has: review_attempts: number (count only).
+
+    target_state: |
+      StepDetailModal shows a "Review History" section when review data exists.
+      Each review entry displays: cycle number, timestamp, outcome, feedback text.
+      Entries are ordered newest-first.
+      When only review_attempts count is available (no feedback data), falls back to
+      showing the count as today.
+
+    shared_artifacts:
+      - name: "review_history"
+        source: "New field on RoadmapStep or separate data structure (schema TBD)"
+        displayed_as: "Review History section in StepDetailModal"
+        consumers: ["StepDetailModal"]
+        note: "DEPENDENCY: Requires schema evolution for review feedback data"
+
+    emotional_state:
+      entry: "Curious about what happened during review but only seeing a count"
+      exit: "Fully informed about the quality journey of each step"
+
+    integration_checkpoint: |
+      - DEPENDENCY: RoadmapStep type needs review_history field
+      - Schema design is a prerequisite (spike or technical task)
+      - Backward compatibility: steps without review_history show count fallback
+      - YAML parser must handle optional review_history field
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "roadmap"
+      must_match_across: [1, 2, 3, 4, 5]
+      failure_message: "All steps consume the same roadmap data -- changes to filtering or display must not affect the underlying data structure"
+
+    - artifact: "review_attempts / review_history"
+      must_match_across: [4, 5]
+      failure_message: "Removing badge from cards (step 4) and adding history to modal (step 5) both touch review data -- ensure consistent data source"
+
+    - artifact: "teammate_id"
+      must_match_across: [2, 3]
+      failure_message: "Active teammate filtering (step 2) and done card cleanup (step 3) both use teammate_id -- ensure consistent interpretation of active/inactive"

@@ -1,0 +1,207 @@
+roadmap:
+  project_id: kanban-board
+  created_at: '2026-03-01T00:37:46Z'
+  total_steps: 9
+  phases: 3
+phases:
+- id: '01'
+  title: 'Backend: State Server'
+  steps:
+  - id: 01-01
+    title: 'Server foundation: types, YAML parser, and file watcher'
+    description: >
+      Scaffold board/server/ with shared TypeScript types mirroring state.yaml and plan.yaml schemas,
+      YAML parser using js-yaml, and chokidar file watcher with 100ms debounce.
+    time_estimate: '2h'
+    dependencies: []
+    acceptance_criteria:
+      - 'Shared types cover DeliveryState, StepState, TeammateState, ExecutionPlan, StepStatus, StateTransition, and WSMessage'
+      - 'Parser correctly deserializes valid state.yaml and rejects malformed content'
+      - 'Watcher emits change event within 200ms of state.yaml modification'
+      - 'Watcher debounces rapid successive writes into single event'
+    files:
+      - board/shared/types.ts
+      - board/server/parser.ts
+      - board/server/watcher.ts
+      - board/package.json
+      - board/tsconfig.json
+      - board/server/__tests__/parser.test.ts
+      - board/server/__tests__/watcher.test.ts
+  - id: 01-02
+    title: 'WebSocket broadcasting and state diff engine'
+    description: >
+      Implement state diff computation that detects step status transitions between successive states.
+      Create WebSocket server (ws library) that broadcasts full state and transition events to all connected clients.
+    time_estimate: '2h'
+    dependencies:
+      - 01-01
+    acceptance_criteria:
+      - 'Differ produces transition list when step status changes between two successive states'
+      - 'Differ returns empty list when state is unchanged'
+      - 'Client receives full state and plan on initial connection'
+      - 'All connected clients receive state and transitions on file change'
+      - 'Multiple connected clients each receive broadcast messages'
+    files:
+      - board/server/differ.ts
+      - board/server/index.ts
+      - board/server/__tests__/differ.test.ts
+  - id: 01-03
+    title: 'Express HTTP endpoints'
+    description: >
+      Add Express HTTP layer serving GET /api/state (current state) and GET /api/plan (execution plan).
+      Server entry point wires watcher, parser, differ, WebSocket, and HTTP together.
+    time_estimate: '1h'
+    dependencies:
+      - 01-02
+    acceptance_criteria:
+      - 'GET /api/state returns current delivery state as JSON with 200 status'
+      - 'GET /api/plan returns execution plan as JSON with 200 status'
+      - 'Server returns 503 with descriptive message when state.yaml does not exist'
+      - 'Server starts on configurable port (default 3001)'
+    files:
+      - board/server/index.ts
+      - board/server/__tests__/index.test.ts
+- id: '02'
+  title: 'Frontend: React Components'
+  steps:
+  - id: 02-01
+    title: 'Vite + React + Tailwind scaffolding and frontend types'
+    description: >
+      Initialize Vite project with React 19, TypeScript, and Tailwind CSS.
+      Create React entry point, index.html, vite config, and frontend-specific UI type definitions.
+      Shared domain types imported from board/shared/types.ts.
+    time_estimate: '1.5h'
+    dependencies:
+      - 01-03
+    acceptance_criteria:
+      - 'Vite dev server starts and renders root React component in browser'
+      - 'Tailwind utility classes apply correctly in rendered output'
+      - 'TypeScript compilation passes with strict mode enabled'
+      - 'App component renders layout shell with placeholder props for all child components'
+    files:
+      - board/vite.config.ts
+      - board/src/main.tsx
+      - board/src/App.tsx
+      - board/public/index.html
+  - id: 02-02
+    title: 'KanbanBoard, LayerLane, StepCard, and ConflictPanel components'
+    description: >
+      Build layer swim lane layout (rows = execution layers, columns = status).
+      LayerLane header shows parallelism count, worktree requirement badge, and layer progress.
+      StepCard displays badges for worktree isolation, file conflict count, review attempts, and blocked state.
+      ConflictPanel shows selected step's file conflicts, shared files, and worktree branch on click.
+    time_estimate: '3h'
+    dependencies:
+      - 02-01
+    acceptance_criteria:
+      - 'Board renders layer swim lanes as rows with status columns'
+      - 'Layer header shows parallelism count, worktree requirement badge, and layer progress'
+      - 'Step cards appear in correct layer row and status column'
+      - 'Cards display badges for worktree, conflict count, review attempts, and blocked state'
+      - 'Clicking a card opens ConflictPanel showing shared files and conflicting steps'
+      - 'Status-based color coding visually distinguishes each column'
+    files:
+      - board/src/components/KanbanBoard.tsx
+      - board/src/components/LayerLane.tsx
+      - board/src/components/StepCard.tsx
+      - board/src/components/ConflictPanel.tsx
+      - board/src/utils/statusColors.ts
+      - board/src/__tests__/KanbanBoard.test.tsx
+      - board/src/__tests__/StepCard.test.tsx
+  - id: 02-03
+    title: 'ProgressHeader and TeamPanel components'
+    description: >
+      Build progress header showing completion ratio, progress bar, current layer, and elapsed time.
+      Build team panel sidebar listing active teammates, their current assignments, and completed counts.
+    time_estimate: '2h'
+    dependencies:
+      - 02-01
+    acceptance_criteria:
+      - 'Progress header displays N/total completed steps and percentage'
+      - 'Progress bar visually fills proportional to completion ratio'
+      - 'Current execution layer number is displayed'
+      - 'Team panel lists each teammate with current step assignment'
+      - 'Team panel shows completed step count per teammate'
+    files:
+      - board/src/components/ProgressHeader.tsx
+      - board/src/components/TeamPanel.tsx
+      - board/src/__tests__/ProgressHeader.test.tsx
+      - board/src/__tests__/TeamPanel.test.tsx
+  - id: 02-04
+    title: 'ActivityFeed and useDeliveryState hook'
+    description: >
+      Build activity feed showing recent state transitions (newest first, max 50 entries) with timestamps.
+      Create WebSocket hook managing connection, reconnection with backoff, and parsed state exposure.
+    time_estimate: '2h'
+    dependencies:
+      - 02-01
+    acceptance_criteria:
+      - 'Activity feed displays transitions with timestamp, step_id, and from/to status'
+      - 'Feed orders entries newest first and limits display to 50 items'
+      - 'Hook exposes state, plan, transitions, connection status, and error'
+      - 'Hook reconnects automatically after WebSocket disconnect'
+      - 'Hook provides initial state from server on connect'
+    files:
+      - board/src/components/ActivityFeed.tsx
+      - board/src/hooks/useDeliveryState.ts
+      - board/src/__tests__/ActivityFeed.test.tsx
+      - board/src/__tests__/useDeliveryState.test.ts
+- id: '03'
+  title: 'Integration and Polish'
+  steps:
+  - id: 03-01
+    title: 'Frontend-backend WebSocket integration'
+    description: >
+      Wire useDeliveryState hook into App, connect all components to live server data,
+      verify end-to-end flow from state.yaml change through to rendered board update.
+    time_estimate: '2h'
+    dependencies:
+      - 01-03
+      - 02-02
+      - 02-03
+      - 02-04
+    acceptance_criteria:
+      - 'Board loads current delivery state on page load'
+      - 'Board updates within 1 second of state.yaml file change'
+      - 'Board displays connection status indicator (connected/disconnected)'
+      - 'Board shows placeholder state when server is unreachable'
+      - 'Board reconnects and resumes updates after server restart'
+    files:
+      - board/src/App.tsx
+      - board/src/hooks/useDeliveryState.ts
+  - id: 03-02
+    title: 'Visual polish: animations, responsive layout, dark theme'
+    description: >
+      Add transition animations for card movement between columns, responsive layout
+      for various screen sizes, and dark theme as default with proper contrast.
+    time_estimate: '2h'
+    dependencies:
+      - 03-01
+    acceptance_criteria:
+      - 'Cards animate smoothly when transitioning between columns'
+      - 'Layout remains usable at viewport widths from 1024px to 1920px'
+      - 'Dark theme renders with sufficient contrast (WCAG AA on text elements)'
+      - 'In-progress cards show subtle pulse or glow animation'
+    files:
+      - board/src/components/KanbanBoard.tsx
+      - board/src/components/StepCard.tsx
+      - board/src/components/ConflictPanel.tsx
+      - board/src/components/ProgressHeader.tsx
+      - board/src/components/TeamPanel.tsx
+      - board/src/components/ActivityFeed.tsx
+      - board/src/App.tsx
+implementation_scope:
+  source_directories:
+    - board/shared/
+    - board/server/
+    - board/src/
+  test_directories:
+    - board/server/__tests__/
+    - board/src/__tests__/
+  excluded_patterns:
+    - node_modules/**
+    - dist/**
+validation:
+  status: approved
+  reviewer: nw-software-crafter-reviewer
+  approved_at: '2026-03-01T01:00:00Z'

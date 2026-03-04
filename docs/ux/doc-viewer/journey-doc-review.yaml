@@ -1,0 +1,269 @@
+journey:
+  name: "Review Feature Documentation"
+  goal: "Read, navigate, and act on project documentation within the board app"
+  persona: "Andres Dandrea -- solo developer monitoring delivery and reviewing documentation"
+
+  emotional_arc:
+    start: "Curious / slightly frustrated -- needs to check something, unsure where it is"
+    middle: "Focused / oriented -- found the doc, reading with rich rendering"
+    end: "Efficient / satisfied -- read the doc, copied path, ready to prompt agent"
+
+steps:
+  - id: 1
+    name: "Trigger -- Board to Docs"
+    action: "Click 'Docs' tab in project navigation"
+    url_pattern: "#/projects/{projectId}/board -> #/projects/{projectId}/docs"
+
+    ui_mockup: |
+      +---------------------------------------------------------------+
+      | < Overview / acme-api                          [Connected]    |
+      +---------------------------------------------------------------+
+      | Board   [Docs]                                                |
+      +---------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: "projectId"
+        source: "URL hash parameter"
+        displayed_as: "${projectId}"
+        consumers:
+          - "Board view URL"
+          - "Doc viewer URL"
+          - "API endpoint for doc tree"
+          - "API endpoint for doc content"
+
+    emotional_state:
+      entry: "Curious -- where was that decision documented?"
+      exit: "Oriented -- I see the Docs link, I know where to go"
+
+    integration_checkpoint: |
+      projectId from board URL carries over to docs URL correctly
+
+    gherkin: |
+      Scenario: Navigate from board to docs
+        Given Andres is viewing the board for project "acme-api"
+        When he clicks the "Docs" tab in the project navigation
+        Then the URL changes to "#/projects/acme-api/docs"
+        And the doc viewer loads with the document tree sidebar
+
+  - id: 2
+    name: "Navigate -- Browse Document Tree"
+    action: "Browse collapsible document tree sidebar"
+    url_pattern: "#/projects/{projectId}/docs"
+
+    ui_mockup: |
+      +-- Doc Tree ----------+  +-- Empty State ---------+
+      |                      |  |                        |
+      | [Search docs...]     |  | Select a document      |
+      |                      |  | from the tree.         |
+      | v ADRs (8)           |  |                        |
+      |   ADR-001-multi...   |  | 8 ADRs                 |
+      |   ADR-002-projec...  |  | 3 Features             |
+      |                      |  | 23 documents total     |
+      | v Features           |  |                        |
+      |   v card-redesign    |  |                        |
+      |     v discuss (7)    |  |                        |
+      |     > design  (3)    |  |                        |
+      |     > distill (5)    |  |                        |
+      |   > kanban-board     |  |                        |
+      |   > multi-project    |  |                        |
+      +----------------------+  +------------------------+
+
+    shared_artifacts:
+      - name: "docTree"
+        source: "GET /api/projects/{projectId}/docs/tree"
+        displayed_as: "Collapsible folder tree"
+        consumers:
+          - "Sidebar navigation"
+          - "Document count summary"
+      - name: "docCount"
+        source: "Derived from docTree"
+        displayed_as: "Category counts in parentheses"
+        consumers:
+          - "Empty state summary"
+          - "Folder labels"
+
+    emotional_state:
+      entry: "Oriented -- doc viewer loaded"
+      exit: "Exploring -- I can see the full structure"
+
+    integration_checkpoint: |
+      docTree reflects actual filesystem structure in the project's configured documentation root
+
+    gherkin: |
+      Scenario: Document tree shows project documentation structure
+        Given Andres has navigated to docs for project "acme-api"
+        And the project has 8 ADRs and 3 feature folders with documentation
+        When the doc viewer loads
+        Then the sidebar shows a collapsible tree with "ADRs (8)" and "Features"
+        And each feature folder shows sub-folders by wave (discuss, design, distill)
+        And the content panel shows an empty state with document counts
+
+  - id: 3
+    name: "Locate -- Find the Document"
+    action: "Click a document in the tree or use search"
+    url_pattern: "#/projects/{projectId}/docs?path={docPath}"
+
+    ui_mockup: |
+      +-- Doc Tree ----------+  +-- Document Content ----+
+      |                      |  |                        |
+      | [Search docs...]     |  | docs/adrs/ADR-001  [cp]|
+      |                      |  |                        |
+      | v ADRs (8)           |  | # ADR-001: Multi-Proj..|
+      |  *ADR-001-multi...*  |  |                        |
+      |   ADR-002-projec...  |  | ## Status              |
+      |   ...                |  | Proposed               |
+      |                      |  |                        |
+      | v Features           |  | ## Context             |
+      |   ...                |  | The board currently... |
+      +----------------------+  +------------------------+
+
+    shared_artifacts:
+      - name: "selectedDocPath"
+        source: "URL query parameter or tree click event"
+        displayed_as: "File path above rendered content"
+        consumers:
+          - "Content panel header"
+          - "Copy button"
+          - "Browser URL (query param)"
+      - name: "docContent"
+        source: "GET /api/projects/{projectId}/docs/content?path={docPath}"
+        displayed_as: "Rendered markdown in content panel"
+        consumers:
+          - "Content panel body"
+      - name: "docTitle"
+        source: "First # heading in markdown content, fallback to filename"
+        displayed_as: "Browser tab title / content panel header"
+        consumers:
+          - "Content panel"
+          - "Search results"
+
+    emotional_state:
+      entry: "Searching -- scanning tree or typing search query"
+      exit: "Focused -- found the document, reading content"
+
+    integration_checkpoint: |
+      selectedDocPath in URL matches the file actually served by the API.
+      docContent is raw markdown from filesystem, not cached stale content.
+
+    gherkin: |
+      Scenario: Select a document from the tree
+        Given Andres is browsing the doc tree for project "acme-api"
+        When he clicks "ADR-001-multi-project-state-management" in the ADRs folder
+        Then the content panel renders the ADR with proper markdown formatting
+        And the file path "docs/adrs/ADR-001-multi-project-state-management.md" is shown above the content
+        And a copy button appears next to the file path
+
+      Scenario: Search for a document by keyword
+        Given Andres is in the doc viewer for project "acme-api"
+        When he types "state management" in the search field
+        Then the tree filters to show only documents matching the query
+        And "ADR-001-multi-project-state-management" is visible in the results
+
+  - id: 4
+    name: "Read -- Consume with Rich Rendering"
+    action: "Read the document with full markdown rendering"
+
+    ui_mockup: |
+      +-- Document Content (rendered) ---------------------+
+      |                                                    |
+      | docs/adrs/ADR-001-multi-project-state-mgmt.md [cp] |
+      |                                                    |
+      | # ADR-001: Multi-Project State Management          |
+      |                                                    |
+      | ## Status                                          |
+      | Proposed                                           |
+      |                                                    |
+      | ## Context                                         |
+      | The board currently holds a single `currentState`  |
+      | and `plan` in the server process. To support       |
+      | multiple concurrent projects (max 5), the server   |
+      | needs to manage per-project state.                 |
+      |                                                    |
+      | ## Decision                                        |
+      | Use an in-memory `Map<ProjectId, ProjectEntry>`    |
+      | managed by a `ProjectRegistry` module.             |
+      |                                                    |
+      | +-- Code Block (TypeScript) ------------------+    |
+      | | interface ProjectEntry {                    |    |
+      | |   state: DeliveryState;                     |    |
+      | |   plan: ExecutionPlan;                      |    |
+      | |   watcher: FileWatcher;                     |    |
+      | | }                                           |    |
+      | +---------------------------------------------+    |
+      |                                                    |
+      | ## Alternatives Considered                         |
+      | ### Alternative 1: SQLite/LevelDB                  |
+      | - **What**: Store project state in a local db...   |
+      | - **Why rejected**: Max 5 projects with state...   |
+      +----------------------------------------------------+
+
+    shared_artifacts:
+      - name: "renderedContent"
+        source: "Client-side markdown rendering of docContent"
+        displayed_as: "Formatted HTML with syntax highlighting"
+        consumers:
+          - "Content panel"
+
+    emotional_state:
+      entry: "Focused -- reading the document"
+      exit: "Informed -- understood the content, ready to act"
+
+    gherkin: |
+      Scenario: Rich markdown rendering
+        Given Andres is viewing "ADR-001-multi-project-state-management.md"
+        Then headings are rendered with proper hierarchy (h1 through h6)
+        And inline code like `currentState` is rendered with monospace background
+        And code blocks show syntax highlighting
+        And tables are rendered with borders and alignment
+        And the content is scrollable when it exceeds viewport height
+
+  - id: 5
+    name: "Act -- Copy Path for AI Agent"
+    action: "Click copy button to copy file path to clipboard"
+
+    ui_mockup: |
+      Before click:
+        docs/adrs/ADR-001-multi-project-state-mgmt.md [cp]
+
+      After click:
+        docs/adrs/ADR-001-multi-project-state-mgmt.md [Copied!]
+
+      After 2 seconds:
+        docs/adrs/ADR-001-multi-project-state-mgmt.md [cp]
+
+    shared_artifacts:
+      - name: "copiedPath"
+        source: "Same as selectedDocPath"
+        displayed_as: "Clipboard content (not visible)"
+        consumers:
+          - "User's AI agent prompt (external)"
+
+    emotional_state:
+      entry: "Informed -- done reading, ready to act"
+      exit: "Efficient / satisfied -- path copied, ready to prompt agent"
+
+    integration_checkpoint: |
+      copiedPath is a valid relative path from project root that resolves
+      when used with file reading tools (cat, Read, etc.)
+
+    gherkin: |
+      Scenario: Copy file path to clipboard
+        Given Andres is viewing "ADR-001-multi-project-state-management.md"
+        When he clicks the copy button next to the file path
+        Then "docs/adrs/ADR-001-multi-project-state-management.md" is copied to clipboard
+        And the button label changes to "Copied!" for 2 seconds
+        And then reverts to the copy icon
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "projectId"
+      must_match_across: [1, 2, 3]
+      failure_message: "Project ID mismatch between board URL and doc viewer URL"
+
+    - artifact: "selectedDocPath"
+      must_match_across: [3, 5]
+      failure_message: "File path shown in UI does not match path copied to clipboard"
+
+    - artifact: "docTree"
+      must_match_across: [2, 3]
+      failure_message: "Document tree structure does not reflect actual filesystem"

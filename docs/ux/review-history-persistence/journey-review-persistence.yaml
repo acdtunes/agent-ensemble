@@ -1,0 +1,121 @@
+journey:
+  name: "Review History Persistence"
+  goal: "Persist reviewer feedback into roadmap.yaml so the board UI can display full review history"
+  persona: "Andres, project owner running parallel agent team delivery"
+
+  emotional_arc:
+    start: "Frustrated -- reviewer feedback is ephemeral, lost when conversations end"
+    middle: "Focused -- CLI captures structured review data on each review event"
+    end: "Confident -- complete audit trail visible in board UI"
+
+steps:
+  - id: 1
+    name: "Reviewer sends verdict"
+    command: "(existing -- reviewer messages Lead with APPROVED/NEEDS_REVISION + feedback text)"
+    status: existing
+    emotional_state:
+      entry: "Neutral -- waiting for reviewer"
+      exit: "Informed -- verdict received"
+    shared_artifacts: []
+    integration_checkpoint: |
+      Reviewer message contains parseable outcome and feedback text.
+
+  - id: 2
+    name: "Lead calls complete-step with review data (approval)"
+    command: |
+      python -m nw_teams.cli.team_state complete-step \
+        --state .nw-teams/state.yaml \
+        --roadmap docs/feature/{project-id}/roadmap.yaml \
+        --step {step_id} \
+        --outcome approved \
+        --feedback "{feedback_text}"
+    status: gap
+    emotional_state:
+      entry: "Focused -- capturing review data"
+      exit: "Confident -- data persisted"
+    shared_artifacts:
+      - name: "outcome"
+        source: "reviewer message"
+        displayed_as: "${outcome}"
+        consumers:
+          - "team_state.py --outcome flag"
+          - "roadmap.yaml review_history[].outcome"
+          - "parser.ts validateReviewHistory"
+          - "StepDetailModal outcome label"
+      - name: "feedback"
+        source: "reviewer message"
+        displayed_as: "${feedback}"
+        consumers:
+          - "team_state.py --feedback flag"
+          - "roadmap.yaml review_history[].feedback"
+          - "parser.ts validateReviewHistory"
+          - "StepDetailModal feedback text"
+    integration_checkpoint: |
+      CLI accepts --outcome and --feedback flags.
+      YAML file updated with review_history entry.
+
+  - id: 3
+    name: "Lead calls transition with review data (rejection)"
+    command: |
+      python -m nw_teams.cli.team_state transition \
+        --state .nw-teams/state.yaml \
+        --roadmap docs/feature/{project-id}/roadmap.yaml \
+        --step {step_id} \
+        --status in_progress \
+        --outcome rejected \
+        --feedback "{feedback_text}"
+    status: gap
+    emotional_state:
+      entry: "Focused -- recording rejection feedback"
+      exit: "Relieved -- rejection reason captured for reference"
+    shared_artifacts:
+      - name: "cycle_number"
+        source: "review_attempts counter (current value at write time)"
+        displayed_as: "${cycle}"
+        consumers:
+          - "roadmap.yaml review_history[].cycle"
+          - "StepDetailModal cycle label"
+    integration_checkpoint: |
+      Cycle number derived from review_attempts at time of recording.
+      Rejection feedback preserved for future reference.
+
+  - id: 4
+    name: "Board UI renders review history"
+    command: "(existing -- StepDetailModal reads review_history from parsed roadmap)"
+    status: existing
+    emotional_state:
+      entry: "Curious -- opening step detail"
+      exit: "Confident -- full review audit trail visible"
+    shared_artifacts: []
+    integration_checkpoint: |
+      review_history entries written by team_state.py pass parser.ts validation.
+      StepDetailModal renders entries newest-first.
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: "outcome"
+      must_match_across: [2, 3, 4]
+      failure_message: "Outcome values written by CLI must match parser.ts REVIEW_OUTCOMES set ('approved', 'rejected')"
+    - artifact: "feedback"
+      must_match_across: [2, 3, 4]
+      failure_message: "Feedback text written to YAML must be valid string parseable by parser.ts"
+    - artifact: "cycle_number"
+      must_match_across: [3, 4]
+      failure_message: "Cycle number must be positive integer matching review_attempts at time of recording"
+
+error_paths:
+  - trigger: "Lead omits --outcome and --feedback flags"
+    behavior: "Backward-compatible -- no review_history entry written, only review_attempts incremented"
+    recovery: "No action needed, existing behavior preserved"
+
+  - trigger: "Lead provides invalid --outcome value"
+    behavior: "CLI prints error and exits with code 2"
+    recovery: "Lead retries with valid outcome (approved or rejected)"
+
+  - trigger: "Lead omits --feedback but provides --outcome"
+    behavior: "CLI records review_history entry with empty string for feedback"
+    recovery: "No action needed, empty feedback is valid"
+
+  - trigger: "YAML file has no existing review_history field"
+    behavior: "CLI creates the review_history list with first entry"
+    recovery: "Automatic -- new field added on first review"

@@ -1,0 +1,194 @@
+roadmap:
+  project_id: unified-roadmap-state
+  created_at: '2026-03-03T00:00:00Z'
+  total_steps: 10
+  phases: 4
+phases:
+- id: '01'
+  name: Unified types and parser
+  description: >
+    Add Roadmap types and parser. Pure additive -- no existing code modified yet.
+  steps:
+  - id: 01-01
+    name: Add Roadmap domain types to shared/types.ts
+    description: >
+      Add RoadmapStep, RoadmapPhase, RoadmapMeta, Roadmap, and RoadmapSummary types.
+      RoadmapStep embeds both plan fields and execution-state fields with defaults.
+    criteria:
+      - RoadmapStep has step_id, name, status (default pending), files_to_modify, dependencies, criteria, teammate_id, started_at, completed_at, review_attempts
+      - RoadmapPhase has phase_id, name, steps array
+      - Roadmap has roadmap metadata and phases array
+      - RoadmapSummary has total_steps, total_phases, completed, failed, in_progress, pending
+      - All fields use readonly modifier
+    dependencies: []
+    files_to_modify:
+      - board/shared/types.ts
+
+  - id: 01-02
+    name: Create parseRoadmap parser with dual-format support
+    description: >
+      Pure parser: YAML string -> Result<Roadmap, ParseError>. Normalizes id/step_id
+      and id/phase_id dual formats. Applies defaults for absent status fields.
+    criteria:
+      - Parses roadmap.yaml with phases[].steps[] structure into Roadmap type
+      - Normalizes step.id to step_id and phase.id to phase_id
+      - Missing status defaults to 'pending'
+      - Missing teammate_id/started_at/completed_at default to null, review_attempts to 0
+      - Invalid YAML returns ParseError with type 'invalid_yaml'
+      - Missing phases array returns ParseError with type 'invalid_schema'
+    dependencies:
+      - 01-01
+    files_to_modify:
+      - board/server/parser.ts
+
+  - id: 01-03
+    name: Add computeRoadmapSummary and bridge functions
+    description: >
+      Pure functions: Roadmap -> RoadmapSummary (count statuses), Roadmap -> ExecutionPlan,
+      Roadmap -> DeliveryState. Bridge functions enable incremental consumer migration.
+    criteria:
+      - computeRoadmapSummary counts step statuses across all phases
+      - Pending count includes steps with no status field
+      - roadmapToExecutionPlan maps phases to layers and strips execution fields
+      - roadmapToDeliveryState maps steps to StepState records with summary
+      - All functions are pure with no side effects
+    dependencies:
+      - 01-02
+    files_to_modify:
+      - board/server/parser.ts
+
+- id: '02'
+  name: Unified server endpoint and feature discovery
+  description: >
+    Add /roadmap endpoint, update feature discovery to read only roadmap.yaml.
+  steps:
+  - id: 02-01
+    name: Add GET /features/:fid/roadmap endpoint
+    description: >
+      New endpoint reads roadmap.yaml, parses with parseRoadmap, returns Roadmap with
+      computed summary. Coexists with existing plan/state endpoints during migration.
+    criteria:
+      - GET /projects/:id/features/:fid/roadmap returns parsed Roadmap with summary
+      - Returns 404 when roadmap.yaml not found
+      - Returns 422 when roadmap.yaml is malformed
+      - Summary is computed from step statuses, not stored
+      - Existing plan and state endpoints continue working unchanged
+    dependencies:
+      - 01-03
+    files_to_modify:
+      - board/server/index.ts
+
+  - id: 02-02
+    name: Simplify feature discovery to roadmap-only
+    description: >
+      Feature discovery reads only roadmap.yaml per feature. Derives FeatureSummary
+      from Roadmap instead of joining ExecutionPlan + DeliveryState.
+    criteria:
+      - Feature discovery reads roadmap.yaml only (not execution-log.yaml)
+      - FeatureSummary derived from Roadmap via computeRoadmapSummary
+      - Features with no roadmap.yaml are still discovered with zero counts
+      - hasExecutionLog reflects whether any step has non-pending status
+      - Feature list endpoint returns same FeatureSummary shape
+    dependencies:
+      - 01-03
+    files_to_modify:
+      - board/server/feature-discovery.ts
+
+- id: '03'
+  name: CLI unification and watcher changes
+  description: >
+    CLI writes directly to roadmap.yaml. Watcher monitors roadmap.yaml instead of state.yaml.
+  steps:
+  - id: 03-01
+    name: Rewrite team_state.py to read/write roadmap.yaml
+    description: >
+      Update command reads roadmap.yaml, finds step across phases, updates status fields,
+      writes back preserving YAML structure. Remove init command. Use ruamel.yaml for
+      round-trip preservation.
+    criteria:
+      - update command reads roadmap.yaml and writes status to the step in-place
+      - Step found by searching across all phases (not flat dict lookup)
+      - show command reads roadmap.yaml and computes summary from step statuses
+      - check command reads roadmap.yaml and checks phase completion
+      - init command removed
+      - YAML comments and formatting preserved on write
+    dependencies:
+      - 01-01
+    files_to_modify:
+      - src/nw_teams/cli/team_state.py
+
+  - id: 03-02
+    name: Update registry to watch roadmap.yaml per feature
+    description: >
+      Registry watches roadmap.yaml instead of state.yaml. On change, re-parses with
+      parseRoadmap, computes transitions via differ, notifies WebSocket subscribers.
+    criteria:
+      - Registry loads and watches roadmap.yaml per feature
+      - File change triggers re-parse and transition computation
+      - Transitions computed by comparing step statuses between old and new Roadmap
+      - WebSocket subscribers notified of roadmap changes
+      - Project discovery checks for roadmap.yaml presence instead of state.yaml
+    dependencies:
+      - 02-01
+      - 02-02
+    files_to_modify:
+      - board/server/registry.ts
+      - board/server/discovery.ts
+      - board/server/multi-project-server.ts
+
+- id: '04'
+  name: Frontend migration and cleanup
+  description: >
+    Switch frontend hooks to unified endpoint. Remove deprecated types, parsers, endpoints.
+  steps:
+  - id: 04-01
+    name: Switch useFeatureState to unified /roadmap endpoint
+    description: >
+      Hook fetches single /roadmap endpoint instead of /plan + /state. Uses bridge
+      functions or consumes Roadmap directly. KanbanBoard adapts to new data shape.
+    criteria:
+      - useFeatureState fetches single /roadmap endpoint
+      - Hook returns Roadmap and computed summary
+      - KanbanBoard renders phases as layer lanes with step statuses
+      - Loading and error states handled as before
+      - No double-fetch of plan + state
+    dependencies:
+      - 02-01
+    files_to_modify:
+      - board/src/hooks/useFeatureState.ts
+      - board/src/components/KanbanBoard.tsx
+
+  - id: 04-02
+    name: Remove deprecated types, parsers, and endpoints
+    description: >
+      Remove ExecutionPlan, DeliveryState, StepState, TeammateState types. Remove
+      parseStateYaml, parsePlanYaml, parseFeatureExecutionLog. Remove plan/state endpoints.
+      Remove parallel_groups plan subcommand.
+    criteria:
+      - ExecutionPlan, DeliveryState, StepState, TeammateState types removed
+      - parseStateYaml, parsePlanYaml, parseFeatureExecutionLog removed
+      - GET /features/:fid/plan and /state endpoints removed
+      - parallel_groups plan subcommand removed (analyze kept)
+      - No remaining imports of removed types or functions
+    dependencies:
+      - 03-02
+      - 04-01
+    files_to_modify:
+      - board/shared/types.ts
+      - board/server/parser.ts
+      - board/server/index.ts
+      - src/nw_teams/cli/parallel_groups.py
+implementation_scope:
+  source_directories:
+    - board/shared/
+    - board/server/
+    - board/src/hooks/
+    - board/src/components/
+    - src/nw_teams/cli/
+  test_directories:
+    - board/server/__tests__/
+    - board/src/__tests__/
+    - tests/
+  excluded_patterns:
+    - node_modules/**
+    - dist/**
