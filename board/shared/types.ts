@@ -64,6 +64,8 @@ export interface RoadmapMeta {
   readonly status?: string;
   readonly reviewer?: string;
   readonly approved_at?: string;
+  readonly short_description?: string;
+  readonly description?: string;
 }
 
 export interface Roadmap {
