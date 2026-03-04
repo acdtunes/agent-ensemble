@@ -20,6 +20,9 @@ import type {
   BrowseEntry,
   BrowseError,
   MultiRootDocTree,
+  ArchiveError,
+  RestoreError,
+  ArchivedFeature,
 } from '../shared/types.js';
 import { createProjectId, createFeatureId, computeRoadmapSummary } from '../shared/types.js';
 import { validateDocPath } from './doc-content.js';
@@ -330,6 +333,12 @@ export interface BrowseHttpDeps {
   readonly defaultPath: () => string;
 }
 
+export interface ArchiveHttpDeps {
+  readonly archiveFeature?: (projectId: ProjectId, featureId: FeatureId) => Promise<Result<void, ArchiveError>>;
+  readonly restoreFeature?: (projectId: ProjectId, featureId: FeatureId) => Promise<Result<void, RestoreError>>;
+  readonly listArchivedFeatures?: (projectId: ProjectId) => Promise<readonly ArchivedFeature[]>;
+}
+
 export interface MultiProjectHttpDeps {
   readonly listProjectSummaries: () => readonly ProjectSummary[];
   readonly getProject: (projectId: ProjectId) => Result<ProjectEntry, unknown>;
@@ -339,6 +348,7 @@ export interface MultiProjectHttpDeps {
   readonly removeProject?: (projectId: ProjectId) => Promise<Result<void, RemoveProjectError>>;
   readonly discoverFeatures?: (projectId: ProjectId) => Promise<readonly FeatureSummary[]>;
   readonly featureArtifacts?: FeatureArtifactDeps;
+  readonly archive?: ArchiveHttpDeps;
 }
 
 // --- Shared doc response helpers (reduce duplication across project/feature endpoints) ---
@@ -530,6 +540,118 @@ export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.A
         summary,
       });
     });
+  }
+
+  // --- Archive endpoints (registered when archive deps are provided) ---
+
+  if (deps.archive) {
+    const { archiveFeature, restoreFeature, listArchivedFeatures } = deps.archive;
+
+    // POST /api/projects/:id/features/:featureId/archive - Archive a feature
+    if (archiveFeature) {
+      app.post('/api/projects/:id/features/:featureId/archive', async (req, res) => {
+        const idResult = createProjectId(req.params.id);
+        if (!idResult.ok) {
+          res.status(400).json({ error: idResult.error });
+          return;
+        }
+
+        const featureIdResult = createFeatureId(req.params.featureId);
+        if (!featureIdResult.ok) {
+          res.status(400).json({ error: featureIdResult.error });
+          return;
+        }
+
+        const projectResult = deps.getProject(idResult.value);
+        if (!projectResult.ok) {
+          res.status(404).json({ error: `Project not found: ${idResult.value}` });
+          return;
+        }
+
+        const archiveResult = await archiveFeature(idResult.value, featureIdResult.value);
+        if (!archiveResult.ok) {
+          switch (archiveResult.error.type) {
+            case 'feature_not_found':
+              res.status(404).json({ error: `Feature not found: ${archiveResult.error.featureId}` });
+              return;
+            case 'already_archived':
+              res.status(409).json({ error: `Feature already archived: ${archiveResult.error.featureId}` });
+              return;
+            case 'invalid_feature_id':
+              res.status(400).json({ error: archiveResult.error.message });
+              return;
+            case 'io_error':
+              res.status(500).json({ error: archiveResult.error.message });
+              return;
+          }
+        }
+
+        res.sendStatus(204);
+      });
+    }
+
+    // GET /api/projects/:id/archive - List archived features
+    if (listArchivedFeatures) {
+      app.get('/api/projects/:id/archive', async (req, res) => {
+        const idResult = createProjectId(req.params.id);
+        if (!idResult.ok) {
+          res.status(400).json({ error: idResult.error });
+          return;
+        }
+
+        const projectResult = deps.getProject(idResult.value);
+        if (!projectResult.ok) {
+          res.status(404).json({ error: `Project not found: ${idResult.value}` });
+          return;
+        }
+
+        const archivedFeatures = await listArchivedFeatures(idResult.value);
+        res.json({ archivedFeatures });
+      });
+    }
+
+    // POST /api/projects/:id/archive/:featureId/restore - Restore archived feature
+    if (restoreFeature) {
+      app.post('/api/projects/:id/archive/:featureId/restore', async (req, res) => {
+        const idResult = createProjectId(req.params.id);
+        if (!idResult.ok) {
+          res.status(400).json({ error: idResult.error });
+          return;
+        }
+
+        const featureIdResult = createFeatureId(req.params.featureId);
+        if (!featureIdResult.ok) {
+          res.status(400).json({ error: featureIdResult.error });
+          return;
+        }
+
+        const projectResult = deps.getProject(idResult.value);
+        if (!projectResult.ok) {
+          res.status(404).json({ error: `Project not found: ${idResult.value}` });
+          return;
+        }
+
+        const restoreResult = await restoreFeature(idResult.value, featureIdResult.value);
+        if (!restoreResult.ok) {
+          switch (restoreResult.error.type) {
+            case 'feature_not_found':
+              res.status(404).json({ error: `Feature not found in archive: ${restoreResult.error.featureId}` });
+              return;
+            case 'already_exists':
+              res.status(409).json({ error: `Feature already exists: ${restoreResult.error.featureId}` });
+              return;
+            case 'invalid_feature_id':
+              res.status(400).json({ error: restoreResult.error.message });
+              return;
+            case 'io_error':
+              res.status(500).json({ error: restoreResult.error.message });
+              return;
+          }
+        }
+
+        res.sendStatus(204);
+      });
+    }
   }
 
   // --- Directory browser endpoint (registered when browse deps are provided) ---
