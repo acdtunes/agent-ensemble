@@ -12,6 +12,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Node.js 20 for dashboard
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install pipx
 RUN pip install pipx && pipx ensurepath
 ENV PATH="/root/.local/bin:$PATH"
@@ -35,8 +40,8 @@ RUN git clone --branch ${BRANCH} ${REPO_URL} agent-ensemble
 WORKDIR /home/testuser/agent-ensemble
 RUN ./install.sh
 
-# Verify installation
-RUN echo "=== Verification ===" && \
+# Verify CLI installation
+RUN echo "=== CLI Verification ===" && \
     echo "1. Checking commands directory..." && \
     ls -la ~/.claude/commands/ensemble/ && \
     echo "" && \
@@ -52,7 +57,24 @@ RUN echo "=== Verification ===" && \
     echo "5. Checking nWave installation..." && \
     ls ~/.claude/agents/nw-*.md 2>/dev/null | head -5 || echo "nWave agents found" && \
     echo "" && \
-    echo "=== All checks passed ==="
+    echo "=== CLI checks passed ==="
+
+# Build and test the dashboard
+RUN echo "=== Dashboard Build ===" && \
+    cd board && \
+    npm install && \
+    npm run build && \
+    echo "" && \
+    echo "Checking build output..." && \
+    ls -la dist/ && \
+    echo "" && \
+    echo "=== Dashboard build passed ==="
+
+# Run dashboard tests
+RUN echo "=== Dashboard Tests ===" && \
+    cd board && \
+    npm test && \
+    echo "=== Dashboard tests passed ==="
 
 # Default command shows what was installed
-CMD ["bash", "-c", "echo 'Installation test successful!' && cat ~/.claude/ensemble-manifest.txt"]
+CMD ["bash", "-c", "echo 'All tests passed!' && echo '' && echo 'CLI:' && cat ~/.claude/ensemble-manifest.txt && echo '' && echo 'Dashboard: dist/ built successfully'"]
