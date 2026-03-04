@@ -33,10 +33,9 @@ const MODAL_MODULE_PATH = ['..', '..', '..', '..', 'components', 'StepDetailModa
 
 // =================================================================
 // Walking Skeleton 1: Andres identifies a task at a glance
-// and sees who is working on it
 // =================================================================
-describe('Walking Skeleton: Andres identifies a task and sees the assigned teammate', () => {
-  it('card shows step name as title, file count as subtitle, step ID, and teammate', () => {
+describe('Walking Skeleton: Andres identifies a task at a glance', () => {
+  it('card shows step name as title, file count as subtitle, and step ID', () => {
     // Given a delivery with step "01-02 Setup API routes" in progress
     // assigned to "crafter-02", modifying 1 file
     const card = createStepCardData({
@@ -59,10 +58,8 @@ describe('Walking Skeleton: Andres identifies a task and sees the assigned teamm
     const stepId = screen.getByText('01-02');
     expect(stepId).toBeInTheDocument();
     expect(stepId.className).toMatch(/font-mono/);
-    // And the card shows teammate "crafter-02" with a colored label
-    const teammate = screen.getByText(/crafter-02/);
-    expect(teammate).toBeInTheDocument();
-    expect(teammate.className).toMatch(/text-(?!gray)/);
+    // Note: teammate display removed per remove-teammates-section feature
+    expect(screen.queryByText(/crafter-02/)).not.toBeInTheDocument();
   });
 });
 
@@ -113,8 +110,8 @@ describe('Walking Skeleton: Andres clicks a card and reads full step context', (
     expect(screen.getByText('src/schema.ts')).toBeInTheDocument();
     // And the dependency "Setup database"
     expect(screen.getByText(/Setup database/)).toBeInTheDocument();
-    // And the teammate
-    expect(screen.getByText(/crafter-02/)).toBeInTheDocument();
+    // Note: teammate display removed per remove-teammates-section feature
+    expect(screen.queryByText(/crafter-02/)).not.toBeInTheDocument();
 
     // And Andres can close the modal
     const closeButton = screen.getByRole('button', { name: /close/i });

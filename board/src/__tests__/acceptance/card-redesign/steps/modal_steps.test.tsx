@@ -124,7 +124,7 @@ describe('US-02: Modal shows status and teammate appropriately', () => {
     expect(screen.queryByText(/crafter-01/)).not.toBeInTheDocument();
   });
 
-  it('in-progress step shows both status and teammate', async () => {
+  it('in-progress step shows status but not teammate (per remove-teammates-section)', async () => {
     // Given step is in progress with teammate
     const step = createRoadmapStep({
       id: '01-02',
@@ -137,9 +137,10 @@ describe('US-02: Modal shows status and teammate appropriately', () => {
 
     await renderModal({ step });
 
-    // Then both status and teammate are shown
+    // Then status is shown
     expect(screen.getByText(/In Progress/i)).toBeInTheDocument();
-    expect(screen.getByText(/crafter-02/)).toBeInTheDocument();
+    // But teammate is not shown (per remove-teammates-section feature)
+    expect(screen.queryByText(/crafter-02/)).not.toBeInTheDocument();
   });
 });
 

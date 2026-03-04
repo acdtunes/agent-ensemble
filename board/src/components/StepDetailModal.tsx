@@ -3,8 +3,6 @@ import { createPortal } from 'react-dom';
 import type { RoadmapStep, ReviewEntry } from '../../shared/types';
 import { mapStatusToDisplayColumn } from '../utils/statusMapping';
 import { getStatusLabel, getStatusColor } from '../utils/statusColors';
-import { getTeammateColor } from '../utils/teammateColors';
-import { getTeammateEmoji } from '../utils/teammateEmoji';
 
 // --- Formatting helpers ---
 
@@ -96,11 +94,6 @@ export const StepDetailModal = ({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-3">
-              {step.teammate_id !== null && displayColumn !== 'done' && (
-                <span className={`text-sm font-medium ${getTeammateColor(step.teammate_id)}`}>
-                  {getTeammateEmoji(step.teammate_id)} {step.teammate_id}
-                </span>
-              )}
               <button
                 type="button"
                 aria-label="Close"
