@@ -145,7 +145,6 @@ def test_transition_records_rejection_with_feedback(tmp_path):
 # --- Happy Path: Approval with feedback via complete-step ---
 
 
-@pytest.mark.skip(reason="Enable after walking skeleton passes")
 def test_complete_step_records_approval_with_feedback(tmp_path):
     """Reviewer approves step and approval feedback is persisted.
 
@@ -185,7 +184,6 @@ def test_complete_step_records_approval_with_feedback(tmp_path):
 # --- Happy Path: Multiple review cycles accumulate ---
 
 
-@pytest.mark.skip(reason="Enable after walking skeleton passes")
 def test_multiple_review_cycles_accumulate_in_history(tmp_path):
     """Multiple review cycles are accumulated in review_history.
 
@@ -258,7 +256,6 @@ def test_transition_without_outcome_preserves_existing_behavior(tmp_path):
 # --- Backward Compatibility: complete-step without outcome flag ---
 
 
-@pytest.mark.skip(reason="Enable after walking skeleton passes")
 def test_complete_step_without_outcome_preserves_existing_behavior(tmp_path):
     """Complete-step without --outcome flag works as before (no review_history created).
 
@@ -323,7 +320,6 @@ def test_invalid_outcome_value_rejected(tmp_path, capsys):
 # --- Edge Case: Outcome without feedback records empty string ---
 
 
-@pytest.mark.skip(reason="Enable after walking skeleton passes")
 def test_outcome_without_feedback_records_empty_string(tmp_path):
     """Outcome provided without --feedback records empty feedback string.
 

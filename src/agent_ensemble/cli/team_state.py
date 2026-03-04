@@ -434,20 +434,30 @@ def cmd_transition(args: list[str]) -> int:
 def cmd_complete_step(args: list[str]) -> int:
     """Complete a step: set approved, merge worktree if used.
 
+    Optional flags:
+        --outcome approved|rejected - Review outcome to record in review_history
+        --feedback STRING - Reviewer feedback text
+
     Output:
         COMPLETED {step_id}
         COMPLETED {step_id} MERGE_OK
         COMPLETED {step_id} MERGE_CONFLICT (exit 1)
     """
-    parsed, roadmap_path, error_arg = _parse_args(args, ["step"])
+    parsed, roadmap_path, error_arg = _parse_args(args, ["step", "outcome", "feedback"])
     if error_arg:
         print(f"Unknown argument: {error_arg}", file=sys.stderr)
         return 2
 
     step_id = parsed["step"]
+    outcome = parsed["outcome"]
+    feedback = parsed["feedback"]
 
     if not roadmap_path or not step_id:
         print("Error: ROADMAP_PATH and --step required", file=sys.stderr)
+        return 2
+
+    if outcome is not None and outcome not in {"approved", "rejected"}:
+        print(f"Error: invalid outcome '{outcome}'. Valid: approved, rejected", file=sys.stderr)
         return 2
 
     roadmap_file = _validate_roadmap_file(roadmap_path)
@@ -470,6 +480,19 @@ def cmd_complete_step(args: list[str]) -> int:
     now = datetime.now(timezone.utc).isoformat()
     step["status"] = "approved"
     step["completed_at"] = now
+
+    # Record review history entry before worktree merge (if outcome provided)
+    if outcome is not None:
+        review_entry = {
+            "cycle": step.get("review_attempts", 1),
+            "timestamp": now,
+            "outcome": outcome,
+            "feedback": feedback if feedback is not None else "",
+        }
+        if "review_history" not in step:
+            step["review_history"] = []
+        step["review_history"].append(review_entry)
+
     _save_roadmap(yaml_inst, data, roadmap_file)
 
     # Handle worktree merge if applicable
