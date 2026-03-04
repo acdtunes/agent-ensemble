@@ -15,6 +15,8 @@ import { describe, it, expect } from 'vitest';
 import {
   createRoadmapMeta,
   createRoadmapYamlWithDescriptions,
+  createRoadmapWithDescriptions,
+  createLegacyRoadmap,
   LEGACY_ROADMAP_YAML,
   type RoadmapMetaWithDescription,
   type FeatureSummaryWithDescription,
@@ -219,28 +221,68 @@ describe('US-01 Scenario: FeatureSummary type includes description fields', () =
   });
 });
 
-// @skip - deriveFeatureSummary not yet updated
-describe.skip('US-01 Scenario: FeatureSummary carries description', () => {
-  it('Given RoadmapMeta with description, When deriveFeatureSummary, Then description present', () => {
-    // Given RoadmapMeta has description
-    const meta = createRoadmapMeta({ description: 'Detailed explanation' });
+// Active - step 01-04: deriveFeatureSummary maps descriptions
+describe('US-01 Scenario: FeatureSummary carries descriptions from deriveFeatureSummary', () => {
+  it('Given Roadmap with short_description, When deriveFeatureSummary, Then shortDescription present', async () => {
+    // Given Roadmap has short_description
+    const roadmap = createRoadmapWithDescriptions('Brief summary', undefined);
 
     // When deriveFeatureSummary is called
-    const summary = mockDeriveFeatureSummary('auth-system', meta);
+    const { deriveFeatureSummary } = await import('../../../../../server/feature-discovery');
+    const summary = deriveFeatureSummary('auth-system' as FeatureId, roadmap);
+
+    // Then FeatureSummary has shortDescription
+    expect(summary.shortDescription).toBe('Brief summary');
+  });
+
+  it('Given Roadmap with description, When deriveFeatureSummary, Then description present', async () => {
+    // Given Roadmap has description
+    const roadmap = createRoadmapWithDescriptions(undefined, 'Detailed explanation');
+
+    // When deriveFeatureSummary is called
+    const { deriveFeatureSummary } = await import('../../../../../server/feature-discovery');
+    const summary = deriveFeatureSummary('auth-system' as FeatureId, roadmap);
 
     // Then FeatureSummary has description
     expect(summary.description).toBe('Detailed explanation');
   });
-});
 
-// @skip - deriveFeatureSummary not yet updated
-describe.skip('US-03 Scenario: FeatureSummary handles missing descriptions', () => {
-  it('Given RoadmapMeta without descriptions, When deriveFeatureSummary, Then both undefined', () => {
-    // Given RoadmapMeta has no description fields
-    const meta = createRoadmapMeta({});
+  it('Given Roadmap with both descriptions, When deriveFeatureSummary, Then both present', async () => {
+    // Given Roadmap has both descriptions
+    const roadmap = createRoadmapWithDescriptions('Brief summary', 'Detailed explanation');
 
     // When deriveFeatureSummary is called
-    const summary = mockDeriveFeatureSummary('auth-system', meta);
+    const { deriveFeatureSummary } = await import('../../../../../server/feature-discovery');
+    const summary = deriveFeatureSummary('auth-system' as FeatureId, roadmap);
+
+    // Then FeatureSummary has both
+    expect(summary.shortDescription).toBe('Brief summary');
+    expect(summary.description).toBe('Detailed explanation');
+  });
+});
+
+// Active - step 01-04: backward compatibility
+describe('US-03 Scenario: FeatureSummary handles missing descriptions via deriveFeatureSummary', () => {
+  it('Given Roadmap without descriptions, When deriveFeatureSummary, Then both undefined', async () => {
+    // Given Roadmap has no description fields
+    const roadmap = createLegacyRoadmap();
+
+    // When deriveFeatureSummary is called
+    const { deriveFeatureSummary } = await import('../../../../../server/feature-discovery');
+    const summary = deriveFeatureSummary('auth-system' as FeatureId, roadmap);
+
+    // Then FeatureSummary has undefined descriptions
+    expect(summary.shortDescription).toBeUndefined();
+    expect(summary.description).toBeUndefined();
+  });
+
+  it('Given null roadmap, When deriveFeatureSummary, Then both undefined', async () => {
+    // Given no roadmap
+    const roadmap = null;
+
+    // When deriveFeatureSummary is called
+    const { deriveFeatureSummary } = await import('../../../../../server/feature-discovery');
+    const summary = deriveFeatureSummary('auth-system' as FeatureId, roadmap);
 
     // Then FeatureSummary has undefined descriptions
     expect(summary.shortDescription).toBeUndefined();

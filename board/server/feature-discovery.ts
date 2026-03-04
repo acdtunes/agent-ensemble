@@ -65,6 +65,8 @@ export const deriveFeatureSummary = (
     inProgress: summary.in_progress,
     currentLayer: countCompletedPhases(roadmap),
     updatedAt: latestTimestamp(roadmap),
+    shortDescription: roadmap.roadmap.short_description,
+    description: roadmap.roadmap.description,
   };
 };
 
@@ -77,10 +79,40 @@ export const isFeatureDir = (name: string): boolean =>
 
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { resolveFeatureRoadmap } from './feature-path-resolver.js';
 import { parseRoadmap } from './parser.js';
 
 const SCAN_DIRS = ['docs/feature', 'docs/ux', 'docs/requirements'] as const;
+
+// Case-insensitive directory lookup - finds actual directory name on disk
+const findActualDirName = async (
+  parentPath: string,
+  targetName: string,
+): Promise<string | null> => {
+  try {
+    const entries = await readdir(parentPath, { withFileTypes: true });
+    const match = entries.find(
+      (e) => e.isDirectory() && e.name.toLowerCase() === targetName.toLowerCase(),
+    );
+    return match?.name ?? null;
+  } catch {
+    return null;
+  }
+};
+
+// Resolve feature directory with case-insensitive lookup
+const resolveFeatureDirFs = async (
+  projectPath: string,
+  featureId: FeatureId,
+): Promise<string | null> => {
+  for (const scanDir of SCAN_DIRS) {
+    const parentPath = join(projectPath, scanDir);
+    const actualName = await findActualDirName(parentPath, featureId as string);
+    if (actualName !== null) {
+      return join(parentPath, actualName);
+    }
+  }
+  return null;
+};
 
 const readYamlFile = async (path: string): Promise<string | null> => {
   try {
@@ -101,8 +133,8 @@ const scanSingleDir = async (
   }
 
   return entries
-    .filter((entry) => entry.isDirectory() && isFeatureDir(entry.name))
-    .map((entry) => createFeatureId(entry.name))
+    .filter((entry) => entry.isDirectory() && isFeatureDir(entry.name.toLowerCase()))
+    .map((entry) => createFeatureId(entry.name.toLowerCase()))
     .filter((result) => result.ok)
     .map((result) => result.value as FeatureId);
 };
@@ -131,7 +163,10 @@ export const loadFeatureRoadmapFs = async (
   projectPath: string,
   featureId: FeatureId,
 ): Promise<Roadmap | null> => {
-  const roadmapPath = resolveFeatureRoadmap(projectPath, featureId);
+  const featureDir = await resolveFeatureDirFs(projectPath, featureId);
+  if (featureDir === null) return null;
+
+  const roadmapPath = join(featureDir, 'roadmap.yaml');
   const roadmapYaml = await readYamlFile(roadmapPath);
 
   if (roadmapYaml === null) return null;
