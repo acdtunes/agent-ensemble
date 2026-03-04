@@ -9,7 +9,7 @@ build/
 .venv/
 venv/
 .DS_Store
-.nw-teams/
+.agent-ensemble/
 .claude/worktrees/
 
 # Node
