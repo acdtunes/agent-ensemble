@@ -1,6 +1,6 @@
-# NW-TEAMS:REVIEW — Multi-Perspective Code Review with Agent Teams
+# AGENT-ENSEMBLE:REVIEW — Multi-Perspective Code Review with Agent Teams
 
-**Command**: `/nw-teams:review`
+**Command**: `/agent-ensemble:review`
 **Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
 
 ## Overview
@@ -150,7 +150,7 @@ Present the unified report to the user.
 Users can request specific focus areas:
 
 ```
-/nw-teams:review --focus security,performance
+/agent-ensemble:review --focus security,performance
 ```
 
 This spawns only the requested reviewer types.
@@ -158,7 +158,7 @@ This spawns only the requested reviewer types.
 ## Example Invocation
 
 ```
-User: /nw-teams:review PR #142
+User: /agent-ensemble:review PR #142
 
 Lead (you):
 1. Fetch PR diff

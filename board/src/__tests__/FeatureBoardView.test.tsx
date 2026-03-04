@@ -133,7 +133,7 @@ describe('FeatureBoardView acceptance', () => {
 
     render(
       <FeatureBoardView
-        projectId="nw-teams"
+        projectId="agent-ensemble"
         featureId="auth-flow"
         roadmap={roadmap}
         features={[makeFeature('auth-flow')]}
@@ -144,7 +144,7 @@ describe('FeatureBoardView acceptance', () => {
 
     const breadcrumb = screen.getByRole('navigation', { name: /breadcrumb/i });
     expect(breadcrumb).toHaveTextContent('Overview');
-    expect(breadcrumb).toHaveTextContent('nw-teams');
+    expect(breadcrumb).toHaveTextContent('agent-ensemble');
     expect(breadcrumb).toHaveTextContent('auth-flow');
   });
 

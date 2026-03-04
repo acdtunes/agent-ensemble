@@ -1,6 +1,6 @@
-# NW-TEAMS:DEBUG — Competing Hypotheses Debugging with Agent Teams
+# AGENT-ENSEMBLE:DEBUG — Competing Hypotheses Debugging with Agent Teams
 
-**Command**: `/nw-teams:debug`
+**Command**: `/agent-ensemble:debug`
 **Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
 
 ## Overview
@@ -177,7 +177,7 @@ Marking Hypothesis 1 as DISPROVEN based on this evidence gap."
 ## Example Invocation
 
 ```
-User: /nw-teams:debug "App crashes after one message instead of staying connected"
+User: /agent-ensemble:debug "App crashes after one message instead of staying connected"
 
 Lead (you):
 1. Generate hypotheses: WebSocket timeout, connection cleanup bug, state management error

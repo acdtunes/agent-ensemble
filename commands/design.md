@@ -1,6 +1,6 @@
-# NW-TEAMS:DESIGN — Cross-Discipline Architecture with Agent Teams
+# AGENT-ENSEMBLE:DESIGN — Cross-Discipline Architecture with Agent Teams
 
-**Command**: `/nw-teams:design`
+**Command**: `/agent-ensemble:design`
 **Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
 
 ## Overview
@@ -268,7 +268,7 @@ Present the unified architecture document to the user.
 ## Example Invocation
 
 ```
-User: /nw-teams:design "Real-time notification system for our e-commerce platform"
+User: /agent-ensemble:design "Real-time notification system for our e-commerce platform"
 
 Lead (you):
 1. Gather requirements: push notifications, email, in-app, at scale

@@ -1,6 +1,6 @@
-# NW-TEAMS:AUDIT — Multi-Perspective Quality Audit with Agent Teams
+# AGENT-ENSEMBLE:AUDIT — Multi-Perspective Quality Audit with Agent Teams
 
-**Command**: `/nw-teams:audit`
+**Command**: `/agent-ensemble:audit`
 **Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
 
 ## Overview
@@ -322,7 +322,7 @@ Present the unified audit report to the user.
 ## Example Invocation
 
 ```
-User: /nw-teams:audit "Full quality audit of the order management module"
+User: /agent-ensemble:audit "Full quality audit of the order management module"
 
 Lead (you):
 1. Scope: order management module, all 5 perspectives relevant

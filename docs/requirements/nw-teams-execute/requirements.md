@@ -1,8 +1,8 @@
-# Requirements: nw-teams:execute Improvements
+# Requirements: agent-ensemble:execute Improvements
 
 Epic: Rename, fix review count display, validate files_to_modify at roadmap creation.
 
-## US-01: Rename command from nw-teams:deliver to nw-teams:execute
+## US-01: Rename command from agent-ensemble:deliver to agent-ensemble:execute
 
 **Job Story**: When I look at the command list, I want the team execution command to have a distinct name from nw:deliver, so I can clearly distinguish roadmap creation from roadmap execution.
 
@@ -12,12 +12,12 @@ Epic: Rename, fix review count display, validate files_to_modify at roadmap crea
 Scenario: Command file reflects new name
   Given the commands directory
   When I list available commands
-  Then I see "nw-teams:execute" (not "nw-teams:deliver")
+  Then I see "agent-ensemble:execute" (not "agent-ensemble:deliver")
 
 Scenario: Command references use new name
-  Given any file in the codebase referencing "nw-teams:deliver"
+  Given any file in the codebase referencing "agent-ensemble:deliver"
   When the rename is complete
-  Then all references say "nw-teams:execute" instead
+  Then all references say "agent-ensemble:execute" instead
 ```
 
 **Scope**: Rename `commands/deliver.md` → `commands/execute.md`. Update all internal references.

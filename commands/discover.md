@@ -1,6 +1,6 @@
-# NW-TEAMS:DISCOVER — Parallel Research with Agent Teams
+# AGENT-ENSEMBLE:DISCOVER — Parallel Research with Agent Teams
 
-**Command**: `/nw-teams:discover`
+**Command**: `/agent-ensemble:discover`
 **Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
 
 ## Overview
@@ -166,7 +166,7 @@ Present the unified report to the user.
 ## Example Invocation
 
 ```
-User: /nw-teams:discover "Should we use event sourcing for our order management system?"
+User: /agent-ensemble:discover "Should we use event sourcing for our order management system?"
 
 Lead (you):
 1. Generate questions:

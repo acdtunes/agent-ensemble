@@ -11,7 +11,7 @@ interface OverviewDashboardProps {
 const EmptyState = ({ onAddProject }: { readonly onAddProject: () => void }) => (
   <div className="flex flex-col items-center justify-center py-20 text-gray-400">
     <p className="text-lg">No projects registered</p>
-    <p className="mt-2 text-sm">Add a project to get started with NW Teams Board.</p>
+    <p className="mt-2 text-sm">Add a project to get started with Agent Ensemble.</p>
     <button
       type="button"
       onClick={onAddProject}

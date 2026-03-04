@@ -1,6 +1,6 @@
-# NW-TEAMS:EXECUTE — Parallel Feature Execution with Agent Teams
+# AGENT-ENSEMBLE:EXECUTE — Parallel Feature Execution with Agent Teams
 
-**Command**: `/nw-teams:execute`
+**Command**: `/agent-ensemble:execute`
 **Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
 
 ## Overview
@@ -9,66 +9,69 @@ Execute parallel feature delivery using Claude Code Agent Teams. You (the Lead) 
 
 ## CLI Tools
 
-This command uses deterministic CLI scripts for coordination. The **atomic commands** (start-step, transition, complete-step) are the PRIMARY interface — they update BOTH state.yaml and roadmap.yaml in a single call, preventing the Lead from forgetting status updates.
+This command uses deterministic CLI scripts for coordination. The **atomic commands** (start-step, transition, complete-step) are the PRIMARY interface — they update roadmap.yaml directly, preventing the Lead from forgetting status updates.
+
+**Note**: All state is tracked directly in `roadmap.yaml` — there is no separate state file.
 
 ```bash
 # Set PYTHONPATH for all CLI commands
 export PYTHONPATH=$HOME/.claude/lib/python
 
-# --- Phase 1: Setup ---
+# --- Setup ---
 
-# Analyze roadmap for parallel groups
-python -m nw_teams.cli.parallel_groups analyze docs/feature/{project-id}/roadmap.yaml
-
-# Generate execution plan
-python -m nw_teams.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .nw-teams/plan.yaml
-
-# Initialize team state
-python -m nw_teams.cli.team_state init --plan .nw-teams/plan.yaml --output .nw-teams/state.yaml
+# Analyze roadmap for parallel groups (displays layer analysis)
+python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/roadmap.yaml
 
 # --- Atomic Commands (MANDATORY — use these, not raw update) ---
 
-# Start a step: checks worktree need → creates worktree if needed → updates state.yaml + roadmap.yaml
+# Start a step: checks worktree need → creates worktree if needed → updates roadmap.yaml
 # Output: "STARTED {step_id} [WORKTREE]" with path, or "STARTED {step_id} [SHARED]"
-python -m nw_teams.cli.team_state start-step \
-  --state .nw-teams/state.yaml \
-  --roadmap docs/feature/{project-id}/roadmap.yaml \
+python -m agent_ensemble.cli.team_state start-step \
+  docs/feature/{project-id}/roadmap.yaml \
   --step {step_id} \
   --teammate crafter-{step_id}
 
 # Transition step status (e.g. in_progress → review, review → in_progress for revision)
-# Updates BOTH state.yaml and roadmap.yaml atomically
-python -m nw_teams.cli.team_state transition \
-  --state .nw-teams/state.yaml \
-  --roadmap docs/feature/{project-id}/roadmap.yaml \
+# Updates roadmap.yaml atomically
+python -m agent_ensemble.cli.team_state transition \
+  docs/feature/{project-id}/roadmap.yaml \
   --step {step_id} \
   --status {review|in_progress|failed}
 
-# Complete a step: updates BOTH files to approved + merges worktree if used
+# Complete a step: sets approved + merges worktree if used
 # Output: "COMPLETED {step_id}", "COMPLETED {step_id} MERGE_OK", or "COMPLETED {step_id} MERGE_CONFLICT"
-python -m nw_teams.cli.team_state complete-step \
-  --state .nw-teams/state.yaml \
-  --roadmap docs/feature/{project-id}/roadmap.yaml \
+python -m agent_ensemble.cli.team_state complete-step \
+  docs/feature/{project-id}/roadmap.yaml \
   --step {step_id}
 
 # --- Monitoring ---
 
-# Show roadmap progress (reads roadmap.yaml)
-python -m nw_teams.cli.team_state show docs/feature/{project-id}/roadmap.yaml
+# Show roadmap progress
+python -m agent_ensemble.cli.team_state show docs/feature/{project-id}/roadmap.yaml
 
 # Check if a phase is complete
-python -m nw_teams.cli.team_state check docs/feature/{project-id}/roadmap.yaml --phase {phase_id}
+python -m agent_ensemble.cli.team_state check docs/feature/{project-id}/roadmap.yaml --phase {phase_id}
 
-# --- Worktree fallbacks (only if complete-step merge fails) ---
+# --- Worktree Commands (fallbacks if complete-step merge fails) ---
 
-# Dry-run preview of all remaining merges
-python -m nw_teams.cli.worktree merge-all --plan .nw-teams/plan.yaml --dry-run
+# List all agent-ensemble worktrees
+python -m agent_ensemble.cli.worktree list
 
-# Merge all remaining worktree branches
-python -m nw_teams.cli.worktree merge-all --plan .nw-teams/plan.yaml [--conflict-aware]
+# Show detailed worktree status (dirty/clean, commit count)
+python -m agent_ensemble.cli.worktree status
 
-# Cleanup worktrees
-python -m nw_teams.cli.worktree cleanup --all
+# Create a worktree manually (usually done by start-step automatically)
+python -m agent_ensemble.cli.worktree create {step_id} [--base BRANCH]
+
+# Merge a single worktree branch
+python -m agent_ensemble.cli.worktree merge {step_id} [--into BRANCH]
+
+# Merge all worktree branches in order
+python -m agent_ensemble.cli.worktree merge-all [--into BRANCH] [--plan PLAN_PATH]
+
+# Cleanup worktrees (removes worktree dir and branch)
+python -m agent_ensemble.cli.worktree cleanup {step_id}
+python -m agent_ensemble.cli.worktree cleanup --all
 ```
 
 ## Pre-Flight Check
@@ -142,18 +145,11 @@ This gate exists because the parallel_groups CLI is lenient and will accept malf
 
 ### Phase 1: Analyze Roadmap
 
-Use the CLI to analyze the roadmap and generate an execution plan:
+Use the CLI to analyze the roadmap for parallel execution groups:
 
 ```bash
 # Analyze and display parallel groups
-PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.parallel_groups analyze docs/feature/{project-id}/roadmap.yaml
-
-# Generate execution plan
-PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .nw-teams/plan.yaml
-
-# Initialize team state tracking
-mkdir -p .nw-teams
-PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state init --plan .nw-teams/plan.yaml --output .nw-teams/state.yaml
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/roadmap.yaml
 ```
 
 The CLI will output:
@@ -185,7 +181,7 @@ Create an agent team for parallel feature delivery.
 
 ### Phase 3: Spawn Teammates
 
-**MAXIMIZE PARALLELISM**: Spawn ALL steps in the current layer simultaneously. If a layer has 4 steps, spawn 4 crafters — not 1 or 2 "to be safe". The entire point of nw-teams is parallel execution. Being conservative defeats the purpose.
+**MAXIMIZE PARALLELISM**: Spawn ALL steps in the current layer simultaneously. If a layer has 4 steps, spawn 4 crafters — not 1 or 2 "to be safe". The entire point of agent-ensemble is parallel execution. Being conservative defeats the purpose.
 
 For each parallel layer, spawn:
 
@@ -312,10 +308,9 @@ Example: Layer 2 has steps A (dep: 1-1) and B (dep: 1-2, 1-3). If 1-1 finishes f
 **MANDATORY PRE-SPAWN — run `start-step` BEFORE every crafter spawn:**
 
 ```bash
-# Single atomic command: checks worktree need → creates if needed → updates state + roadmap
-PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state start-step \
-  --state .nw-teams/state.yaml \
-  --roadmap docs/feature/{project-id}/roadmap.yaml \
+# Single atomic command: checks worktree need → creates if needed → updates roadmap.yaml
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state start-step \
+  docs/feature/{project-id}/roadmap.yaml \
   --step {step_id} \
   --teammate crafter-{step_id}
 ```
@@ -324,7 +319,7 @@ PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state start-step
 - `STARTED {step_id} [SHARED]` → use standard spawn prompt (shared directory)
 - `STARTED {step_id} [WORKTREE]` + worktree path → use WORKTREE spawn prompt (see "Worktree Isolation" section)
 
-**IMPORTANT**: `start-step` updates state.yaml to `in_progress` BEFORE returning. This means the NEXT `start-step` call will see this step as active and correctly detect file conflicts. You MUST call `start-step` SEQUENTIALLY for each crafter — do NOT batch them. The order matters for conflict detection.
+**IMPORTANT**: `start-step` updates roadmap.yaml to `in_progress` BEFORE returning. This means the NEXT `start-step` call will see this step as active and correctly detect file conflicts. You MUST call `start-step` SEQUENTIALLY for each crafter — do NOT batch them. The order matters for conflict detection.
 
 **Sequence for spawning N crafters in a layer:**
 1. `start-step` for crafter A → read output (SHARED or WORKTREE)
@@ -340,16 +335,15 @@ While teammates are working:
 1. **Monitor progress**: Use CLI to track state
    ```bash
    # Show roadmap progress
-   PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state show docs/feature/{project-id}/roadmap.yaml
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state show docs/feature/{project-id}/roadmap.yaml
 
    # Transition step to review when crafter signals readiness
-   PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state transition \
-     --state .nw-teams/state.yaml \
-     --roadmap docs/feature/{project-id}/roadmap.yaml \
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state transition \
+     docs/feature/{project-id}/roadmap.yaml \
      --step {step_id} --status review
 
    # Check if phase is complete
-   PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state check \
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state check \
      docs/feature/{project-id}/roadmap.yaml --phase {phase_id}
    ```
 
@@ -390,11 +384,10 @@ PYTHONPATH=$HOME/.claude/lib/python python -m des.cli.verify_deliver_integrity d
 ### Phase 7: Next Layer or Finalize
 
 **With eager spawning, layers blur**: Because you eagerly spawn next-layer steps as soon as their deps are met, there is no clean "layer boundary". Instead of waiting for an entire layer to complete before starting the next, you continuously:
-1. Complete the step atomically (updates state + roadmap + merges worktree):
+1. Complete the step atomically (updates roadmap.yaml + merges worktree):
    ```bash
-   PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state complete-step \
-     --state .nw-teams/state.yaml \
-     --roadmap docs/feature/{project-id}/roadmap.yaml \
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state complete-step \
+     docs/feature/{project-id}/roadmap.yaml \
      --step {step_id}
    ```
 2. Shut down the reviewer immediately after approval, then the crafter after completion
@@ -420,7 +413,7 @@ This means Phases 5-7 are a continuous loop, not discrete stages.
 1. **Identify refactoring targets** — Scan the files modified during delivery. Group by module/area:
    ```bash
    # List all files modified during delivery (from roadmap tracking)
-   PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state show docs/feature/{project-id}/roadmap.yaml
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state show docs/feature/{project-id}/roadmap.yaml
    ```
 
 2. **Group independent targets** — Files that don't overlap can be refactored in parallel. Files within the same module should go to a single crafter.
@@ -513,7 +506,7 @@ If all layers and refactoring pass complete:
 
 Worktree detection and creation is handled automatically by `start-step`. The Lead does NOT manually check for conflicts or create worktrees.
 
-**How it works**: `start-step` checks the step's files against all currently active steps in state.yaml. If overlap is found, it creates a worktree before marking the step as in_progress. The output tells the Lead which spawn prompt to use:
+**How it works**: `start-step` checks the step's files against all currently active steps in roadmap.yaml. If overlap is found, it creates a worktree before marking the step as in_progress. The output tells the Lead which spawn prompt to use:
 - `STARTED {step_id} [SHARED]` → standard spawn prompt
 - `STARTED {step_id} [WORKTREE]` + path → worktree spawn prompt (below)
 
@@ -553,10 +546,9 @@ The reviewer does NOT need a worktree. It can read files from any worktree path 
 Merges happen **automatically** when `complete-step` is called. The Lead does NOT manually call `merge-on-approve`.
 
 ```bash
-# Single command: marks approved in state + roadmap, then merges worktree if used
-PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state complete-step \
-  --state .nw-teams/state.yaml \
-  --roadmap docs/feature/{project-id}/roadmap.yaml \
+# Single command: marks approved in roadmap.yaml, then merges worktree if used
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state complete-step \
+  docs/feature/{project-id}/roadmap.yaml \
   --step {step_id}
 ```
 
@@ -575,7 +567,7 @@ PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state complete-s
    ```
 4. Cleanup the worktree manually after resolution:
    ```bash
-   PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.worktree cleanup {step_id}
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree cleanup {step_id}
    ```
 
 **Escalate to User only if:**
@@ -585,9 +577,11 @@ PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.team_state complete-s
 
 **Fallback — merge remaining branches at finalization:**
 ```bash
-PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.worktree merge-all --plan .nw-teams/plan.yaml --dry-run
-PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.worktree merge-all --plan .nw-teams/plan.yaml [--conflict-aware]
-PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.worktree cleanup --all
+# Merge all worktree branches (stops on first conflict)
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree merge-all
+
+# Cleanup all worktrees after merge
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree cleanup --all
 ```
 
 ### Step Lifecycle Summary
@@ -598,9 +592,8 @@ PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.worktree cleanup --al
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  1. START-STEP (atomic)                                          │
-│     ├── Checks file conflicts with active steps in state.yaml    │
+│     ├── Checks file conflicts with active steps in roadmap.yaml  │
 │     ├── Creates worktree if conflicts found                      │
-│     ├── Updates state.yaml → in_progress                         │
 │     ├── Updates roadmap.yaml → in_progress                       │
 │     └── Output: STARTED [SHARED] or STARTED [WORKTREE] + path   │
 │                                                                  │
@@ -610,14 +603,12 @@ PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.worktree cleanup --al
 │  3. CRAFTER WORKS → signals Lead "ready for review"              │
 │                                                                  │
 │  4. TRANSITION (atomic) → review                                 │
-│     ├── Updates state.yaml → review                              │
 │     └── Updates roadmap.yaml → review                            │
 │                                                                  │
 │  5. LEAD SPAWNS REVIEWER → APPROVED or NEEDS_REVISION            │
 │     └── On NEEDS_REVISION: transition back to in_progress        │
 │                                                                  │
 │  6. COMPLETE-STEP (atomic)                                       │
-│     ├── Updates state.yaml → approved                            │
 │     ├── Updates roadmap.yaml → approved                          │
 │     ├── Merges worktree branch if used (automatic)               │
 │     └── Output: COMPLETED, COMPLETED MERGE_OK, or MERGE_CONFLICT│
@@ -659,7 +650,7 @@ PYTHONPATH=$HOME/.claude/lib/python python -m nw_teams.cli.worktree cleanup --al
 ## Example Invocation
 
 ```
-User: /nw-teams:execute auth-feature
+User: /agent-ensemble:execute auth-feature
 
 Lead (you):
 1. Read docs/feature/auth-feature/roadmap.yaml

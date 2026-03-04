@@ -1,4 +1,4 @@
-# Definition of Ready: nw-teams
+# Definition of Ready: agent-ensemble
 
 ## DoR Checklist
 
@@ -18,14 +18,14 @@
 ### For Solution Architect (DESIGN wave)
 
 **Input Artifacts**:
-- `docs/ux/nw-teams/jtbd-job-stories.md` - Jobs and opportunity scores
-- `docs/ux/nw-teams/jtbd-four-forces.md` - Adoption anxieties to address
-- `docs/ux/nw-teams/journey-parallel-deliver-visual.md` - UX journey
-- `docs/requirements/nw-teams-user-stories.md` - Stories with AC
+- `docs/ux/agent-ensemble/jtbd-job-stories.md` - Jobs and opportunity scores
+- `docs/ux/agent-ensemble/jtbd-four-forces.md` - Adoption anxieties to address
+- `docs/ux/agent-ensemble/journey-parallel-deliver-visual.md` - UX journey
+- `docs/requirements/agent-ensemble-user-stories.md` - Stories with AC
 
 **Key Decisions for Architect**:
-1. **Namespace**: Create `~/.claude/commands/nw-teams/` separate from `~/.claude/commands/nw/`
-2. **Agent reuse**: nw-teams agents can delegate to existing nw agents (software-crafter, etc.)
+1. **Namespace**: Create `~/.claude/commands/agent-ensemble/` separate from `~/.claude/commands/nw/`
+2. **Agent reuse**: agent-ensemble agents can delegate to existing nw agents (software-crafter, etc.)
 3. **Feature flag**: Fail fast if `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` not set
 4. **DES integration**: Team execution must produce valid execution-log entries
 
@@ -42,11 +42,11 @@
 
 ## Next Step
 
-Invoke: `/nw:design nw-teams`
+Invoke: `/nw:design agent-ensemble`
 
 Architect will:
 1. Define component boundaries (orchestrator, teammate protocol, task coordination)
-2. Create C4 diagrams showing nw-teams structure
+2. Create C4 diagrams showing agent-ensemble structure
 3. Select teammate display mode (in-process vs tmux)
 4. Design DES integration for team execution
 5. Produce roadmap.yaml for implementation

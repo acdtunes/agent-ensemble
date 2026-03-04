@@ -71,7 +71,7 @@ describe('FeatureDocsView acceptance', () => {
 
     render(
       <FeatureDocsView
-        projectId="nw-teams"
+        projectId="agent-ensemble"
         featureId="card-redesign"
         tree={tree}
         features={[makeFeature('card-redesign')]}
@@ -91,7 +91,7 @@ describe('FeatureDocsView acceptance', () => {
 
     render(
       <FeatureDocsView
-        projectId="nw-teams"
+        projectId="agent-ensemble"
         featureId="new-feature"
         tree={makeEmptyDocTree()}
         features={[makeFeature('new-feature')]}
@@ -111,7 +111,7 @@ describe('FeatureDocsView acceptance', () => {
 
     render(
       <FeatureDocsView
-        projectId="nw-teams"
+        projectId="agent-ensemble"
         featureId="card-redesign"
         tree={makeEmptyDocTree()}
         features={features}

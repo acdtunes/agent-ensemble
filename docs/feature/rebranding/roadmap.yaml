@@ -1,0 +1,264 @@
+roadmap:
+  project_id: rebranding
+  created_at: '2026-03-04T00:51:40Z'
+  total_steps: 11
+  phases: 6
+phases:
+- id: '01'
+  name: 'Python Package'
+  steps:
+  - id: 01-01
+    name: 'Rename Python package directory and update pyproject.toml'
+    description: 'Rename src/nw_teams/ to src/agent_ensemble/ and update pyproject.toml
+      package metadata'
+    files_to_modify:
+    - src/nw_teams/__init__.py
+    - src/nw_teams/cli/__init__.py
+    - pyproject.toml
+    deps: []
+    criteria:
+    - 'Directory src/agent_ensemble/ exists with all original modules'
+    - 'pyproject.toml name field is "agent-ensemble"'
+    - 'Package docstrings reference "agent-ensemble"'
+    time_estimate: 15m
+    status: approved
+    teammate_id: crafter-01-01
+    started_at: '2026-03-04T01:01:06.531467+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T01:03:53.101338+00:00'
+  - id: 01-02
+    name: 'Update Python module internal references'
+    description: 'Update usage examples and display strings in CLI modules'
+    files_to_modify:
+    - src/agent_ensemble/cli/worktree.py
+    - src/agent_ensemble/cli/team_state.py
+    - src/agent_ensemble/cli/parallel_groups.py
+    - src/agent_ensemble/cli/migrate_roadmap.py
+    deps:
+    - 01-01
+    criteria:
+    - 'Usage examples reference agent_ensemble.cli.*'
+    - 'Display strings show "agent-ensemble"'
+    - 'No residual "nw_teams" or "nw-teams" in Python source'
+    time_estimate: 10m
+    status: approved
+    teammate_id: crafter-01-02
+    started_at: '2026-03-04T01:04:14.140477+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T01:06:21.024069+00:00'
+  - id: 01-03
+    name: 'Update Python tests'
+    description: 'Update import paths in all Python test files'
+    files_to_modify:
+    - tests/test_team_state.py
+    - tests/test_parallel_groups.py
+    - tests/test_migrate_roadmap.py
+    deps:
+    - 01-01
+    criteria:
+    - 'All imports use agent_ensemble module path'
+    - 'pytest runs successfully with renamed imports'
+    time_estimate: 10m
+
+    status: approved
+    completed_at: '2026-03-04T01:03:57.489243+00:00'
+- id: '02'
+  name: 'CLI Commands'
+  steps:
+  - id: 02-01
+    name: 'Update all command markdown files'
+    description: 'Update command prefix, module refs, and state paths in all 10 command
+      files'
+    files_to_modify:
+    - commands/audit.md
+    - commands/debug.md
+    - commands/deliver.md
+    - commands/design.md
+    - commands/discover.md
+    - commands/distill.md
+    - commands/document.md
+    - commands/execute.md
+    - commands/refactor.md
+    - commands/review.md
+    deps:
+    - 01-02
+    criteria:
+    - 'All commands use /agent-ensemble:* prefix pattern'
+    - 'Python module references use agent_ensemble.cli.*'
+    - 'State directory paths reference .agent-ensemble/'
+    - 'No residual "nw-teams" or "nw_teams" in command files'
+    time_estimate: 20m
+
+    status: approved
+    teammate_id: crafter-02-01
+    started_at: '2026-03-04T01:06:25.259766+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T01:08:01.577309+00:00'
+- id: '03'
+  name: 'Web Dashboard'
+  steps:
+  - id: 03-01
+    name: 'Update board package identity'
+    description: 'Update package.json name and index.html title'
+    files_to_modify:
+    - board/package.json
+    - board/index.html
+    deps:
+    - 01-01
+    criteria:
+    - 'package.json name is "agent-ensemble"'
+    - 'HTML title is "Agent Ensemble"'
+    time_estimate: 5m
+    status: approved
+    teammate_id: crafter-03-01
+    started_at: '2026-03-04T01:04:17.714717+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T01:05:11.690778+00:00'
+  - id: 03-02
+    name: 'Update React component display text'
+    description: 'Update App.tsx (3 header locations: ProjectTabs, ProjectView, OverviewView)
+      and OverviewDashboard.tsx empty state text'
+    files_to_modify:
+    - board/src/App.tsx
+    - board/src/components/OverviewDashboard.tsx
+    deps:
+    - 03-01
+    criteria:
+    - 'All 3 App.tsx header locations display "Agent Ensemble"'
+    - 'Empty state shows "Agent Ensemble" branding'
+    - 'No residual "NW Teams" display text in components'
+    time_estimate: 10m
+    status: approved
+    teammate_id: crafter-03-02
+    started_at: '2026-03-04T01:05:16.270346+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T01:06:46.770734+00:00'
+  - id: 03-03
+    name: 'Update board component tests'
+    description: 'Update display text assertions and fixture projectIds in all React
+      tests'
+    files_to_modify:
+    - board/src/__tests__/App.test.tsx
+    - board/src/__tests__/OverviewDashboard.test.tsx
+    - board/src/__tests__/FeatureBoardView.test.tsx
+    - board/src/__tests__/FeatureDocsView.test.tsx
+    - board/src/__tests__/ProjectFeatureView.test.tsx
+    - board/src/__tests__/Breadcrumb.test.tsx
+    deps:
+    - 03-02
+    criteria:
+    - 'Test assertions match new "Agent Ensemble" display text'
+    - 'Test fixture projectIds updated for consistency'
+    - 'All board vitest tests pass'
+    time_estimate: 20m
+
+    status: approved
+    teammate_id: crafter-03-03
+    started_at: '2026-03-04T01:06:50.797629+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T01:08:30.888637+00:00'
+- id: '04'
+  name: 'Infrastructure'
+  steps:
+  - id: 04-01
+    name: 'Update install script with migration'
+    description: 'Update install.sh paths and add cleanup of old nw-teams symlinks'
+    files_to_modify:
+    - install.sh
+    deps:
+    - 01-01
+    criteria:
+    - 'Commands symlink targets ~/.claude/commands/agent-ensemble'
+    - 'Python symlink targets ~/.claude/lib/python/agent_ensemble'
+    - 'Old nw-teams symlinks cleaned up before install'
+    - 'Summary output shows /agent-ensemble:* commands'
+    time_estimate: 15m
+    status: approved
+    teammate_id: crafter-04-01
+    started_at: '2026-03-04T01:04:23.347434+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T01:05:48.217809+00:00'
+  - id: 04-02
+    name: 'Update gitignore'
+    description: 'Replace .nw-teams/ with .agent-ensemble/ in gitignore'
+    files_to_modify:
+    - .gitignore
+    deps: []
+    criteria:
+    - 'State directory .agent-ensemble/ is ignored'
+    - 'No reference to .nw-teams/'
+    time_estimate: 2m
+
+    status: approved
+    teammate_id: crafter-04-02
+    started_at: '2026-03-04T01:01:09.949035+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T01:03:18.160296+00:00'
+- id: '05'
+  name: 'Documentation'
+  steps:
+  - id: 05-01
+    name: 'Bulk rename in documentation'
+    description: 'Find and replace nw-teams/nw_teams references across all docs'
+    files_to_modify:
+    - docs/dor-checklist.md
+    - docs/requirements/nw-teams-execute/requirements.md
+    - docs/adrs/ADR-010-rebranding-to-agent-ensemble.md
+    deps:
+    - 02-01
+    - 03-02
+    - 04-01
+    criteria:
+    - 'User-facing docs reference "agent-ensemble"'
+    - 'Module paths reference agent_ensemble'
+    - 'Command examples use /agent-ensemble:* prefix'
+    time_estimate: 15m
+
+    status: approved
+    teammate_id: crafter-05-01
+    started_at: '2026-03-04T01:08:06.759263+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T01:09:19.020485+00:00'
+- id: '06'
+  name: 'Verification'
+  steps:
+  - id: 06-01
+    name: 'Run full test suite and residual check'
+    description: 'Execute all Python and board tests, grep for residual old-name references'
+    files_to_modify:
+    - docs/feature/rebranding/VERIFICATION.md
+    deps:
+    - 01-03
+    - 02-01
+    - 03-03
+    - 04-02
+    - 05-01
+    criteria:
+    - 'pytest passes for all Python tests'
+    - 'vitest passes for all board tests'
+    - 'grep finds no residual "nw-teams" or "nw_teams" in source (excluding git history)'
+    time_estimate: 10m
+    status: approved
+    teammate_id: crafter-06-01
+    started_at: '2026-03-04T01:09:24.744582+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-04T01:11:37.234494+00:00'
+implementation_scope:
+  source_directories:
+  - src/agent_ensemble/
+  - commands/
+  - board/src/
+  - board/server/
+  test_directories:
+  - tests/
+  - board/src/__tests__/
+  - board/server/__tests__/
+  excluded_patterns:
+  - __init__.py
+  - __pycache__/**
+  - node_modules/**
+  - .git/**
+validation:
+  status: approved
+  reviewer: solution-architect-reviewer
+  approved_at: '2026-03-04T00:58:00Z'

@@ -153,7 +153,7 @@ const ProjectTabs = ({
   <div className="flex items-center gap-3">
     <a href="#/" className="text-sm text-gray-400 hover:text-gray-200">Overview</a>
     <span className="text-gray-600">/</span>
-    <h1 className="text-xl font-semibold text-gray-100">NW Teams Board</h1>
+    <h1 className="text-xl font-semibold text-gray-100">Agent Ensemble</h1>
     <nav className="ml-4 flex gap-1">
       <a
         href={`#/projects/${projectId}/board`}
@@ -225,8 +225,7 @@ const FeatureNavHeader = ({
 };
 
 const FeatureBoardView = ({ projectId, featureId }: { readonly projectId: string; readonly featureId: string }) => {
-  const { roadmap, loading, error } = useFeatureState(projectId, featureId);
-  const { connectionStatus } = useProjectList(WS_URL);
+  const { roadmap, loading, error, connectionStatus } = useFeatureState(projectId, featureId, WS_URL);
 
   return (
     <PageShell
@@ -266,7 +265,7 @@ const ProjectView = ({ projectId }: { readonly projectId: string }) => {
   return (
     <PageShell
       connectionStatus={connectionStatus}
-      headerContent={<h1 className="text-xl font-semibold text-gray-100">NW Teams Board</h1>}
+      headerContent={<h1 className="text-xl font-semibold text-gray-100">Agent Ensemble</h1>}
     >
       <ProjectFeatureView
         projectId={projectId}
@@ -307,7 +306,7 @@ const OverviewView = () => {
   return (
     <PageShell
       connectionStatus={connectionStatus}
-      headerContent={<h1 className="text-xl font-semibold text-gray-100">NW Teams Board</h1>}
+      headerContent={<h1 className="text-xl font-semibold text-gray-100">Agent Ensemble</h1>}
     >
       {showAddDialog && (
         <div className="mb-4">

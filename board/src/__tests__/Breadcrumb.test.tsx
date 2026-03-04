@@ -9,18 +9,18 @@ describe('Breadcrumb', () => {
   it('renders all segment labels', () => {
     const segments: BreadcrumbSegment[] = [
       { label: 'Overview', onClick: vi.fn() },
-      { label: 'nw-teams' },
+      { label: 'agent-ensemble' },
     ];
     render(<Breadcrumb segments={segments} />);
     expect(screen.getByText('Overview')).toBeInTheDocument();
-    expect(screen.getByText('nw-teams')).toBeInTheDocument();
+    expect(screen.getByText('agent-ensemble')).toBeInTheDocument();
   });
 
   it('renders clickable segments as buttons', () => {
     const onClick = vi.fn();
     const segments: BreadcrumbSegment[] = [
       { label: 'Overview', onClick },
-      { label: 'nw-teams' },
+      { label: 'agent-ensemble' },
     ];
     render(<Breadcrumb segments={segments} />);
     fireEvent.click(screen.getByText('Overview'));
@@ -30,17 +30,17 @@ describe('Breadcrumb', () => {
   it('renders last segment as non-clickable text', () => {
     const segments: BreadcrumbSegment[] = [
       { label: 'Overview', onClick: vi.fn() },
-      { label: 'nw-teams' },
+      { label: 'agent-ensemble' },
     ];
     render(<Breadcrumb segments={segments} />);
-    const lastSegment = screen.getByText('nw-teams');
+    const lastSegment = screen.getByText('agent-ensemble');
     expect(lastSegment.tagName).not.toBe('BUTTON');
   });
 
   it('renders separator between segments', () => {
     const segments: BreadcrumbSegment[] = [
       { label: 'Overview', onClick: vi.fn() },
-      { label: 'nw-teams' },
+      { label: 'agent-ensemble' },
     ];
     const { container } = render(<Breadcrumb segments={segments} />);
     expect(container.textContent).toContain('/');

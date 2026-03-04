@@ -58,7 +58,7 @@ describe('ProjectFeatureView', () => {
   it('renders breadcrumb with Overview / projectId', () => {
     render(
       <ProjectFeatureView
-        projectId="nw-teams"
+        projectId="agent-ensemble"
         features={testFeatures}
         onNavigateOverview={vi.fn()}
         onNavigateFeatureBoard={vi.fn()}
@@ -66,14 +66,14 @@ describe('ProjectFeatureView', () => {
       />,
     );
     expect(screen.getByText('Overview')).toBeInTheDocument();
-    expect(screen.getByText('nw-teams')).toBeInTheDocument();
+    expect(screen.getByText('agent-ensemble')).toBeInTheDocument();
   });
 
   it('clicking Overview breadcrumb calls onNavigateOverview', () => {
     const onNavigateOverview = vi.fn();
     render(
       <ProjectFeatureView
-        projectId="nw-teams"
+        projectId="agent-ensemble"
         features={testFeatures}
         onNavigateOverview={onNavigateOverview}
         onNavigateFeatureBoard={vi.fn()}
@@ -87,7 +87,7 @@ describe('ProjectFeatureView', () => {
   it('renders one feature card per feature', () => {
     render(
       <ProjectFeatureView
-        projectId="nw-teams"
+        projectId="agent-ensemble"
         features={testFeatures}
         onNavigateOverview={vi.fn()}
         onNavigateFeatureBoard={vi.fn()}
@@ -107,7 +107,7 @@ describe('ProjectFeatureView', () => {
     const features = [makeFeature('card-redesign', { hasRoadmap: true })];
     render(
       <ProjectFeatureView
-        projectId="nw-teams"
+        projectId="agent-ensemble"
         features={features}
         onNavigateOverview={vi.fn()}
         onNavigateFeatureBoard={onNavigateFeatureBoard}
@@ -123,7 +123,7 @@ describe('ProjectFeatureView', () => {
     const features = [makeFeature('kanban-board', { hasRoadmap: false, totalSteps: 0, done: 0, inProgress: 0 })];
     render(
       <ProjectFeatureView
-        projectId="nw-teams"
+        projectId="agent-ensemble"
         features={features}
         onNavigateOverview={vi.fn()}
         onNavigateFeatureBoard={vi.fn()}
@@ -137,7 +137,7 @@ describe('ProjectFeatureView', () => {
   it('renders empty state when no features', () => {
     render(
       <ProjectFeatureView
-        projectId="nw-teams"
+        projectId="agent-ensemble"
         features={[]}
         onNavigateOverview={vi.fn()}
         onNavigateFeatureBoard={vi.fn()}
@@ -151,7 +151,7 @@ describe('ProjectFeatureView', () => {
     it('applies correct grid column classes for high-density layout', () => {
       const { container } = render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={testFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -182,7 +182,7 @@ describe('ProjectFeatureView', () => {
 
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={features}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -202,7 +202,7 @@ describe('ProjectFeatureView', () => {
 
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={features}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -227,7 +227,7 @@ describe('ProjectFeatureView', () => {
 
       const { container } = render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={features}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -249,7 +249,7 @@ describe('ProjectFeatureView', () => {
 
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={features}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -279,7 +279,7 @@ describe('ProjectFeatureView', () => {
     it('displays search input with placeholder above feature grid', () => {
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={searchFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -309,7 +309,7 @@ describe('ProjectFeatureView', () => {
     ])('filters features case-insensitively: "%s" shows %j', (searchTerm, expectedNames) => {
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={searchFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -337,7 +337,7 @@ describe('ProjectFeatureView', () => {
     it('clearing search input restores all features', () => {
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={searchFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -366,7 +366,7 @@ describe('ProjectFeatureView', () => {
     it('displays "No features match your search" when no matches', () => {
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={searchFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -402,7 +402,7 @@ describe('ProjectFeatureView', () => {
     it('updates group header counts to reflect filtered results', () => {
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={mixedFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -432,7 +432,7 @@ describe('ProjectFeatureView', () => {
     it('hides group headers when filtering results in zero matches for that group', () => {
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={mixedFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -456,7 +456,7 @@ describe('ProjectFeatureView', () => {
     it('shows multiple group headers when search matches features in different groups', () => {
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={mixedFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -495,7 +495,7 @@ describe('ProjectFeatureView', () => {
     it('displays status filter with all options and counts', () => {
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={statusFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -517,7 +517,7 @@ describe('ProjectFeatureView', () => {
     it('has "All" selected by default', () => {
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={statusFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -533,7 +533,7 @@ describe('ProjectFeatureView', () => {
     it('filters to show only selected status when clicked', () => {
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={statusFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -562,7 +562,7 @@ describe('ProjectFeatureView', () => {
     it('composes search and status filter as intersection', () => {
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={statusFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
@@ -592,7 +592,7 @@ describe('ProjectFeatureView', () => {
     it('updates filter counts when search changes', () => {
       render(
         <ProjectFeatureView
-          projectId="nw-teams"
+          projectId="agent-ensemble"
           features={statusFeatures}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
