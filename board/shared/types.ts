@@ -298,6 +298,26 @@ export type DocContentError =
   | { readonly type: 'invalid_path'; readonly message: string }
   | { readonly type: 'read_failed'; readonly message: string };
 
+// --- Feature archive types ---
+
+export interface ArchivedFeature {
+  readonly featureId: FeatureId;
+  readonly name: string;
+  readonly archivedAt: string;
+}
+
+export type ArchiveError =
+  | { readonly type: 'feature_not_found'; readonly featureId: FeatureId }
+  | { readonly type: 'already_archived'; readonly featureId: FeatureId }
+  | { readonly type: 'invalid_feature_id'; readonly message: string }
+  | { readonly type: 'io_error'; readonly message: string };
+
+export type RestoreError =
+  | { readonly type: 'feature_not_found'; readonly featureId: FeatureId }
+  | { readonly type: 'already_exists'; readonly featureId: FeatureId }
+  | { readonly type: 'invalid_feature_id'; readonly message: string }
+  | { readonly type: 'io_error'; readonly message: string };
+
 // --- Project management error types ---
 
 export type AddProjectError =
