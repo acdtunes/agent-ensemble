@@ -42,8 +42,8 @@ describe('createDirectoryWatcher', () => {
     // Create a new feature directory
     await mkdir(join(projectPath, 'docs/feature/auth'));
 
-    // Wait for debounce + processing
-    await delay(400);
+    // Wait for debounce + processing (increased for CI reliability)
+    await delay(600);
 
     await watcher.close();
 

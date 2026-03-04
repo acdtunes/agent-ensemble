@@ -3,7 +3,6 @@ import type { FeatureSummary } from "../../shared/types";
 import { computeCompletionPercentage } from "./ProjectCard";
 import { ArchiveConfirmDialog } from "./ArchiveConfirmDialog";
 import { useArchiveFeature } from "../hooks/useArchiveFeature";
-import { Toast } from "./Toast";
 import { useToast } from "../hooks/useToast";
 
 // --- Pure functions ---
@@ -93,16 +92,20 @@ export const FeatureCard = ({
       >
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-semibold text-gray-100">
-              {feature.name}
-            </h3>
-            <span
-              data-testid="feature-id"
-              onClick={handleFeatureIdClick}
-              className="font-mono text-xs text-gray-500 cursor-pointer hover:underline hover:text-gray-300"
-            >
-              {feature.featureId}
-            </span>
+            <div className="flex items-center gap-2">
+              <h3
+                data-testid="feature-id"
+                onClick={handleFeatureIdClick}
+                className="truncate text-sm font-semibold text-gray-100 cursor-pointer hover:underline"
+              >
+                {feature.name}
+              </h3>
+              {toast.message && (
+                <span role="status" className="text-xs text-gray-400">
+                  {toast.message}
+                </span>
+              )}
+            </div>
             {hasValidDescription(feature.shortDescription) && (
               <p
                 data-testid="feature-description"
@@ -180,7 +183,6 @@ export const FeatureCard = ({
         onCancel={handleCancel}
         loading={archiving}
       />
-      <Toast message={toast.message} />
     </>
   );
 };

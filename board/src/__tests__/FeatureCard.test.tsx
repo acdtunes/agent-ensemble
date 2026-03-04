@@ -102,7 +102,7 @@ describe("formatProgressLabel", () => {
 describe("FeatureCard", () => {
   it("displays feature name", () => {
     render(<FeatureCard feature={makeFeature()} />);
-    expect(screen.getByRole("heading", { name: "card-redesign" })).toBeInTheDocument();
+    expect(screen.getByTestId("feature-id")).toHaveTextContent("card-redesign");
   });
 
   // =================================================================
@@ -176,14 +176,7 @@ describe("FeatureCard", () => {
       });
     });
 
-    it("displays feature ID with monospace font", () => {
-      render(<FeatureCard feature={makeFeature()} />);
-      const featureId = screen.getByTestId("feature-id");
-      expect(featureId).toHaveTextContent("card-redesign");
-      expect(featureId.className).toMatch(/font-mono/);
-    });
-
-    it("copies feature ID to clipboard when clicked", async () => {
+    it("copies feature ID to clipboard when title is clicked", async () => {
       render(<FeatureCard feature={makeFeature()} />);
       fireEvent.click(screen.getByTestId("feature-id"));
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("card-redesign");
@@ -197,7 +190,7 @@ describe("FeatureCard", () => {
       });
     });
 
-    it("does not trigger card onClick when feature ID is clicked", () => {
+    it("does not trigger card onClick when title is clicked", () => {
       const onClick = vi.fn();
       render(<FeatureCard feature={makeFeature()} onClick={onClick} />);
       fireEvent.click(screen.getByTestId("feature-id"));

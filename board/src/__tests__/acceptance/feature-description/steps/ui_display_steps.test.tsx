@@ -46,10 +46,11 @@ describe('US-01 Scenario: FeatureCard shows short description below feature name
 
     // Then description appears below the feature name with muted styling
     const card = screen.getByRole('button');
-    const featureName = within(card).getByText('auth-system');
-    const description = within(card).getByText('Handles user authentication');
+    // Feature name appears in heading
+    const featureName = within(card).getByRole('heading', { level: 3 });
+    expect(featureName).toHaveTextContent('auth-system');
 
-    expect(featureName).toBeInTheDocument();
+    const description = within(card).getByText('Handles user authentication');
     expect(description).toBeInTheDocument();
     // Description should have muted/secondary text styling
     expect(description.className).toMatch(/text-gray-400|text-gray-500/);
@@ -84,8 +85,8 @@ describe('US-01 Scenario: FeatureCard shows nothing when short description is un
     const { container } = render(<FeatureCard feature={feature} />);
 
     // Then no description element is rendered
-    // Feature name should exist
-    expect(screen.getByText('legacy-feature')).toBeInTheDocument();
+    // Feature name should exist (use heading to avoid matching feature-id span)
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('legacy-feature');
     // But no element with description text-specific styling
     const descriptionElements = container.querySelectorAll('[data-testid="feature-description"]');
     expect(descriptionElements).toHaveLength(0);
@@ -190,7 +191,7 @@ describe('US-03 Scenario: Existing feature without descriptions displays normall
     render(<FeatureCard feature={feature} />);
 
     // Then card displays feature name and progress
-    expect(screen.getByText('existing-feature')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('existing-feature');
     expect(screen.getByText(/5 of 10/)).toBeInTheDocument();
     // And no description elements shown
     expect(screen.queryByTestId('feature-description')).not.toBeInTheDocument();
@@ -238,7 +239,7 @@ describe('US-01 Scenario: FeatureCard handles empty string short description', (
     render(<FeatureCard feature={feature} />);
 
     // Then no description element is rendered
-    expect(screen.getByText('empty-desc')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('empty-desc');
     expect(screen.queryByTestId('feature-description')).not.toBeInTheDocument();
   });
 });
@@ -279,7 +280,7 @@ describe('US-01 Scenario: FeatureCard handles whitespace-only short description'
     render(<FeatureCard feature={feature} />);
 
     // Then no description element is rendered
-    expect(screen.getByText('whitespace-desc')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('whitespace-desc');
     expect(screen.queryByTestId('feature-description')).not.toBeInTheDocument();
   });
 });

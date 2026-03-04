@@ -4,7 +4,6 @@ import { getStatusTopBarColor } from '../utils/statusColors';
 import { getCardAnimationClasses } from '../utils/animationClasses';
 import { getTeammateColor } from '../utils/teammateColors';
 import { getTeammateEmoji } from '../utils/teammateEmoji';
-import { Toast } from './Toast';
 import { useToast } from '../hooks/useToast';
 
 const Badge = ({ bg, text, children }: { readonly bg: string; readonly text: string; readonly children: React.ReactNode }) => (
@@ -104,15 +103,21 @@ export const StepCard = ({ card, onCardClick, isHighlighted = false }: StepCardP
         ) : (
           <span />
         )}
-        <span
-          data-testid="step-id"
-          className="shrink-0 whitespace-nowrap font-mono text-xs text-gray-400 cursor-pointer hover:underline hover:text-gray-200"
-          onClick={handleStepIdClick}
-        >
-          {card.stepId}
+        <span className="flex items-center gap-1">
+          {toast.message && (
+            <span role="status" className="text-xs text-gray-500">
+              {toast.message}
+            </span>
+          )}
+          <span
+            data-testid="step-id"
+            className="shrink-0 whitespace-nowrap font-mono text-xs text-gray-400 cursor-pointer hover:underline hover:text-gray-200"
+            onClick={handleStepIdClick}
+          >
+            {card.stepId}
+          </span>
         </span>
       </div>
-      <Toast message={toast.message} />
     </div>
   );
 };
