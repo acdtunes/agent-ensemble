@@ -108,22 +108,19 @@ You are the **Team Lead** — a Claude AI session that orchestrates but does NOT
 
 ## Workflow
 
-### Phase 0: Validate Roadmap (MANDATORY GATE)
+### Phase 0: Ensure Valid Roadmap (MANDATORY GATE)
 
-**BEFORE any other action**, validate the roadmap path and schema.
+**BEFORE any other action**, ensure a valid roadmap exists.
 
-**Step 0a: Verify roadmap location**
-
-The roadmap MUST be at `docs/feature/{project-id}/roadmap.yaml` (root level).
+**Step 0a: Check if roadmap exists**
 
 ```bash
-# Check roadmap exists at correct location
 ls docs/feature/{project-id}/roadmap.yaml
 ```
 
-**If the file is NOT at this location** (e.g., it's at `board/docs/feature/` or `src/docs/feature/`):
-1. Tell the user: "Roadmap found at wrong location. It must be at `docs/feature/{project-id}/roadmap.yaml`."
-2. **DO NOT proceed. DO NOT attempt to execute.**
+**If roadmap does NOT exist:**
+1. Run `/nw:roadmap {project-id}` to create it
+2. After `/nw:roadmap` completes, continue to Step 0b
 
 **Step 0b: Validate schema**
 
@@ -133,13 +130,14 @@ PYTHONPATH=$HOME/.claude/lib/python python3 -m des.cli.roadmap validate docs/fea
 
 **Exit codes:**
 - `0` = Valid, proceed to Phase 1
-- `1` = Invalid schema, **STOP IMMEDIATELY** and report errors to user
+- `1` = Invalid schema
 - `2` = Usage error
 
 **If validation fails:**
 1. Print all errors from the CLI output
-2. Tell the user: "Roadmap is invalid. Use `/nw:roadmap` to create a valid roadmap or fix the errors manually."
-3. **DO NOT proceed to Phase 1. DO NOT attempt to execute.**
+2. Ask user: "Roadmap is invalid. Recreate it? (Y/n)"
+3. If yes: run `/nw:roadmap {project-id}` to recreate, then re-validate
+4. If no: **STOP. DO NOT proceed.**
 
 This gate exists because the parallel_groups CLI is lenient and will accept malformed roadmaps that will cause execution failures later.
 
