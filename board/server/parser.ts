@@ -145,6 +145,8 @@ const validateRoadmapMeta = (raw: unknown): RoadmapMeta => {
     ...(typeof raw.status === 'string' ? { status: raw.status } : {}),
     ...(typeof raw.reviewer === 'string' ? { reviewer: raw.reviewer } : {}),
     ...(typeof raw.approved_at === 'string' ? { approved_at: raw.approved_at } : {}),
+    ...(typeof raw.short_description === 'string' ? { short_description: raw.short_description } : {}),
+    ...(typeof raw.description === 'string' ? { description: raw.description } : {}),
   };
 };
 
@@ -173,3 +175,6 @@ export const parseRoadmap = (content: string): Result<Roadmap, ParseError> => {
   if (!yamlResult.ok) return yamlResult;
   return validateRoadmap(yamlResult.value);
 };
+
+// Alias for acceptance tests
+export const parseRoadmapYaml = parseRoadmap;

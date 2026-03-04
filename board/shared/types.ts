@@ -145,6 +145,8 @@ export interface FeatureSummary {
   readonly inProgress: number;
   readonly currentLayer: number;
   readonly updatedAt: string;
+  readonly shortDescription?: string;
+  readonly description?: string;
 }
 
 export interface ManifestEntry {
