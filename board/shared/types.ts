@@ -259,6 +259,18 @@ export interface DocTree {
   readonly fileCount: number;
 }
 
+/** Multi-root doc tree: docs from multiple directories merged with labels */
+export interface LabeledDocTree {
+  readonly label: string;
+  readonly root: readonly DocNode[];
+  readonly fileCount: number;
+}
+
+export interface MultiRootDocTree {
+  readonly roots: readonly LabeledDocTree[];
+  readonly totalFileCount: number;
+}
+
 export interface DirEntry {
   readonly name: string;
   readonly path: string;

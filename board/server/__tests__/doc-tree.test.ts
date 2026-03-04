@@ -9,6 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import type { LabeledDocTree, MultiRootDocTree, DocTree } from '../../shared/types.js';
 
 // Computed path prevents Vite from statically resolving the import before the file exists.
 const DOC_TREE_MODULE_PATH = ['..', '..', 'server', 'doc-tree'].join('/');
@@ -230,5 +231,103 @@ describe('buildDocTree: file count matches actual file nodes', () => {
 
     // Then fileCount is 4 (root.md + 2 ADRs + arch.md)
     expect(tree.fileCount).toBe(4);
+  });
+});
+
+// =================================================================
+// buildMultiRootDocTree: merges multiple labeled doc trees
+// =================================================================
+describe('buildMultiRootDocTree: merges labeled doc trees from multiple roots', () => {
+  it('combines multiple doc trees with their labels', async () => {
+    const { buildMultiRootDocTree } = await import(/* @vite-ignore */ DOC_TREE_MODULE_PATH);
+
+    // Given doc trees from multiple roots with labels
+    const labeledTrees: readonly { label: string; tree: DocTree }[] = [
+      {
+        label: 'feature',
+        tree: { root: [{ type: 'file', name: 'overview', path: 'overview.md' }], fileCount: 1 },
+      },
+      {
+        label: 'ux',
+        tree: {
+          root: [
+            { type: 'file', name: 'jtbd', path: 'jtbd.md' },
+            { type: 'file', name: 'journey-map', path: 'journey-map.md' },
+          ],
+          fileCount: 2,
+        },
+      },
+      {
+        label: 'requirements',
+        tree: {
+          root: [{ type: 'file', name: 'user-stories', path: 'user-stories.md' }],
+          fileCount: 1,
+        },
+      },
+    ];
+
+    // When combined into multi-root tree
+    const result: MultiRootDocTree = buildMultiRootDocTree(labeledTrees);
+
+    // Then result contains all roots with proper labels and total count
+    expect(result.roots).toHaveLength(3);
+    expect(result.roots[0].label).toBe('feature');
+    expect(result.roots[0].fileCount).toBe(1);
+    expect(result.roots[1].label).toBe('ux');
+    expect(result.roots[1].fileCount).toBe(2);
+    expect(result.roots[2].label).toBe('requirements');
+    expect(result.roots[2].fileCount).toBe(1);
+    expect(result.totalFileCount).toBe(4);
+  });
+
+  it('handles empty input (no roots)', async () => {
+    const { buildMultiRootDocTree } = await import(/* @vite-ignore */ DOC_TREE_MODULE_PATH);
+
+    // Given no doc trees
+    const labeledTrees: readonly { label: string; tree: DocTree }[] = [];
+
+    // When combined
+    const result = buildMultiRootDocTree(labeledTrees);
+
+    // Then result is empty
+    expect(result.roots).toHaveLength(0);
+    expect(result.totalFileCount).toBe(0);
+  });
+
+  it('handles single root (backward compatibility)', async () => {
+    const { buildMultiRootDocTree } = await import(/* @vite-ignore */ DOC_TREE_MODULE_PATH);
+
+    // Given a single doc tree
+    const labeledTrees: readonly { label: string; tree: DocTree }[] = [
+      {
+        label: 'feature',
+        tree: { root: [{ type: 'file', name: 'readme', path: 'readme.md' }], fileCount: 1 },
+      },
+    ];
+
+    // When combined
+    const result = buildMultiRootDocTree(labeledTrees);
+
+    // Then result has single root
+    expect(result.roots).toHaveLength(1);
+    expect(result.roots[0].label).toBe('feature');
+    expect(result.totalFileCount).toBe(1);
+  });
+
+  it('preserves order of input trees', async () => {
+    const { buildMultiRootDocTree } = await import(/* @vite-ignore */ DOC_TREE_MODULE_PATH);
+
+    // Given trees in specific order
+    const labeledTrees: readonly { label: string; tree: DocTree }[] = [
+      { label: 'ux', tree: { root: [], fileCount: 0 } },
+      { label: 'feature', tree: { root: [], fileCount: 0 } },
+      { label: 'requirements', tree: { root: [], fileCount: 0 } },
+    ];
+
+    // When combined
+    const result: MultiRootDocTree = buildMultiRootDocTree(labeledTrees);
+
+    // Then order is preserved
+    expect(result.roots.map((r) => r.label)).toEqual(['ux', 'feature', 'requirements']);
   });
 });

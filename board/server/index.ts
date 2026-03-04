@@ -19,11 +19,13 @@ import type {
   FeatureId,
   BrowseEntry,
   BrowseError,
+  MultiRootDocTree,
 } from '../shared/types.js';
 import { createProjectId, createFeatureId, computeRoadmapSummary } from '../shared/types.js';
 import { validateDocPath } from './doc-content.js';
 import { validateBrowsePath, computeParentPath } from './browse.js';
-import { buildDocTree } from './doc-tree.js';
+import { buildDocTree, buildMultiRootDocTree } from './doc-tree.js';
+import type { LabeledRoot } from './feature-docs-root.js';
 import { resolveFeatureRoadmap } from './feature-path-resolver.js';
 import { isRecord, parseRoadmap } from './parser.js';
 
@@ -310,7 +312,10 @@ export const createSubscriptionServer = (
 
 export interface DocHttpDeps {
   readonly getDocsRoot: (projectId: ProjectId) => string | undefined;
+  /** @deprecated Use getAllFeatureDocsRoots for multi-root support */
   readonly getFeatureDocsRoot?: (projectId: ProjectId, featureId: FeatureId) => string | undefined;
+  /** Returns all doc roots for a feature (feature, ux, requirements) */
+  readonly getAllFeatureDocsRoots?: (projectId: ProjectId, featureId: FeatureId) => readonly LabeledRoot[];
   readonly scanDocsDir: (docsRoot: string) => Promise<Result<readonly DirEntry[], DocTreeError>>;
   readonly readDocContent: (validatedPath: string) => Promise<Result<string, DocContentError>>;
 }
@@ -601,9 +606,85 @@ export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.A
       await sendDocContent(docs, docsRoot, pathParam, res);
     });
 
-    // --- Feature-scoped doc endpoints ---
+    // --- Feature-scoped doc endpoints (multi-root) ---
 
-    if (docs.getFeatureDocsRoot) {
+    if (docs.getAllFeatureDocsRoots) {
+      const getAllFeatureDocsRoots = docs.getAllFeatureDocsRoots;
+
+      app.get('/api/projects/:id/features/:featureId/docs/tree', async (req, res) => {
+        const idResult = createProjectId(req.params.id);
+        if (!idResult.ok) {
+          res.status(400).json({ error: idResult.error });
+          return;
+        }
+
+        const featureIdResult = createFeatureId(req.params.featureId);
+        if (!featureIdResult.ok) {
+          res.status(400).json({ error: featureIdResult.error });
+          return;
+        }
+
+        const labeledRoots = getAllFeatureDocsRoots(idResult.value, featureIdResult.value);
+        if (labeledRoots.length === 0) {
+          res.status(404).json({ error: 'Documentation not found for this feature' });
+          return;
+        }
+
+        // Scan all roots and build multi-root doc tree
+        const labeledTrees = await Promise.all(
+          labeledRoots.map(async ({ label, root }) => {
+            const scanResult = await docs.scanDocsDir(root);
+            if (!scanResult.ok) {
+              return { label, tree: { root: [], fileCount: 0 } };
+            }
+            return { label, tree: buildDocTree(scanResult.value) };
+          }),
+        );
+
+        const multiRootTree: MultiRootDocTree = buildMultiRootDocTree(labeledTrees);
+        res.json(multiRootTree);
+      });
+
+      app.get('/api/projects/:id/features/:featureId/docs/content', async (req, res) => {
+        const idResult = createProjectId(req.params.id);
+        if (!idResult.ok) {
+          res.status(400).json({ error: idResult.error });
+          return;
+        }
+
+        const featureIdResult = createFeatureId(req.params.featureId);
+        if (!featureIdResult.ok) {
+          res.status(400).json({ error: featureIdResult.error });
+          return;
+        }
+
+        const pathParam = req.query.path;
+        if (typeof pathParam !== 'string' || !pathParam) {
+          res.status(400).json({ error: 'Missing required query parameter: path' });
+          return;
+        }
+
+        // Path format: {label}/{relativePath} e.g., "ux/jtbd.md"
+        const slashIndex = pathParam.indexOf('/');
+        if (slashIndex === -1) {
+          res.status(400).json({ error: 'Invalid path format. Expected: {label}/{relativePath}' });
+          return;
+        }
+
+        const label = pathParam.slice(0, slashIndex);
+        const relativePath = pathParam.slice(slashIndex + 1);
+
+        const labeledRoots = getAllFeatureDocsRoots(idResult.value, featureIdResult.value);
+        const matchingRoot = labeledRoots.find((r) => r.label === label);
+        if (!matchingRoot) {
+          res.status(404).json({ error: 'Documentation not found for this feature' });
+          return;
+        }
+
+        await sendDocContent(docs, matchingRoot.root, relativePath, res);
+      });
+    } else if (docs.getFeatureDocsRoot) {
+      // Legacy single-root fallback
       const getFeatureDocsRoot = docs.getFeatureDocsRoot;
 
       app.get('/api/projects/:id/features/:featureId/docs/tree', async (req, res) => {

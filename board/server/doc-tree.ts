@@ -1,6 +1,6 @@
 import { readdir, stat, realpath } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
-import type { DirEntry, DocNode, DocTree, DocTreeError, Result } from '../shared/types';
+import type { DirEntry, DocNode, DocTree, DocTreeError, Result, MultiRootDocTree, LabeledDocTree } from '../shared/types';
 import { ok, err } from '../shared/types.js';
 
 // --- Predicates ---
@@ -157,4 +157,29 @@ export const buildDocTree = (entries: readonly DirEntry[]): DocTree => {
   const filtered = filterEntries(entries);
   const root = buildNodes(filtered, '');
   return { root, fileCount: countFiles(root) };
+};
+
+// --- Multi-root doc tree construction (pure) ---
+
+interface LabeledTree {
+  readonly label: string;
+  readonly tree: DocTree;
+}
+
+const toLabeledDocTree = ({ label, tree }: LabeledTree): LabeledDocTree => ({
+  label,
+  root: tree.root,
+  fileCount: tree.fileCount,
+});
+
+/**
+ * Combine multiple labeled doc trees into a single multi-root structure.
+ * Pure function — no IO.
+ */
+export const buildMultiRootDocTree = (
+  labeledTrees: readonly LabeledTree[],
+): MultiRootDocTree => {
+  const roots = labeledTrees.map(toLabeledDocTree);
+  const totalFileCount = roots.reduce((sum, r) => sum + r.fileCount, 0);
+  return { roots, totalFileCount };
 };

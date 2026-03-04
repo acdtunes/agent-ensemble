@@ -354,17 +354,27 @@ def cmd_transition(args: list[str]) -> int:
     Valid transitions:
         in_progress -> review
         review -> in_progress (revision)
+
+    Optional flags:
+        --outcome approved|rejected - Review outcome to record in review_history
+        --feedback STRING - Reviewer feedback text
     """
-    parsed, roadmap_path, error_arg = _parse_args(args, ["step", "status"])
+    parsed, roadmap_path, error_arg = _parse_args(args, ["step", "status", "outcome", "feedback"])
     if error_arg:
         print(f"Unknown argument: {error_arg}", file=sys.stderr)
         return 2
 
     step_id = parsed["step"]
     new_status = parsed["status"]
+    outcome = parsed["outcome"]
+    feedback = parsed["feedback"]
 
     if not roadmap_path or not step_id or not new_status:
         print("Error: ROADMAP_PATH, --step, and --status required", file=sys.stderr)
+        return 2
+
+    if outcome is not None and outcome not in {"approved", "rejected"}:
+        print(f"Error: invalid outcome '{outcome}'. Valid: approved, rejected", file=sys.stderr)
         return 2
 
     if new_status not in {"in_progress", "review"}:
@@ -403,6 +413,17 @@ def cmd_transition(args: list[str]) -> int:
 
     if new_status == "failed":
         step["completed_at"] = now
+
+    if outcome is not None:
+        review_entry = {
+            "cycle": step.get("review_attempts", 1),
+            "timestamp": now,
+            "outcome": outcome,
+            "feedback": feedback if feedback is not None else "",
+        }
+        if "review_history" not in step:
+            step["review_history"] = []
+        step["review_history"].append(review_entry)
 
     _save_roadmap(yaml_inst, data, roadmap_file)
 

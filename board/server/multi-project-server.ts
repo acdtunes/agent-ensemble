@@ -27,6 +27,9 @@ import { scanDocsDir } from './doc-tree.js';
 import { readDocContent } from './doc-content.js';
 import { listDirectories, defaultPath } from './browse.js';
 import { discoverFeaturesFs } from './feature-discovery.js';
+import { findAllFeatureDocsRoots, type LabeledRoot } from './feature-docs-root.js';
+import { existsSync } from 'node:fs';
+import { createDirectoryWatcher, type DirectoryWatcher } from './directory-watcher.js';
 import { ok, err } from '../shared/types.js';
 
 // --- Projects manifest persistence ---
@@ -175,6 +178,51 @@ const createFeatureWatcherManager = (deps: FeatureWatcherManagerDeps): FeatureWa
   return { getRoadmap, onSubscribed, onUnsubscribed, closeAll };
 };
 
+// --- Feature directory watcher manager ---
+
+interface FeatureDirectoryWatcherManager {
+  readonly startWatching: (projectId: ProjectId, projectPath: string) => Promise<void>;
+  readonly stopWatching: (projectId: ProjectId) => Promise<void>;
+  readonly closeAll: () => Promise<void>;
+}
+
+interface FeatureDirectoryWatcherDeps {
+  readonly onDirectoryChanged: (projectId: ProjectId) => void;
+}
+
+const createFeatureDirectoryWatcherManager = (
+  deps: FeatureDirectoryWatcherDeps,
+): FeatureDirectoryWatcherManager => {
+  const watchers = new Map<ProjectId, DirectoryWatcher>();
+
+  const startWatching = async (projectId: ProjectId, projectPath: string): Promise<void> => {
+    // Don't start duplicate watchers
+    if (watchers.has(projectId)) return;
+
+    const watcher = createDirectoryWatcher(projectPath, () => {
+      deps.onDirectoryChanged(projectId);
+    });
+
+    watchers.set(projectId, watcher);
+    await watcher.ready;
+  };
+
+  const stopWatching = async (projectId: ProjectId): Promise<void> => {
+    const watcher = watchers.get(projectId);
+    if (watcher) {
+      await watcher.close();
+      watchers.delete(projectId);
+    }
+  };
+
+  const closeAll = async (): Promise<void> => {
+    await Promise.all([...watchers.values()].map((watcher) => watcher.close()));
+    watchers.clear();
+  };
+
+  return { startWatching, stopWatching, closeAll };
+};
+
 // --- Synchronous file read adapter ---
 
 const readFileSyncResult = (path: string): Result<string, string> => {
@@ -234,21 +282,34 @@ export const createMultiProjectServer = (
     },
   });
 
+  // Feature directory watcher — watches for new/deleted feature directories
+  const featureDirectoryWatcherManager = createFeatureDirectoryWatcherManager({
+    onDirectoryChanged: (projectId) => {
+      // Re-run feature discovery and broadcast updated list
+      refreshFeatures(projectId).then(() => subscriptionServer?.notifyProjectListChange());
+    },
+  });
+
   // Manifest-registered project IDs — discovery must not remove these
   const manifestIds = new Set<ProjectId>();
 
   // Discovery → Registry bridge
   const registryActions: RegistryActions = {
     add: (projectId: ProjectId) => {
-      pathMap.set(projectId, join(config.projectsRoot, projectId as string));
+      const projectPath = join(config.projectsRoot, projectId as string);
+      pathMap.set(projectId, projectPath);
       registry.add(toConfigFromDiscovery(projectId));
       refreshFeatures(projectId).then(() => subscriptionServer?.notifyProjectListChange());
+      // Start watching for feature directory changes
+      featureDirectoryWatcherManager.startWatching(projectId, projectPath).catch(() => {});
     },
     remove: (projectId: ProjectId) => {
       if (manifestIds.has(projectId)) return; // Never remove manifest-registered projects
       pathMap.delete(projectId);
       featuresCache.delete(projectId);
       registry.remove(projectId);
+      // Stop watching for feature directory changes
+      featureDirectoryWatcherManager.stopWatching(projectId).catch(() => {});
       subscriptionServer?.notifyProjectListChange();
     },
     knownIds: () => {
@@ -306,6 +367,9 @@ export const createMultiProjectServer = (
     onFeatureUnsubscribed: featureWatcherManager.onUnsubscribed,
   });
 
+  // Candidate directories for feature docs (ordered by priority)
+  const FEATURE_DOCS_DIRS = ['docs/feature', 'docs/ux', 'docs/requirements'] as const;
+
   // Doc endpoint deps — wired with real scanDocsDir and readDocContent
   const docDeps: DocHttpDeps = {
     getDocsRoot: (projectId) => {
@@ -313,10 +377,15 @@ export const createMultiProjectServer = (
       if (!projectPath) return undefined;
       return join(projectPath, 'docs');
     },
-    getFeatureDocsRoot: (projectId: ProjectId, featureId: FeatureId) => {
+    getAllFeatureDocsRoots: (projectId: ProjectId, featureId: FeatureId): readonly LabeledRoot[] => {
       const projectPath = pathMap.get(projectId);
-      if (!projectPath) return undefined;
-      return join(projectPath, 'docs', 'feature', featureId as string);
+      if (!projectPath) return [];
+      return findAllFeatureDocsRoots(
+        projectPath,
+        featureId as string,
+        FEATURE_DOCS_DIRS,
+        existsSync,
+      );
     },
     scanDocsDir,
     readDocContent,
@@ -359,6 +428,8 @@ export const createMultiProjectServer = (
     }
 
     await refreshFeatures(idResult.value);
+    // Start watching for feature directory changes
+    await featureDirectoryWatcherManager.startWatching(idResult.value, projectPath);
 
     projectsManifest = {
       projects: [...projectsManifest.projects, { projectId: idResult.value as string, path: projectPath }],
@@ -380,6 +451,8 @@ export const createMultiProjectServer = (
     pathMap.delete(projectId);
     featuresCache.delete(projectId);
     manifestIds.delete(projectId);
+    // Stop watching for feature directory changes
+    await featureDirectoryWatcherManager.stopWatching(projectId);
 
     projectsManifest = {
       projects: projectsManifest.projects.filter((p) => p.projectId !== (projectId as string)),
@@ -433,6 +506,8 @@ export const createMultiProjectServer = (
         manifestIds.add(idResult.value);
         pathMap.set(idResult.value, registration.path);
         registry.add(toConfigFromPath(idResult.value, registration.path));
+        // Start watching for feature directory changes
+        featureDirectoryWatcherManager.startWatching(idResult.value, registration.path).catch(() => {});
       }
     }
 
@@ -452,6 +527,7 @@ export const createMultiProjectServer = (
   const close = async (): Promise<void> => {
     discovery.stop();
     stopFeaturesRefresh();
+    await featureDirectoryWatcherManager.closeAll();
     await featureWatcherManager.closeAll();
     await registry.close();
     await subscriptionServer!.close();
