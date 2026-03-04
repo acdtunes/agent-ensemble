@@ -37,7 +37,7 @@ export const FileCard = ({ card, onCardClick }: FileCardProps) => {
         </div>
       )}
       <div className="mt-1 flex flex-wrap gap-1">
-        {card.worktree && (
+        {card.usesWorktree && (
           <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-600">worktree</span>
         )}
         {card.reviewCount > 0 && (

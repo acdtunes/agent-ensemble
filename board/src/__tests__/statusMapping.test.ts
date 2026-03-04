@@ -109,9 +109,14 @@ describe('expandStepToFileCards', () => {
     expect(card.reviewCount).toBe(3);
   });
 
-  it('sets worktree flag from step (always false for RoadmapStep)', () => {
-    const step = makeStep();
-    expect(expandStepToFileCards(step, false)[0].worktree).toBe(false);
+  it('sets usesWorktree true when step has worktree path', () => {
+    const step = makeStep({ worktree: '/path/to/worktree' });
+    expect(expandStepToFileCards(step, false)[0].usesWorktree).toBe(true);
+  });
+
+  it('sets usesWorktree false when step has no worktree', () => {
+    const step = makeStep({ worktree: undefined });
+    expect(expandStepToFileCards(step, false)[0].usesWorktree).toBe(false);
   });
 
   it('propagates isBlocked flag from parameter', () => {
@@ -159,5 +164,73 @@ describe('expandStepToStepCard', () => {
     const step = makeStep({ dependencies: [] });
     const card = expandStepToStepCard(step, false);
     expect(card.dependencyCount).toBe(0);
+  });
+
+  // --- Conflict field mapping (step 02-02) ---
+
+  it('maps conflicts_with to conflictsWith array', () => {
+    const step = makeStep({ conflicts_with: ['step-02', 'step-03'] });
+    const card = expandStepToStepCard(step, false);
+    expect(card.conflictsWith).toEqual(['step-02', 'step-03']);
+  });
+
+  it('sets conflictsWith to empty array when conflicts_with is undefined', () => {
+    const step = makeStep({ conflicts_with: undefined });
+    const card = expandStepToStepCard(step, false);
+    expect(card.conflictsWith).toEqual([]);
+  });
+
+  it('sets conflictsWith to empty array when conflicts_with is empty', () => {
+    const step = makeStep({ conflicts_with: [] });
+    const card = expandStepToStepCard(step, false);
+    expect(card.conflictsWith).toEqual([]);
+  });
+
+  it('sets usesWorktree true when worktree field has a path', () => {
+    const step = makeStep({ worktree: '/path/to/worktree' });
+    const card = expandStepToStepCard(step, false);
+    expect(card.usesWorktree).toBe(true);
+  });
+
+  it('sets usesWorktree false when worktree is undefined', () => {
+    const step = makeStep({ worktree: undefined });
+    const card = expandStepToStepCard(step, false);
+    expect(card.usesWorktree).toBe(false);
+  });
+
+  it('sets usesWorktree false when worktree is empty string', () => {
+    const step = makeStep({ worktree: '' });
+    const card = expandStepToStepCard(step, false);
+    expect(card.usesWorktree).toBe(false);
+  });
+
+  it('preserves all existing step data unchanged when conflict fields added', () => {
+    const step = makeStep({
+      id: 'step-99',
+      name: 'Test step',
+      files_to_modify: ['a.ts', 'b.ts'],
+      dependencies: ['step-01'],
+      status: 'in_progress',
+      teammate_id: 'crafter-01',
+      review_attempts: 2,
+      worktree: '/worktrees/step-99',
+      conflicts_with: ['step-02'],
+    });
+    const card = expandStepToStepCard(step, true);
+
+    // Verify existing fields unchanged
+    expect(card.stepId).toBe('step-99');
+    expect(card.stepName).toBe('Test step');
+    expect(card.fileCount).toBe(2);
+    expect(card.files).toEqual(['a.ts', 'b.ts']);
+    expect(card.dependencyCount).toBe(1);
+    expect(card.displayColumn).toBe('in_progress');
+    expect(card.teammateId).toBe('crafter-01');
+    expect(card.reviewCount).toBe(2);
+    expect(card.isBlocked).toBe(true);
+
+    // Verify new fields
+    expect(card.usesWorktree).toBe(true);
+    expect(card.conflictsWith).toEqual(['step-02']);
   });
 });

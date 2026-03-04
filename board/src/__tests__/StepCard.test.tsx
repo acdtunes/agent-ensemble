@@ -21,10 +21,11 @@ const baseCard: StepCardData = {
   fileCount: 1,
   files: ['server/index.ts'],
   reviewCount: 0,
-  worktree: false,
+  usesWorktree: false,
   isBlocked: false,
   teammateId: null,
   dependencyCount: 0,
+  conflictsWith: [],
 };
 
 describe('StepCard', () => {
@@ -95,10 +96,10 @@ describe('StepCard', () => {
   });
 
   it.each([
-    { worktree: true, visible: true },
-    { worktree: false, visible: false },
-  ])('worktree badge: worktree=$worktree', ({ worktree, visible }) => {
-    const card = { ...baseCard, worktree };
+    { usesWorktree: true, visible: true },
+    { usesWorktree: false, visible: false },
+  ])('worktree badge: usesWorktree=$usesWorktree', ({ usesWorktree, visible }) => {
+    const card = { ...baseCard, usesWorktree };
     render(<StepCard card={card} />);
     if (visible) {
       expect(screen.getByText('worktree')).toBeInTheDocument();
@@ -201,6 +202,94 @@ describe('StepCard', () => {
       const card = { ...baseCard, dependencyCount };
       render(<StepCard card={card} />);
       expect(screen.getByText(expected)).toBeInTheDocument();
+    });
+  });
+
+  describe('conflict badge', () => {
+    it('displays conflicts badge with count when conflictsWith is non-empty', () => {
+      const card = { ...baseCard, conflictsWith: ['02-01', '02-02'] };
+      render(<StepCard card={card} />);
+      expect(screen.getByText('conflicts: 2')).toBeInTheDocument();
+    });
+
+    it('does not display conflicts badge when conflictsWith is empty', () => {
+      const card = { ...baseCard, conflictsWith: [] };
+      render(<StepCard card={card} />);
+      expect(screen.queryByText(/conflicts:/)).not.toBeInTheDocument();
+    });
+
+    it('displays singular count for single conflict', () => {
+      const card = { ...baseCard, conflictsWith: ['02-01'] };
+      render(<StepCard card={card} />);
+      expect(screen.getByText('conflicts: 1')).toBeInTheDocument();
+    });
+
+    it('hides conflicts badge when displayColumn is done regardless of conflict data', () => {
+      const card = { ...baseCard, displayColumn: 'done' as const, conflictsWith: ['02-01', '02-02'] };
+      render(<StepCard card={card} />);
+      expect(screen.queryByText(/conflicts:/)).not.toBeInTheDocument();
+    });
+
+    it('hides worktree badge when displayColumn is done', () => {
+      const card = { ...baseCard, displayColumn: 'done' as const, usesWorktree: true };
+      render(<StepCard card={card} />);
+      expect(screen.queryByText('worktree')).not.toBeInTheDocument();
+    });
+
+    it('hides blocked badge when displayColumn is done', () => {
+      const card = { ...baseCard, displayColumn: 'done' as const, isBlocked: true };
+      render(<StepCard card={card} />);
+      expect(screen.queryByText('blocked')).not.toBeInTheDocument();
+    });
+
+    it('shows conflicts badge with amber/warning styling', () => {
+      const card = { ...baseCard, conflictsWith: ['02-01'] };
+      render(<StepCard card={card} />);
+      const badge = screen.getByText('conflicts: 1');
+      expect(badge.className).toMatch(/amber|orange|yellow/);
+    });
+
+    describe('conflict tooltip', () => {
+      it('shows tooltip with conflicting step IDs on badge hover', async () => {
+        const card = { ...baseCard, conflictsWith: ['02-01', '02-02'] };
+        render(<StepCard card={card} />);
+        const badge = screen.getByText('conflicts: 2');
+        fireEvent.mouseEnter(badge);
+        expect(screen.getByRole('tooltip')).toHaveTextContent('Conflicts with: 02-01, 02-02');
+      });
+
+      it('hides tooltip on mouse leave', async () => {
+        const card = { ...baseCard, conflictsWith: ['02-01'] };
+        render(<StepCard card={card} />);
+        const badge = screen.getByText('conflicts: 1');
+        fireEvent.mouseEnter(badge);
+        expect(screen.getByRole('tooltip')).toBeInTheDocument();
+        fireEvent.mouseLeave(badge);
+        expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('conflict highlight', () => {
+    it('applies highlight styling when isHighlighted is true', () => {
+      const card = { ...baseCard, conflictsWith: ['02-01'] };
+      render(<StepCard card={card} isHighlighted={true} />);
+      const stepCard = screen.getByTestId('step-card');
+      expect(stepCard.className).toMatch(/ring-2|ring-amber|border-amber/);
+    });
+
+    it('does not apply highlight styling when isHighlighted is false', () => {
+      const card = { ...baseCard, conflictsWith: ['02-01'] };
+      render(<StepCard card={card} isHighlighted={false} />);
+      const stepCard = screen.getByTestId('step-card');
+      expect(stepCard.className).not.toMatch(/ring-amber/);
+    });
+
+    it('does not apply highlight styling when isHighlighted is undefined', () => {
+      const card = { ...baseCard, conflictsWith: ['02-01'] };
+      render(<StepCard card={card} />);
+      const stepCard = screen.getByTestId('step-card');
+      expect(stepCard.className).not.toMatch(/ring-amber/);
     });
   });
 

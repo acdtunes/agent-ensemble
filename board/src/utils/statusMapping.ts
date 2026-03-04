@@ -19,7 +19,6 @@ const STATUS_TO_COLUMN: Readonly<Record<StepStatus, DisplayColumn>> = {
   in_progress: 'in_progress',
   review: 'review',
   approved: 'done',
-  failed: 'in_progress',
 };
 
 export const mapStatusToDisplayColumn = (status: StepStatus): DisplayColumn =>
@@ -34,10 +33,11 @@ export interface StepCardData {
   readonly fileCount: number;
   readonly files: readonly string[];
   readonly reviewCount: number;
-  readonly worktree: boolean;
+  readonly usesWorktree: boolean;
   readonly isBlocked: boolean;
   readonly teammateId: string | null;
   readonly dependencyCount: number;
+  readonly conflictsWith: readonly string[];
 }
 
 export const expandStepToStepCard = (step: RoadmapStep, isBlocked: boolean): StepCardData => {
@@ -52,10 +52,11 @@ export const expandStepToStepCard = (step: RoadmapStep, isBlocked: boolean): Ste
     fileCount: files.length,
     files,
     reviewCount: step.review_attempts,
-    worktree: false,
+    usesWorktree: Boolean(step.worktree),
     isBlocked,
     teammateId: step.teammate_id,
     dependencyCount: step.dependencies.length,
+    conflictsWith: step.conflicts_with ?? [],
   };
 };
 
@@ -67,7 +68,7 @@ export interface FileCardData {
   readonly stepName: string;
   readonly displayColumn: DisplayColumn;
   readonly reviewCount: number;
-  readonly worktree: boolean;
+  readonly usesWorktree: boolean;
   readonly isBlocked: boolean;
   readonly teammateId: string | null;
 }
@@ -83,7 +84,7 @@ export const expandStepToFileCards = (step: RoadmapStep, isBlocked: boolean): re
     stepName: step.name,
     displayColumn: mapStatusToDisplayColumn(step.status),
     reviewCount: step.review_attempts,
-    worktree: false,
+    usesWorktree: Boolean(step.worktree),
     isBlocked,
     teammateId: step.teammate_id,
   }));
