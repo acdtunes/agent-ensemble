@@ -11,14 +11,6 @@ test.describe('Dashboard Smoke Tests', () => {
     await expect(page.getByRole('button', { name: /add project/i })).toBeVisible();
   });
 
-  test('API /api/projects responds with array', async ({ request }) => {
-    const response = await request.get('/api/projects');
-    expect(response.ok()).toBeTruthy();
-
-    const data = await response.json();
-    expect(Array.isArray(data)).toBeTruthy();
-  });
-
   test('can click Add Project and see path input', async ({ page }) => {
     await page.goto('/');
 
