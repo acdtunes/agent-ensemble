@@ -17,7 +17,6 @@ import { ProgressHeader } from "./components/ProgressHeader";
 import { KanbanBoard } from "./components/KanbanBoard";
 import { StepDetailModal } from "./components/StepDetailModal";
 import { buildPlanStepLookup } from "./utils/stepDetailUtils";
-import { TeamPanel } from "./components/TeamPanel";
 import { OverviewDashboard } from "./components/OverviewDashboard";
 import { AddProjectDialog } from "./components/AddProjectDialog";
 import { ProjectFeatureView } from "./components/ProjectFeatureView";
@@ -125,18 +124,8 @@ const BoardContent = ({ roadmap }: BoardContentProps) => {
         currentPhase={currentPhase}
         createdAt={roadmap.roadmap.created_at ?? ""}
       />
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-4">
-        <div className="lg:col-span-3">
-          <KanbanBoard roadmap={roadmap} onCardClick={handleCardClick} />
-        </div>
-        <div className="space-y-6">
-          <section aria-label="Teammates">
-            <h2 className="mb-3 text-lg font-medium text-gray-300">
-              Teammates
-            </h2>
-            <TeamPanel roadmap={roadmap} />
-          </section>
-        </div>
+      <div className="mt-6">
+        <KanbanBoard roadmap={roadmap} onCardClick={handleCardClick} />
       </div>
       {selectedStep !== null && (
         <StepDetailModal
