@@ -1,13 +1,12 @@
 /**
- * Acceptance tests: US-05 - Teammate Visibility on Cards
+ * Acceptance tests: Remove Teammates Section - Step 01-02
  *
  * Driving port: StepCard component (rendered via props including teammateId)
- * Validates: teammate label rendering and color differentiation
+ * Validates: teammate indicators are NOT displayed on cards
  *
- * Gherkin reference: milestone-3-teammate-visibility.feature (US-05 scenarios)
- *
- * Color determinism, palette validity, and edge cases are covered by
- * teammateColors.test.ts — only acceptance-level scenarios kept here.
+ * Note: Original US-05 tests (teammate visibility) are superseded by
+ * the remove-teammates-section feature. Cards now show step name and
+ * status color only, without agent IDs or emoji badges.
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
@@ -19,11 +18,11 @@ import { createStepCardData } from './test-fixtures';
 afterEach(cleanup);
 
 // =================================================================
-// US-05 Scenario 1: Active card shows teammate with colored label
+// Removal validation: Cards do not display teammate indicators
 // =================================================================
-describe('US-05: Active card shows teammate with colored label', () => {
-  it('card for step "01-02" shows "crafter-02" with a person icon and colored label', () => {
-    // Given step "01-02 Setup API routes" is in progress, assigned to "crafter-02"
+describe('Remove Teammates: Cards do not display agent indicators', () => {
+  it('card with teammateId does not show teammate ID or emoji', () => {
+    // Given a step assigned to a teammate
     const card = createStepCardData({
       stepId: '01-02',
       stepName: 'Setup API routes',
@@ -36,19 +35,13 @@ describe('US-05: Active card shows teammate with colored label', () => {
     // When Andres views the card
     render(<StepCard card={card} />);
 
-    // Then the card shows the label "crafter-02"
-    expect(screen.getByText(/crafter-02/)).toBeInTheDocument();
-    // And the label uses a distinctive text color (not default gray)
-    const label = screen.getByText(/crafter-02/);
-    expect(label.className).toMatch(/text-(?!gray)/);
+    // Then the card does NOT show the teammate ID
+    expect(screen.queryByText(/crafter-02/)).not.toBeInTheDocument();
+    // And the card still shows the step name
+    expect(screen.getByText('Setup API routes')).toBeInTheDocument();
   });
-});
 
-// =================================================================
-// US-05 Scenario 3: Different teammates display different colors
-// =================================================================
-describe('US-05: Different teammates display different label colors', () => {
-  it('"crafter-01" and "crafter-02" have different text colors', () => {
+  it('cards preserve step name and status color without teammate display', () => {
     // Given two steps assigned to different teammates
     const card1 = createStepCardData({
       stepId: '01-01',
@@ -61,27 +54,25 @@ describe('US-05: Different teammates display different label colors', () => {
     const card2 = createStepCardData({
       stepId: '01-02',
       stepName: 'Setup API routes',
-      displayColumn: 'in_progress',
+      displayColumn: 'done',
       fileCount: 1,
       files: ['src/routes.ts'],
       teammateId: 'crafter-02',
     });
 
-    // When Andres views cards from both steps
+    // When Andres views both cards
     render(
       <div>
-        <div data-testid="card-1"><StepCard card={card1} /></div>
-        <div data-testid="card-2"><StepCard card={card2} /></div>
+        <StepCard card={card1} />
+        <StepCard card={card2} />
       </div>,
     );
 
-    // Then the label colors differ
-    const label1 = screen.getByText(/crafter-01/);
-    const label2 = screen.getByText(/crafter-02/);
-    const color1 = label1.className.match(/text-\w+-\d+/)?.[0];
-    const color2 = label2.className.match(/text-\w+-\d+/)?.[0];
-    expect(color1).toBeDefined();
-    expect(color2).toBeDefined();
-    expect(color1).not.toBe(color2);
+    // Then step names are visible
+    expect(screen.getByText('Setup database')).toBeInTheDocument();
+    expect(screen.getByText('Setup API routes')).toBeInTheDocument();
+    // And teammate IDs are NOT visible
+    expect(screen.queryByText(/crafter-01/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/crafter-02/)).not.toBeInTheDocument();
   });
 });
