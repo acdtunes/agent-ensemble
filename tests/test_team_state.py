@@ -441,3 +441,109 @@ def test_compute_conflicting_step_ids_returns_empty_for_no_overlap():
     result = _compute_conflicting_step_ids(step, active_steps)
 
     assert result == []
+
+
+# --- Unit: _clear_conflict_references pure function ---
+
+
+def test_clear_conflict_references_removes_step_id_from_other_steps():
+    """Unit: Pure function removes step ID from all steps' conflicts_with arrays."""
+    from agent_ensemble.cli.team_state import _clear_conflict_references
+
+    steps = [
+        {"id": "01-01", "conflicts_with": ["01-02"]},
+        {"id": "01-02", "conflicts_with": ["01-01"]},
+        {"id": "01-03", "conflicts_with": ["01-01", "01-02"]},
+    ]
+
+    _clear_conflict_references(steps, "01-02")
+
+    assert "conflicts_with" not in steps[0]  # 01-01 had only 01-02
+    assert "conflicts_with" not in steps[1]  # 01-02 had its conflicts cleared
+    assert steps[2].get("conflicts_with") == ["01-01"]  # 01-03 still has 01-01
+
+
+def test_clear_conflict_references_handles_steps_without_conflicts_with():
+    """Unit: Function handles steps that don't have conflicts_with field."""
+    from agent_ensemble.cli.team_state import _clear_conflict_references
+
+    steps = [
+        {"id": "01-01"},
+        {"id": "01-02", "conflicts_with": ["01-01"]},
+    ]
+
+    _clear_conflict_references(steps, "01-01")
+
+    assert "conflicts_with" not in steps[0]
+    assert "conflicts_with" not in steps[1]  # Became empty, removed
+
+
+# --- Acceptance: complete-step clears conflicts_with ---
+
+
+ROADMAP_WITH_MUTUAL_CONFLICTS = textwrap.dedent("""\
+    roadmap:
+      project_id: conflict-clear-test
+    phases:
+    - id: '01'
+      name: Foundation
+      steps:
+      - id: 01-01
+        name: Add auth
+        files_to_modify:
+          - src/auth.ts
+        status: in_progress
+        teammate_id: crafter-01
+        conflicts_with:
+          - 01-02
+      - id: 01-02
+        name: Add api
+        files_to_modify:
+          - src/auth.ts
+        status: review
+        teammate_id: crafter-02
+        conflicts_with:
+          - 01-01
+      - id: 01-03
+        name: Add tests
+        files_to_modify:
+          - src/auth.ts
+        status: in_progress
+        teammate_id: crafter-03
+        conflicts_with:
+          - 01-01
+          - 01-02
+""")
+
+
+def test_complete_step_clears_all_conflict_references(tmp_path):
+    """Acceptance: Completing a step clears its conflicts_with and removes its ID from others.
+
+    Verifies:
+    - Completed step has conflicts_with removed
+    - Completed step ID removed from other steps' conflicts_with arrays
+    - Steps with no remaining conflicts have conflicts_with field removed entirely
+    """
+    roadmap_file = tmp_path / "roadmap.yaml"
+    roadmap_file.write_text(ROADMAP_WITH_MUTUAL_CONFLICTS)
+
+    exit_code = main(["complete-step", str(roadmap_file), "--step", "01-02"])
+
+    assert exit_code == 0
+
+    from ruamel.yaml import YAML
+    yaml = YAML()
+    data = yaml.load(roadmap_file.read_text())
+
+    step_01 = data["phases"][0]["steps"][0]  # 01-01
+    step_02 = data["phases"][0]["steps"][1]  # 01-02
+    step_03 = data["phases"][0]["steps"][2]  # 01-03
+
+    # Completed step has conflicts_with removed
+    assert "conflicts_with" not in step_02
+
+    # Step 01-01 had only 01-02 in conflicts_with, field removed entirely
+    assert "conflicts_with" not in step_01
+
+    # Step 01-03 had [01-01, 01-02], now only has 01-01
+    assert step_03.get("conflicts_with") == ["01-01"]

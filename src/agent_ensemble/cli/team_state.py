@@ -207,6 +207,40 @@ def _add_conflict_reference(step: dict, conflict_id: str) -> None:
         step["conflicts_with"].append(conflict_id)
 
 
+def _clear_conflict_references(steps: list[dict], completed_step_id: str) -> None:
+    """Remove conflict references for a completed step from all steps.
+
+    Mutates step dicts in place:
+    - Clears conflicts_with from the completed step itself
+    - Removes completed_step_id from each other step's conflicts_with
+    - Removes conflicts_with field entirely if it becomes empty
+
+    Args:
+        steps: List of all step dicts
+        completed_step_id: ID of the step being completed
+    """
+    for step in steps:
+        step_id = step.get("id")
+        conflicts = step.get("conflicts_with")
+
+        # Clear conflicts_with from the completed step itself
+        if step_id == completed_step_id:
+            if conflicts is not None:
+                del step["conflicts_with"]
+            continue
+
+        if conflicts is None:
+            continue
+
+        # Remove completed step ID from other steps' conflicts_with
+        if completed_step_id in conflicts:
+            conflicts.remove(completed_step_id)
+
+        # Remove field entirely if empty
+        if not conflicts:
+            del step["conflicts_with"]
+
+
 def _load_roadmap(path: Path):
     """Load roadmap.yaml with ruamel.yaml for round-trip preservation."""
     yaml = YAML()
@@ -533,6 +567,9 @@ def cmd_complete_step(args: list[str]) -> int:
         if "review_history" not in step:
             step["review_history"] = []
         step["review_history"].append(review_entry)
+
+    # Clear conflict references from all steps
+    _clear_conflict_references(_all_steps(data), step_id)
 
     _save_roadmap(yaml_inst, data, roadmap_file)
 
