@@ -33,16 +33,22 @@ python -m agent_ensemble.cli.team_state start-step \
 
 # Transition step status (e.g. in_progress → review, review → in_progress for revision)
 # Updates roadmap.yaml atomically
+# Optional: --outcome and --feedback record review_history entries
 python -m agent_ensemble.cli.team_state transition \
   docs/feature/{project-id}/roadmap.yaml \
   --step {step_id} \
-  --status {review|in_progress|failed}
+  --status {review|in_progress|failed} \
+  [--outcome approved|rejected] \
+  [--feedback "Reviewer feedback text"]
 
 # Complete a step: sets approved + merges worktree if used
 # Output: "COMPLETED {step_id}", "COMPLETED {step_id} MERGE_OK", or "COMPLETED {step_id} MERGE_CONFLICT"
+# Optional: --outcome and --feedback record review_history entries before merge
 python -m agent_ensemble.cli.team_state complete-step \
   docs/feature/{project-id}/roadmap.yaml \
-  --step {step_id}
+  --step {step_id} \
+  [--outcome approved|rejected] \
+  [--feedback "Reviewer feedback text"]
 
 # --- Monitoring ---
 
@@ -263,12 +269,26 @@ Reviewers are spawned **lazily by the Lead** — only when a crafter signals it 
 
 **On NEEDS_REVISION (reviewer already running)**:
 1. Crafter addresses feedback and messages the Lead again: "Step {step_id} ready for re-review"
-2. Lead messages the **same already-running `reviewer-{step_id}`** — do NOT re-spawn
-3. The reviewer persists across revision cycles
+2. Lead records rejection in review_history:
+   ```bash
+   python -m agent_ensemble.cli.team_state transition \
+     docs/feature/{project-id}/roadmap.yaml \
+     --step {step_id} --status in_progress \
+     --outcome rejected --feedback "Reviewer feedback summary"
+   ```
+3. Lead messages the **same already-running `reviewer-{step_id}`** — do NOT re-spawn
+4. The reviewer persists across revision cycles
 
 **On APPROVED**:
 1. Crafter messages the Lead: "Step {step_id} APPROVED"
-2. Lead runs `complete-step` (marks approved + merges worktree if used), then shuts down both crafter and reviewer
+2. Lead runs `complete-step` with review outcome (marks approved + records review_history + merges worktree if used):
+   ```bash
+   python -m agent_ensemble.cli.team_state complete-step \
+     docs/feature/{project-id}/roadmap.yaml \
+     --step {step_id} \
+     --outcome approved --feedback "Approved: meets quality standards"
+   ```
+3. Lead shuts down both crafter and reviewer
 
 **Spawn prompt for Reviewer** (used by Lead when crafter signals readiness):
 ```
@@ -604,9 +624,12 @@ PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree cleanu
 │     └── Updates roadmap.yaml → review                            │
 │                                                                  │
 │  5. LEAD SPAWNS REVIEWER → APPROVED or NEEDS_REVISION            │
-│     └── On NEEDS_REVISION: transition back to in_progress        │
+│     ├── On NEEDS_REVISION: transition --outcome rejected         │
+│     │   └── Records review_history entry (cycle, feedback)       │
+│     └── On APPROVED: proceed to complete-step                    │
 │                                                                  │
-│  6. COMPLETE-STEP (atomic)                                       │
+│  6. COMPLETE-STEP (atomic) with --outcome approved               │
+│     ├── Records review_history entry (cycle, feedback)           │
 │     ├── Updates roadmap.yaml → approved                          │
 │     ├── Merges worktree branch if used (automatic)               │
 │     └── Output: COMPLETED, COMPLETED MERGE_OK, or MERGE_CONFLICT│
