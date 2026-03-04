@@ -13,7 +13,7 @@ Instead of sequential agent workflows, Agent Ensemble coordinates teams of speci
 git clone https://github.com/acdtunes/agent-ensemble.git
 cd agent-ensemble
 
-# Install (also installs nWave if missing)
+# Install commands and CLI tools (also installs nWave if missing)
 ./install.sh
 
 # Enable agent teams in Claude Code settings (see Configuration below)
@@ -36,16 +36,19 @@ cd agent-ensemble
 | `/ensemble:refactor` | Parallel refactoring with multiple approaches |
 | `/ensemble:audit` | Multi-perspective quality audit |
 
-### Feature Dashboard (Optional)
+### Project Dashboard (Optional)
 
-Visual board showing all features across projects with roadmap status.
+Visual board showing all projects and their features with roadmap progress.
 
 ```bash
 cd board
 npm install
 npm run dev
+# Starts both the API server and web UI
 # Open http://localhost:5173
 ```
+
+Add projects via the UI or create `.nw-board-projects.json` (see Configuration).
 
 ## Prerequisites
 
@@ -148,9 +151,9 @@ Enable agent teams (required). Edit `~/.claude/settings.json`:
 
 If you already have settings, just add the `env` section to your existing file.
 
-### Dashboard Projects
+### Dashboard Projects (Optional)
 
-Register projects for the dashboard by creating `.nw-board-projects.json` in your home directory or project root:
+You can add projects directly in the dashboard UI, or create `.nw-board-projects.json` in your home directory:
 
 ```json
 {
@@ -164,7 +167,7 @@ Register projects for the dashboard by creating `.nw-board-projects.json` in you
 }
 ```
 
-Projects need `docs/feature/*/roadmap.yaml` files to display on the dashboard.
+Projects with `docs/feature/*/roadmap.yaml` files will show feature progress on the dashboard.
 
 ## Updating
 
