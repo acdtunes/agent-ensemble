@@ -63,8 +63,8 @@ const unifiedRoadmapYaml = (opts?: { withActivity?: boolean }): string =>
         {
           id: '01-01',
           name: 'Step A',
-          files: ['a.ts'],
-          dependencies: [],
+          files_to_modify: ['a.ts'],
+          deps: [],
           criteria: ['AC1'],
           ...(opts?.withActivity ? {
             status: 'approved',
@@ -77,8 +77,8 @@ const unifiedRoadmapYaml = (opts?: { withActivity?: boolean }): string =>
         {
           id: '01-02',
           name: 'Step B',
-          files: ['b.ts'],
-          dependencies: ['01-01'],
+          files_to_modify: ['b.ts'],
+          deps: ['01-01'],
           criteria: ['AC2'],
           ...(opts?.withActivity ? {
             status: 'in_progress',
@@ -129,7 +129,7 @@ describe('discoverFeaturesFs: full discovery pipeline (scan → loadRoadmap → 
     expect(auth.hasRoadmap).toBe(true);
     expect(auth.hasExecutionLog).toBe(true);
     expect(auth.totalSteps).toBe(2);
-    expect(auth.completed).toBe(1);
+    expect(auth.done).toBe(1);
     expect(auth.inProgress).toBe(1);
   });
 
@@ -151,7 +151,7 @@ describe('discoverFeaturesFs: full discovery pipeline (scan → loadRoadmap → 
     expect(noRoadmap.hasRoadmap).toBe(false);
     expect(noRoadmap.hasExecutionLog).toBe(false);
     expect(noRoadmap.totalSteps).toBe(0);
-    expect(noRoadmap.completed).toBe(0);
+    expect(noRoadmap.done).toBe(0);
 
     const hasRoadmap = summaries.find((s) => (s.featureId as string) === 'has-roadmap')!;
     expect(hasRoadmap.hasRoadmap).toBe(true);
@@ -166,7 +166,7 @@ describe('discoverFeaturesFs: full discovery pipeline (scan → loadRoadmap → 
     expect(summaries).toHaveLength(1);
     expect(summaries[0].hasExecutionLog).toBe(false);
     expect(summaries[0].totalSteps).toBe(2);
-    expect(summaries[0].completed).toBe(0);
+    expect(summaries[0].done).toBe(0);
   });
 });
 

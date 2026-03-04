@@ -46,9 +46,8 @@ export const deriveFeatureSummary = (
       hasRoadmap: false,
       hasExecutionLog: false,
       totalSteps: 0,
-      completed: 0,
+      done: 0,
       inProgress: 0,
-      failed: 0,
       currentLayer: 0,
       updatedAt: '',
     };
@@ -62,9 +61,8 @@ export const deriveFeatureSummary = (
     hasRoadmap: true,
     hasExecutionLog: hasNonPendingStep(roadmap),
     totalSteps: summary.total_steps,
-    completed: summary.completed,
+    done: summary.done,
     inProgress: summary.in_progress,
-    failed: summary.failed,
     currentLayer: countCompletedPhases(roadmap),
     updatedAt: latestTimestamp(roadmap),
   };

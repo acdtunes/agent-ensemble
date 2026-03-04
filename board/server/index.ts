@@ -355,6 +355,23 @@ const sendDocTree = async (
   res.json(buildDocTree(scanResult.value));
 };
 
+const getDocContentErrorMessage = (error: DocContentError): string => {
+  switch (error.type) {
+    case 'not_found': return 'Document not found';
+    case 'invalid_path': return error.message;
+    case 'read_failed': return error.message;
+  }
+};
+
+const getBrowseErrorMessage = (error: BrowseError): string => {
+  switch (error.type) {
+    case 'not_found': return `Directory not found: ${error.path}`;
+    case 'invalid_path': return error.message;
+    case 'permission_denied': return `Permission denied: ${error.path}`;
+    case 'read_failed': return error.message;
+  }
+};
+
 const sendDocContent = async (
   docs: DocHttpDeps,
   docsRoot: string,
@@ -363,16 +380,14 @@ const sendDocContent = async (
 ): Promise<void> => {
   const pathResult = validateDocPath(docsRoot, pathParam);
   if (!pathResult.ok) {
-    res.status(400).json({ error: pathResult.error.message });
+    res.status(400).json({ error: getDocContentErrorMessage(pathResult.error) });
     return;
   }
 
   const contentResult = await docs.readDocContent(pathResult.value);
   if (!contentResult.ok) {
     const status = contentResult.error.type === 'not_found' ? 404 : 500;
-    res.status(status).json({ error: contentResult.error.type === 'not_found'
-      ? 'Document not found'
-      : 'Failed to read document' });
+    res.status(status).json({ error: getDocContentErrorMessage(contentResult.error) });
     return;
   }
 
@@ -524,27 +539,19 @@ export const createMultiProjectHttpApp = (deps: MultiProjectHttpDeps): express.A
 
       const pathResult = validateBrowsePath(rawPath);
       if (!pathResult.ok) {
-        res.status(400).json({ error: pathResult.error.message });
+        res.status(400).json({ error: getBrowseErrorMessage(pathResult.error) });
         return;
       }
 
       const validatedPath = pathResult.value;
       const listResult = await browse.listDirectories(validatedPath);
       if (!listResult.ok) {
-        switch (listResult.error.type) {
-          case 'invalid_path':
-            res.status(400).json({ error: listResult.error.message });
-            return;
-          case 'permission_denied':
-            res.status(403).json({ error: `Permission denied: ${listResult.error.path}` });
-            return;
-          case 'not_found':
-            res.status(404).json({ error: `Directory not found: ${listResult.error.path}` });
-            return;
-          case 'read_failed':
-            res.status(500).json({ error: listResult.error.message });
-            return;
-        }
+        const status = listResult.error.type === 'not_found' ? 404
+          : listResult.error.type === 'permission_denied' ? 403
+          : listResult.error.type === 'invalid_path' ? 400
+          : 500;
+        res.status(status).json({ error: getBrowseErrorMessage(listResult.error) });
+        return;
       }
 
       res.json({ path: validatedPath, parent: computeParentPath(validatedPath), entries: listResult.value });

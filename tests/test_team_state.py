@@ -219,7 +219,6 @@ def test_update_errors_on_unknown_step(tmp_path, capsys):
 @pytest.mark.parametrize("status,timestamp_field", [
     ("claimed", "started_at"),
     ("approved", "completed_at"),
-    ("failed", "completed_at"),
 ])
 def test_update_sets_timestamp_on_status_transition(tmp_path, status, timestamp_field):
     roadmap_file = tmp_path / "roadmap.yaml"

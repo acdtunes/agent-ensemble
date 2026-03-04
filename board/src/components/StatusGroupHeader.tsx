@@ -11,7 +11,7 @@ interface StatusGroupHeaderProps {
 }
 
 export const StatusGroupHeader = ({ groupName, count }: StatusGroupHeaderProps) => (
-  <h2 className="col-span-full rounded-md bg-gray-800/50 px-3 py-2 text-sm font-semibold uppercase tracking-wide text-gray-200">
+  <h2 className="col-span-full px-1 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
     {formatGroupLabel(groupName, count)}
   </h2>
 );

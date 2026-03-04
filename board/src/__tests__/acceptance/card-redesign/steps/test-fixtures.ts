@@ -60,8 +60,7 @@ export const createRoadmap = (
 export const createRoadmapSummary = (overrides?: Partial<RoadmapSummary>): RoadmapSummary => ({
   total_steps: 7,
   total_phases: 3,
-  completed: 3,
-  failed: 0,
+  done: 3,
   in_progress: 2,
   pending: 2,
   ...overrides,

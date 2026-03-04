@@ -15,7 +15,6 @@ export const STEP_STATUSES = [
   'in_progress',
   'review',
   'approved',
-  'failed',
 ] as const;
 
 export type StepStatus = (typeof STEP_STATUSES)[number];
@@ -73,8 +72,7 @@ export interface Roadmap {
 export interface RoadmapSummary {
   readonly total_steps: number;
   readonly total_phases: number;
-  readonly completed: number;
-  readonly failed: number;
+  readonly done: number;
   readonly in_progress: number;
   readonly pending: number;
 }
@@ -85,17 +83,15 @@ const IN_PROGRESS_STATUSES: ReadonlySet<StepStatus> = new Set(['claimed', 'in_pr
 
 export const computeRoadmapSummary = (roadmap: Roadmap): RoadmapSummary => {
   const allSteps = roadmap.phases.flatMap((p) => p.steps);
-  const completed = allSteps.filter((s) => s.status === 'approved').length;
-  const failed = allSteps.filter((s) => s.status === 'failed').length;
+  const done = allSteps.filter((s) => s.status === 'approved').length;
   const in_progress = allSteps.filter((s) => IN_PROGRESS_STATUSES.has(s.status)).length;
 
   return {
     total_steps: allSteps.length,
     total_phases: roadmap.phases.length,
-    completed,
-    failed,
+    done,
     in_progress,
-    pending: allSteps.length - completed - failed - in_progress,
+    pending: allSteps.length - done - in_progress,
   };
 };
 
@@ -141,8 +137,7 @@ export interface FeatureSummary {
   readonly hasRoadmap: boolean;
   readonly hasExecutionLog: boolean;
   readonly totalSteps: number;
-  readonly completed: number;
-  readonly failed: number;
+  readonly done: number;
   readonly inProgress: number;
   readonly currentLayer: number;
   readonly updatedAt: string;
@@ -165,8 +160,7 @@ export interface ProjectSummary {
   readonly projectId: ProjectId;
   readonly name: string;
   readonly totalSteps: number;
-  readonly completed: number;
-  readonly failed: number;
+  readonly done: number;
   readonly inProgress: number;
   readonly currentLayer: number;
   readonly updatedAt: string;
@@ -192,16 +186,43 @@ export const deriveProjectSummary = (
   roadmap: Roadmap,
   features: readonly FeatureSummary[] = [],
 ): ProjectSummary => {
-  const summary = computeRoadmapSummary(roadmap);
+  const projectSummary = computeRoadmapSummary(roadmap);
+  const hasProjectRoadmap = projectSummary.total_steps > 0;
+
+  // If project has its own roadmap, use it; otherwise aggregate from features
+  if (hasProjectRoadmap) {
+    return {
+      projectId,
+      name: projectId as string,
+      totalSteps: projectSummary.total_steps,
+      done: projectSummary.done,
+      inProgress: projectSummary.in_progress,
+      currentLayer: countCompletedPhases(roadmap),
+      updatedAt: latestRoadmapTimestamp(roadmap),
+      featureCount: features.length,
+      features,
+    };
+  }
+
+  // Aggregate from features
+  const totalSteps = features.reduce((sum, f) => sum + f.totalSteps, 0);
+  const done = features.reduce((sum, f) => sum + f.done, 0);
+  const inProgress = features.reduce((sum, f) => sum + f.inProgress, 0);
+  const completedFeatures = features.filter((f) => f.totalSteps > 0 && f.done === f.totalSteps).length;
+  const latestUpdate = features
+    .map((f) => f.updatedAt)
+    .filter((t) => t !== '')
+    .sort()
+    .at(-1) ?? '';
+
   return {
     projectId,
     name: projectId as string,
-    totalSteps: summary.total_steps,
-    completed: summary.completed,
-    failed: summary.failed,
-    inProgress: summary.in_progress,
-    currentLayer: countCompletedPhases(roadmap),
-    updatedAt: latestRoadmapTimestamp(roadmap),
+    totalSteps,
+    done,
+    inProgress,
+    currentLayer: completedFeatures,
+    updatedAt: latestUpdate,
     featureCount: features.length,
     features,
   };

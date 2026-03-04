@@ -43,10 +43,10 @@ describe('StatusGroupHeader', () => {
     expect(header).toHaveClass('col-span-full');
   });
 
-  it('visually distinguishes with distinct background and typography', () => {
+  it('visually distinguishes with distinct typography styling', () => {
     render(<StatusGroupHeader groupName="Active" count={1} />);
     const header = screen.getByRole('heading', { level: 2 });
-    expect(header).toHaveClass('bg-gray-800/50');
-    expect(header).toHaveClass('text-gray-200');
+    expect(header).toHaveClass('text-gray-500');
+    expect(header).toHaveClass('uppercase');
   });
 });

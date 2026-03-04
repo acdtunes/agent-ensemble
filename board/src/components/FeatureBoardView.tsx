@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
-import type { DeliveryState, ExecutionPlan, FeatureSummary } from '../../shared/types';
+import type { Roadmap, FeatureSummary } from '../../shared/types';
 import { Breadcrumb, type BreadcrumbSegment } from './Breadcrumb';
 import { ContextDropdowns } from './ContextDropdowns';
 import { KanbanBoard } from './KanbanBoard';
 import {
-  synthesizeQueuedState,
   filterBoardCapableFeatures,
   buildFeatureBoardUrl,
   buildFeatureDocsUrl,
@@ -13,8 +12,7 @@ import {
 interface FeatureBoardViewProps {
   readonly projectId: string;
   readonly featureId: string;
-  readonly plan: ExecutionPlan;
-  readonly state: DeliveryState | null;
+  readonly roadmap: Roadmap;
   readonly features: readonly FeatureSummary[];
   readonly onNavigateOverview: () => void;
   readonly onNavigateProject: () => void;
@@ -27,17 +25,11 @@ const navigateToFeatureBoard = (projectId: string, featureId: string): void => {
 export const FeatureBoardView = ({
   projectId,
   featureId,
-  plan,
-  state,
+  roadmap,
   features,
   onNavigateOverview,
   onNavigateProject,
 }: FeatureBoardViewProps) => {
-  const effectiveState = useMemo(
-    () => state ?? synthesizeQueuedState(plan),
-    [state, plan],
-  );
-
   const boardCapableFeatures = useMemo(
     () => filterBoardCapableFeatures(features),
     [features],
@@ -83,7 +75,7 @@ export const FeatureBoardView = ({
         />
       </div>
 
-      <KanbanBoard state={effectiveState} plan={plan} />
+      <KanbanBoard roadmap={roadmap} />
     </div>
   );
 };

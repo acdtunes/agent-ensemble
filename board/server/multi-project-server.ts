@@ -228,6 +228,9 @@ export const createMultiProjectServer = (
     getProjectPath: (projectId) => pathMap.get(projectId),
     onRoadmapChanged: (projectId, featureId, roadmap, transitions) => {
       subscriptionServer?.notifyFeatureUpdate(projectId, featureId, roadmap, transitions);
+      // Also refresh the features cache and broadcast project list change
+      // so the features list page sees updated summaries
+      refreshFeatures(projectId).then(() => subscriptionServer?.notifyProjectListChange());
     },
   });
 
@@ -262,6 +265,37 @@ export const createMultiProjectServer = (
     scanProjectDirsFs,
     config.pollIntervalMs,
   );
+
+  // --- Periodic features refresh for real-time updates ---
+  let featuresRefreshTimer: ReturnType<typeof setInterval> | null = null;
+
+  const refreshAllFeaturesAndBroadcast = async (): Promise<void> => {
+    const projectIds = registry.list();
+    const oldCacheJson = JSON.stringify([...featuresCache.entries()].map(([k, v]) => [k, v.map(f => ({ id: f.featureId, done: f.done, inProgress: f.inProgress }))]));
+
+    await Promise.all(projectIds.map(refreshFeatures));
+
+    const newCacheJson = JSON.stringify([...featuresCache.entries()].map(([k, v]) => [k, v.map(f => ({ id: f.featureId, done: f.done, inProgress: f.inProgress }))]));
+
+    // Only broadcast if something changed
+    if (oldCacheJson !== newCacheJson) {
+      subscriptionServer?.notifyProjectListChange();
+    }
+  };
+
+  const startFeaturesRefresh = (): void => {
+    if (featuresRefreshTimer !== null) return;
+    featuresRefreshTimer = setInterval(() => {
+      refreshAllFeaturesAndBroadcast().catch(() => {});
+    }, config.pollIntervalMs);
+  };
+
+  const stopFeaturesRefresh = (): void => {
+    if (featuresRefreshTimer !== null) {
+      clearInterval(featuresRefreshTimer);
+      featuresRefreshTimer = null;
+    }
+  };
 
   // Subscription server with live deps from registry
   subscriptionServer = createSubscriptionServer(config.wsPort, {
@@ -410,10 +444,14 @@ export const createMultiProjectServer = (
 
     // Populate features cache for all registered projects
     await Promise.all(registry.list().map(refreshFeatures));
+
+    // Start periodic features refresh for real-time updates
+    startFeaturesRefresh();
   })();
 
   const close = async (): Promise<void> => {
     discovery.stop();
+    stopFeaturesRefresh();
     await featureWatcherManager.closeAll();
     await registry.close();
     await subscriptionServer!.close();

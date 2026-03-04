@@ -3,9 +3,10 @@ import type { DocTree as DocTreeType, DocNode } from '../../shared/types';
 
 // --- Props ---
 
-interface DocTreeProps {
+export interface DocTreeProps {
   readonly tree: DocTreeType;
   readonly onSelectDoc: (path: string) => void;
+  readonly defaultExpanded?: boolean;
 }
 
 // --- Pure functions ---
@@ -85,8 +86,21 @@ const TreeNode = ({
 
 // --- DocTree component ---
 
-export const DocTree = ({ tree, onSelectDoc }: DocTreeProps) => {
-  const [expandedFolders, setExpandedFolders] = useState<ReadonlySet<string>>(new Set());
+const collectAllFolderPaths = (nodes: readonly DocNode[]): string[] => {
+  const paths: string[] = [];
+  for (const node of nodes) {
+    if (node.type === 'directory') {
+      paths.push(node.path);
+      paths.push(...collectAllFolderPaths(node.children));
+    }
+  }
+  return paths;
+};
+
+export const DocTree = ({ tree, onSelectDoc, defaultExpanded = false }: DocTreeProps) => {
+  const [expandedFolders, setExpandedFolders] = useState<ReadonlySet<string>>(() =>
+    defaultExpanded ? new Set(collectAllFolderPaths(tree.root)) : new Set(),
+  );
 
   const handleToggleFolder = useCallback((path: string) => {
     setExpandedFolders(prev => {

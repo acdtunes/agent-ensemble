@@ -101,11 +101,11 @@ describe('US-02: Modal displays file list and dependency information', () => {
 });
 
 // =================================================================
-// US-02 Scenario 3: Timing and review attempts for completed step
+// US-02 Scenario 3: Status for completed step, teammate for in-progress
 // =================================================================
-describe('US-02: Modal shows timing and review attempts for completed step', () => {
-  it('modal shows status, timing, and review attempts', async () => {
-    // Given step "01-01" is approved with timing data and 2 review attempts
+describe('US-02: Modal shows status and teammate appropriately', () => {
+  it('completed step shows status but not teammate', async () => {
+    // Given step "01-01" is approved (done)
     const step = createRoadmapStep({
       id: '01-01',
       name: 'Setup database',
@@ -113,18 +113,33 @@ describe('US-02: Modal shows timing and review attempts for completed step', () 
       teammate_id: 'crafter-01',
       started_at: '2026-01-01T00:10:00Z',
       completed_at: '2026-01-01T00:30:00Z',
-      review_attempts: 2,
       files_to_modify: ['src/db.ts'],
     });
 
     await renderModal({ step });
 
-    // Then the modal shows status (mapped to display label)
-    expect(screen.getByText(/Done|Approved/i)).toBeInTheDocument();
-    // And shows timing information
-    expect(screen.getByText(/2026/)).toBeInTheDocument();
-    // And shows review attempts
-    expect(screen.getByText(/2/)).toBeInTheDocument();
+    // Then the modal shows status
+    expect(screen.getByText(/Done/i)).toBeInTheDocument();
+    // But not teammate (work is done)
+    expect(screen.queryByText(/crafter-01/)).not.toBeInTheDocument();
+  });
+
+  it('in-progress step shows both status and teammate', async () => {
+    // Given step is in progress with teammate
+    const step = createRoadmapStep({
+      id: '01-02',
+      name: 'Setup API',
+      status: 'in_progress',
+      teammate_id: 'crafter-02',
+      started_at: '2026-01-01T00:15:00Z',
+      files_to_modify: ['src/api.ts'],
+    });
+
+    await renderModal({ step });
+
+    // Then both status and teammate are shown
+    expect(screen.getByText(/In Progress/i)).toBeInTheDocument();
+    expect(screen.getByText(/crafter-02/)).toBeInTheDocument();
   });
 });
 
@@ -254,10 +269,10 @@ describe('US-02: Modal shows review history when present', () => {
 });
 
 // =================================================================
-// US-02 Scenario 8: Review history absent falls back to review_attempts
+// US-02 Scenario 8: No review_history shows no review section
 // =================================================================
-describe('US-02: Modal falls back to review_attempts when review_history absent', () => {
-  it('shows review attempts count without review history section', async () => {
+describe('US-02: Modal shows no review section when review_history absent', () => {
+  it('does not render review history section when absent', async () => {
     // Given step has review_attempts but no review_history
     const step = createRoadmapStep({
       id: '01-01',
@@ -271,9 +286,7 @@ describe('US-02: Modal falls back to review_attempts when review_history absent'
 
     await renderModal({ step });
 
-    // Then review attempts count is shown in timing section
-    expect(screen.getByText(/3 review attempts/)).toBeInTheDocument();
-    // And no "Review History" section appears
+    // Then no "Review History" section appears
     expect(screen.queryByText('Review History')).not.toBeInTheDocument();
   });
 });

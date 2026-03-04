@@ -14,8 +14,7 @@ export const computeCompletionPercentage = (completed: number, total: number): n
 export type FeatureStatus = 'completed' | 'in-progress' | 'failed' | 'pending';
 
 export const classifyFeatureStatus = (feature: FeatureSummary): FeatureStatus => {
-  if (feature.totalSteps > 0 && feature.completed === feature.totalSteps) return 'completed';
-  if (feature.failed > 0) return 'failed';
+  if (feature.totalSteps > 0 && feature.done === feature.totalSteps) return 'completed';
   if (feature.inProgress > 0) return 'in-progress';
   return 'pending';
 };
@@ -54,7 +53,7 @@ const formatUpdatedAt = (updatedAt: string): string => {
 };
 
 export const ProjectCard = ({ project, onNavigate, onRemove }: ProjectCardProps) => {
-  const percentage = computeCompletionPercentage(project.completed, project.totalSteps);
+  const percentage = computeCompletionPercentage(project.done, project.totalSteps);
   const featureCount = project.featureCount ?? 0;
   const featureLabel = formatFeatureCount(featureCount);
   const featureStats = aggregateFeatureStatuses(project.features ?? []);
@@ -69,14 +68,14 @@ export const ProjectCard = ({ project, onNavigate, onRemove }: ProjectCardProps)
     >
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-gray-100">{project.name}</h3>
-        <span className="text-sm text-gray-400">Layer {project.currentLayer}</span>
+        <span className="text-sm text-gray-400">{project.currentLayer} done</span>
       </div>
 
       <div className="text-xs text-gray-400">{featureLabel}</div>
 
       <div className="mt-1.5">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-300">{project.completed} / {project.totalSteps}</span>
+          <span className="text-gray-300">{project.done} / {project.totalSteps}</span>
           <span className="font-medium text-gray-200">{percentage}%</span>
         </div>
         <div

@@ -1,17 +1,21 @@
-// Deterministic teammate emoji assignment.
-// Palette: 10 distinct animals for visual teammate identification.
+// Role-based teammate emoji assignment.
 
-export const EMOJI_PALETTE: readonly string[] = [
-  '🐙', '🦊', '🐢', '🦉', '🐬', '🦋', '🐺', '🦈', '🦁', '🐝',
-] as const;
-
-const hashString = (input: string): number => {
-  let hash = 0;
-  for (let i = 0; i < input.length; i++) {
-    hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
+const ROLE_EMOJI: Record<string, string> = {
+  crafter: '🛠️',
+  reviewer: '🔍',
+  researcher: '🔬',
+  planner: '📋',
+  debugger: '🐛',
 };
 
-export const getTeammateEmoji = (teammateId: string): string =>
-  EMOJI_PALETTE[hashString(teammateId) % EMOJI_PALETTE.length];
+const DEFAULT_EMOJI = '👤';
+
+const extractRole = (teammateId: string): string | null => {
+  const match = teammateId.match(/^([a-z]+)-\d+$/);
+  return match?.[1] ?? null;
+};
+
+export const getTeammateEmoji = (teammateId: string): string => {
+  const role = extractRole(teammateId);
+  return role !== null ? (ROLE_EMOJI[role] ?? DEFAULT_EMOJI) : DEFAULT_EMOJI;
+};

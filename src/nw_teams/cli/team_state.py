@@ -1,18 +1,22 @@
 """CLI: Track team state via roadmap.yaml (unified format).
 
 Usage:
+    python -m nw_teams.cli.team_state start-step ROADMAP_PATH --step STEP_ID --teammate TEAMMATE_ID
+    python -m nw_teams.cli.team_state transition ROADMAP_PATH --step STEP_ID --status STATUS
+    python -m nw_teams.cli.team_state complete-step ROADMAP_PATH --step STEP_ID
     python -m nw_teams.cli.team_state update ROADMAP_PATH --step STEP_ID --status STATUS [--teammate TEAMMATE_ID]
     python -m nw_teams.cli.team_state show ROADMAP_PATH
     python -m nw_teams.cli.team_state check ROADMAP_PATH --phase PHASE_ID
 
 Exit codes:
     0 = Success / All complete
-    1 = In progress / Not complete / Step not found
+    1 = In progress / Not complete / Step not found / Merge conflict
     2 = Usage error
 """
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,8 +26,8 @@ from ruamel.yaml import YAML
 
 # --- Constants ---
 
-VALID_STATUSES = {"pending", "claimed", "in_progress", "review", "approved", "failed"}
-TERMINAL_STATUSES = {"approved", "failed"}
+VALID_STATUSES = {"pending", "claimed", "in_progress", "review", "approved"}
+TERMINAL_STATUSES = {"approved"}
 ACTIVE_STATUSES = {"claimed", "in_progress", "review"}
 STATUS_ICONS = {
     "pending": "○",
@@ -31,11 +35,146 @@ STATUS_ICONS = {
     "in_progress": "◑",
     "review": "◕",
     "approved": "●",
-    "failed": "✗",
 }
+
+WORKTREE_DIR = ".claude/worktrees"
+BRANCH_PREFIX = "worktree-crafter-"
+
+
+# --- Git helpers ---
+
+def _run_git(args: list[str], check: bool = True) -> subprocess.CompletedProcess:
+    """Run a git command."""
+    return subprocess.run(
+        ["git"] + args,
+        capture_output=True,
+        text=True,
+        check=check,
+    )
+
+
+def _get_repo_root() -> Path:
+    """Get the repository root directory."""
+    result = _run_git(["rev-parse", "--show-toplevel"])
+    return Path(result.stdout.strip())
+
+
+def _get_default_branch() -> str:
+    """Get the default branch (main or master)."""
+    result = _run_git(["symbolic-ref", "refs/remotes/origin/HEAD"], check=False)
+    if result.returncode == 0:
+        return result.stdout.strip().split("/")[-1]
+    for branch in ["main", "master"]:
+        result = _run_git(["rev-parse", "--verify", branch], check=False)
+        if result.returncode == 0:
+            return branch
+    return "main"
+
+
+def _worktree_path(step_id: str) -> Path:
+    """Get worktree path for a step."""
+    return _get_repo_root() / WORKTREE_DIR / f"crafter-{step_id}"
+
+
+def _branch_name(step_id: str) -> str:
+    """Get branch name for a step's worktree."""
+    return f"{BRANCH_PREFIX}{step_id}"
+
+
+def _worktree_exists(step_id: str) -> bool:
+    """Check if a worktree exists for a step."""
+    return _worktree_path(step_id).exists()
+
+
+def _create_worktree(step_id: str) -> tuple[bool, str]:
+    """Create a worktree for a step. Returns (success, path_or_error)."""
+    wt_path = _worktree_path(step_id)
+    br_name = _branch_name(step_id)
+    base = _get_default_branch()
+
+    if wt_path.exists():
+        return True, str(wt_path)
+
+    wt_path.parent.mkdir(parents=True, exist_ok=True)
+    result = _run_git(
+        ["worktree", "add", str(wt_path), "-b", br_name, base],
+        check=False,
+    )
+    if result.returncode != 0:
+        return False, result.stderr
+    return True, str(wt_path)
+
+
+def _merge_worktree(step_id: str) -> tuple[bool, str]:
+    """Merge a worktree branch into default branch. Returns (success, message)."""
+    br_name = _branch_name(step_id)
+    into_branch = _get_default_branch()
+
+    # Check branch exists
+    result = _run_git(["rev-parse", "--verify", br_name], check=False)
+    if result.returncode != 0:
+        return True, "NO_WORKTREE"  # No worktree to merge
+
+    # Get current branch
+    orig_branch = _run_git(["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
+
+    # Checkout target
+    result = _run_git(["checkout", into_branch], check=False)
+    if result.returncode != 0:
+        return False, f"checkout failed: {result.stderr}"
+
+    # Merge
+    result = _run_git(
+        ["merge", br_name, "--no-ff", "-m", f"Merge step {step_id}"],
+        check=False,
+    )
+    if result.returncode != 0:
+        status = _run_git(["status", "--porcelain"])
+        if "UU " in status.stdout or "AA " in status.stdout:
+            return False, "MERGE_CONFLICT"
+        return False, f"merge failed: {result.stderr}"
+
+    return True, "MERGE_OK"
+
+
+def _cleanup_worktree(step_id: str) -> None:
+    """Remove worktree and branch for a step."""
+    wt_path = _worktree_path(step_id)
+    br_name = _branch_name(step_id)
+
+    if wt_path.exists():
+        _run_git(["worktree", "remove", str(wt_path), "--force"], check=False)
+    _run_git(["branch", "-D", br_name], check=False)
 
 
 # --- Roadmap data helpers ---
+
+def _get_step_files(step: dict) -> set[str]:
+    """Get files_to_modify from a step."""
+    return set(step.get("files_to_modify", []))
+
+
+def _get_active_steps(data: dict) -> list[dict]:
+    """Get all steps with active status (in_progress, review)."""
+    return [
+        s for s in _all_steps(data)
+        if s.get("status") in {"in_progress", "review"}
+    ]
+
+
+def _detect_file_conflicts(step: dict, active_steps: list[dict]) -> list[str]:
+    """Check if step's files conflict with any active step's files."""
+    step_files = _get_step_files(step)
+    conflicting_files = []
+    for active in active_steps:
+        if active.get("id") == step.get("id"):
+            continue
+        active_files = _get_step_files(active)
+        overlap = step_files & active_files
+        if overlap:
+            conflicting_files.extend(overlap)
+    return list(set(conflicting_files))
+
 
 def _load_roadmap(path: Path):
     """Load roadmap.yaml with ruamel.yaml for round-trip preservation."""
@@ -141,6 +280,197 @@ def _validate_roadmap_file(roadmap_path: str | None) -> Path | None:
 
 
 # --- Command handlers ---
+
+def cmd_start_step(args: list[str]) -> int:
+    """Start a step: detect conflicts, create worktree if needed, set in_progress.
+
+    Output:
+        STARTED {step_id} [SHARED]
+        STARTED {step_id} [WORKTREE] {path}
+    """
+    parsed, roadmap_path, error_arg = _parse_args(args, ["step", "teammate"])
+    if error_arg:
+        print(f"Unknown argument: {error_arg}", file=sys.stderr)
+        return 2
+
+    step_id = parsed["step"]
+    teammate_id = parsed["teammate"]
+
+    if not roadmap_path or not step_id or not teammate_id:
+        print("Error: ROADMAP_PATH, --step, and --teammate required", file=sys.stderr)
+        return 2
+
+    roadmap_file = _validate_roadmap_file(roadmap_path)
+    if not roadmap_file:
+        return 2
+
+    yaml_inst, data = _load_roadmap(roadmap_file)
+
+    step = _find_step(data, step_id)
+    if step is None:
+        print(f"Error: step not found: {step_id}", file=sys.stderr)
+        return 1
+
+    current_status = step.get("status", "pending")
+    if current_status not in {"pending", "claimed"}:
+        print(f"Error: step {step_id} is {current_status}, cannot start", file=sys.stderr)
+        return 1
+
+    # Check for file conflicts with active steps
+    active_steps = _get_active_steps(data)
+    conflicts = _detect_file_conflicts(step, active_steps)
+
+    use_worktree = bool(conflicts)
+    worktree_path_str = None
+
+    if use_worktree:
+        success, result = _create_worktree(step_id)
+        if not success:
+            print(f"Error creating worktree: {result}", file=sys.stderr)
+            return 1
+        worktree_path_str = result
+
+    # Update roadmap
+    now = datetime.now(timezone.utc).isoformat()
+    step["status"] = "in_progress"
+    step["teammate_id"] = teammate_id
+    step["started_at"] = now
+    if use_worktree:
+        step["worktree"] = worktree_path_str
+
+    _save_roadmap(yaml_inst, data, roadmap_file)
+
+    if use_worktree:
+        print(f"STARTED {step_id} [WORKTREE] {worktree_path_str}")
+    else:
+        print(f"STARTED {step_id} [SHARED]")
+
+    return 0
+
+
+def cmd_transition(args: list[str]) -> int:
+    """Transition step to a new status.
+
+    Valid transitions:
+        in_progress -> review
+        review -> in_progress (revision)
+    """
+    parsed, roadmap_path, error_arg = _parse_args(args, ["step", "status"])
+    if error_arg:
+        print(f"Unknown argument: {error_arg}", file=sys.stderr)
+        return 2
+
+    step_id = parsed["step"]
+    new_status = parsed["status"]
+
+    if not roadmap_path or not step_id or not new_status:
+        print("Error: ROADMAP_PATH, --step, and --status required", file=sys.stderr)
+        return 2
+
+    if new_status not in {"in_progress", "review"}:
+        print(f"Error: invalid transition status '{new_status}'. Valid: in_progress, review", file=sys.stderr)
+        return 2
+
+    roadmap_file = _validate_roadmap_file(roadmap_path)
+    if not roadmap_file:
+        return 2
+
+    yaml_inst, data = _load_roadmap(roadmap_file)
+
+    step = _find_step(data, step_id)
+    if step is None:
+        print(f"Error: step not found: {step_id}", file=sys.stderr)
+        return 1
+
+    current_status = step.get("status", "pending")
+
+    # Validate transition
+    valid_transitions = {
+        ("in_progress", "review"),
+        ("review", "in_progress"),
+    }
+    if new_status == "failed":
+        pass  # Always allowed
+    elif (current_status, new_status) not in valid_transitions:
+        print(f"Error: invalid transition {current_status} -> {new_status}", file=sys.stderr)
+        return 1
+
+    now = datetime.now(timezone.utc).isoformat()
+    step["status"] = new_status
+
+    if new_status == "review":
+        step["review_attempts"] = step.get("review_attempts", 0) + 1
+
+    if new_status == "failed":
+        step["completed_at"] = now
+
+    _save_roadmap(yaml_inst, data, roadmap_file)
+
+    print(f"TRANSITIONED {step_id}: {current_status} -> {new_status}")
+    return 0
+
+
+def cmd_complete_step(args: list[str]) -> int:
+    """Complete a step: set approved, merge worktree if used.
+
+    Output:
+        COMPLETED {step_id}
+        COMPLETED {step_id} MERGE_OK
+        COMPLETED {step_id} MERGE_CONFLICT (exit 1)
+    """
+    parsed, roadmap_path, error_arg = _parse_args(args, ["step"])
+    if error_arg:
+        print(f"Unknown argument: {error_arg}", file=sys.stderr)
+        return 2
+
+    step_id = parsed["step"]
+
+    if not roadmap_path or not step_id:
+        print("Error: ROADMAP_PATH and --step required", file=sys.stderr)
+        return 2
+
+    roadmap_file = _validate_roadmap_file(roadmap_path)
+    if not roadmap_file:
+        return 2
+
+    yaml_inst, data = _load_roadmap(roadmap_file)
+
+    step = _find_step(data, step_id)
+    if step is None:
+        print(f"Error: step not found: {step_id}", file=sys.stderr)
+        return 1
+
+    current_status = step.get("status", "pending")
+    if current_status != "review":
+        print(f"Error: step {step_id} is {current_status}, must be in review to complete", file=sys.stderr)
+        return 1
+
+    # Update roadmap first
+    now = datetime.now(timezone.utc).isoformat()
+    step["status"] = "approved"
+    step["completed_at"] = now
+    _save_roadmap(yaml_inst, data, roadmap_file)
+
+    # Handle worktree merge if applicable
+    had_worktree = step.get("worktree") is not None
+
+    if had_worktree:
+        success, result = _merge_worktree(step_id)
+        if not success:
+            if result == "MERGE_CONFLICT":
+                print(f"COMPLETED {step_id} MERGE_CONFLICT")
+                return 1
+            else:
+                print(f"Error merging worktree: {result}", file=sys.stderr)
+                return 1
+
+        _cleanup_worktree(step_id)
+        print(f"COMPLETED {step_id} MERGE_OK")
+    else:
+        print(f"COMPLETED {step_id}")
+
+    return 0
+
 
 def cmd_update(args: list[str]) -> int:
     """Update step status in roadmap.yaml."""
@@ -288,13 +618,16 @@ def main(argv: list[str] | None = None) -> int:
         argv = sys.argv[1:]
 
     if not argv:
-        print("Usage: python -m nw_teams.cli.team_state {update|show|check} [OPTIONS]")
+        print("Usage: python -m nw_teams.cli.team_state {start-step|transition|complete-step|update|show|check} [OPTIONS]")
         return 2
 
     subcommand = argv[0]
     sub_args = argv[1:]
 
     commands = {
+        "start-step": cmd_start_step,
+        "transition": cmd_transition,
+        "complete-step": cmd_complete_step,
         "update": cmd_update,
         "show": cmd_show,
         "check": cmd_check,

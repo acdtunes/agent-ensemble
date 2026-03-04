@@ -14,16 +14,17 @@ from nw_teams.cli.parallel_groups import (
 
 def test_extract_steps_reads_description_from_yaml():
     roadmap = {
+        "roadmap": {"project_id": "test"},
         "phases": [
             {
-                "phase_id": "01",
+                "id": "01",
                 "steps": [
                     {
-                        "step_id": "01-01",
+                        "id": "01-01",
                         "name": "Do thing",
                         "description": "Detailed explanation",
                         "files_to_modify": ["src/thing.py"],
-                        "blocked_by": [],
+                        "deps": [],
                     },
                 ],
             },
@@ -37,15 +38,16 @@ def test_extract_steps_reads_description_from_yaml():
 
 def test_extract_steps_defaults_description_when_missing():
     roadmap = {
+        "roadmap": {"project_id": "test"},
         "phases": [
             {
-                "phase_id": "01",
+                "id": "01",
                 "steps": [
                     {
-                        "step_id": "01-01",
+                        "id": "01-01",
                         "name": "Do thing",
                         "files_to_modify": ["src/thing.py"],
-                        "blocked_by": [],
+                        "deps": [],
                     },
                 ],
             },
@@ -62,15 +64,16 @@ def test_extract_steps_defaults_description_when_missing():
 
 def test_extract_steps_rejects_empty_files_to_modify():
     roadmap = {
+        "roadmap": {"project_id": "test"},
         "phases": [
             {
-                "phase_id": "01",
+                "id": "01",
                 "steps": [
                     {
-                        "step_id": "01-01",
+                        "id": "01-01",
                         "name": "Missing files",
                         "files_to_modify": [],
-                        "blocked_by": [],
+                        "deps": [],
                     },
                 ],
             },
@@ -86,21 +89,22 @@ def test_extract_steps_rejects_empty_files_to_modify():
 
 def test_identify_parallel_groups_builds_layers():
     roadmap = {
+        "roadmap": {"project_id": "test"},
         "phases": [
             {
-                "phase_id": "01",
+                "id": "01",
                 "steps": [
                     {
-                        "step_id": "01-01",
+                        "id": "01-01",
                         "name": "First",
                         "files_to_modify": ["a.py"],
-                        "blocked_by": [],
+                        "deps": [],
                     },
                     {
-                        "step_id": "01-02",
+                        "id": "01-02",
                         "name": "Second",
                         "files_to_modify": ["b.py"],
-                        "blocked_by": ["01-01"],
+                        "deps": ["01-01"],
                     },
                 ],
             },

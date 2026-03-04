@@ -1,30 +1,36 @@
 import { describe, it, expect } from 'vitest';
-import { getTeammateEmoji, EMOJI_PALETTE } from '../utils/teammateEmoji';
-
-describe('EMOJI_PALETTE', () => {
-  const EXPECTED_PALETTE = ['🐙', '🦊', '🐢', '🦉', '🐬', '🦋', '🐺', '🦈', '🦁', '🐝'];
-
-  it('contains exactly the 10 animal emojis', () => {
-    expect([...EMOJI_PALETTE]).toEqual(EXPECTED_PALETTE);
-  });
-
-  it('has no duplicates', () => {
-    const unique = new Set(EMOJI_PALETTE);
-    expect(unique.size).toBe(EMOJI_PALETTE.length);
-  });
-});
+import { getTeammateEmoji } from '../utils/teammateEmoji';
 
 describe('getTeammateEmoji', () => {
-  it('returns emoji from palette for various input lengths', () => {
-    const inputs = ['crafter-01', 'a', 'crafter-some-very-long-teammate-identifier-12345'];
-    for (const teammateId of inputs) {
-      expect(EMOJI_PALETTE).toContain(getTeammateEmoji(teammateId));
-    }
+  it('returns crafter emoji for crafter-XX', () => {
+    expect(getTeammateEmoji('crafter-01')).toBe('🛠️');
+    expect(getTeammateEmoji('crafter-99')).toBe('🛠️');
   });
 
-  it('is deterministic — same input always produces same output', () => {
-    const first = getTeammateEmoji('agent-alpha');
-    const second = getTeammateEmoji('agent-alpha');
-    expect(first).toBe(second);
+  it('returns reviewer emoji for reviewer-XX', () => {
+    expect(getTeammateEmoji('reviewer-01')).toBe('🔍');
+    expect(getTeammateEmoji('reviewer-42')).toBe('🔍');
+  });
+
+  it('returns researcher emoji for researcher-XX', () => {
+    expect(getTeammateEmoji('researcher-01')).toBe('🔬');
+  });
+
+  it('returns planner emoji for planner-XX', () => {
+    expect(getTeammateEmoji('planner-01')).toBe('📋');
+  });
+
+  it('returns debugger emoji for debugger-XX', () => {
+    expect(getTeammateEmoji('debugger-01')).toBe('🐛');
+  });
+
+  it('returns default emoji for unknown roles', () => {
+    expect(getTeammateEmoji('unknown-01')).toBe('👤');
+    expect(getTeammateEmoji('agent-alpha')).toBe('👤');
+    expect(getTeammateEmoji('random-string')).toBe('👤');
+  });
+
+  it('is deterministic', () => {
+    expect(getTeammateEmoji('crafter-01')).toBe(getTeammateEmoji('crafter-01'));
   });
 });

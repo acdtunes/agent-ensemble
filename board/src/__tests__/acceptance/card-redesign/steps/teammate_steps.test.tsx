@@ -37,9 +37,9 @@ describe('US-05: Active card shows teammate with colored label', () => {
     render(<StepCard card={card} />);
 
     // Then the card shows the label "crafter-02"
-    expect(screen.getByText('crafter-02')).toBeInTheDocument();
+    expect(screen.getByText(/crafter-02/)).toBeInTheDocument();
     // And the label uses a distinctive text color (not default gray)
-    const label = screen.getByText('crafter-02');
+    const label = screen.getByText(/crafter-02/);
     expect(label.className).toMatch(/text-(?!gray)/);
   });
 });
@@ -76,8 +76,8 @@ describe('US-05: Different teammates display different label colors', () => {
     );
 
     // Then the label colors differ
-    const label1 = screen.getByText('crafter-01');
-    const label2 = screen.getByText('crafter-02');
+    const label1 = screen.getByText(/crafter-01/);
+    const label2 = screen.getByText(/crafter-02/);
     const color1 = label1.className.match(/text-\w+-\d+/)?.[0];
     const color2 = label2.className.match(/text-\w+-\d+/)?.[0];
     expect(color1).toBeDefined();

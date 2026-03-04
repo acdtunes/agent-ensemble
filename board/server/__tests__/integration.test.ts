@@ -238,13 +238,13 @@ describe('Multi-project end-to-end integration', () => {
     expect(alphaUpdate.type).toBe('update');
     if (alphaUpdate.type !== 'update') return;
     expect(alphaUpdate.projectId).toBe('project-alpha');
-    expect(alphaUpdate.state.steps['01-01'].status).toBe('in_progress');
+    expect(alphaUpdate.roadmap.phases[0].steps[0].status).toBe('in_progress');
 
     // clientBeta still only has project_list + init (no update)
     expect(clientBeta.messages).toHaveLength(2);
   });
 
-  it('should serve project state and plan via HTTP endpoints', async () => {
+  it('should serve project list via HTTP endpoints', async () => {
     // Given: a project exists
     await addProjectDir(rootDir, 'project-alpha');
 
@@ -258,23 +258,12 @@ describe('Multi-project end-to-end integration', () => {
 
     // When: HTTP endpoints are queried
     const listResponse = await fetch(`http://localhost:${server.httpPort}/api/projects`);
-    const stateResponse = await fetch(`http://localhost:${server.httpPort}/api/projects/project-alpha/state`);
-    const planResponse = await fetch(`http://localhost:${server.httpPort}/api/projects/project-alpha/plan`);
 
-    // Then: all return correct data
+    // Then: project list returns correct data
     expect(listResponse.status).toBe(200);
     const projects = await listResponse.json();
     expect(projects).toHaveLength(1);
     expect(projects[0].projectId).toBe('project-alpha');
-
-    expect(stateResponse.status).toBe(200);
-    const state = await stateResponse.json();
-    expect(state.schema_version).toBe('1.0');
-
-    expect(planResponse.status).toBe(200);
-    const plan = await planResponse.json();
-    expect(plan.schema_version).toBe('1.0');
-    expect(plan.layers).toHaveLength(1);
   });
 
   it('should serve doc tree for project with docs directory', async () => {

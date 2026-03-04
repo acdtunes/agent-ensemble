@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import type {
-  DeliveryState,
-  ExecutionPlan,
   ProjectConfig,
   ProjectId,
   ParseError,
@@ -49,65 +47,6 @@ const makeRoadmap = (overrides: Partial<Roadmap> = {}): Roadmap => ({
   ...overrides,
 });
 
-const makeBridgedState = (roadmap: Roadmap): DeliveryState => {
-  const allSteps = roadmap.phases.flatMap((p) => p.steps);
-  const completed = allSteps.filter((s) => s.status === 'approved').length;
-  const failed = allSteps.filter((s) => s.status === 'failed').length;
-  const inProgress = allSteps.filter((s) => ['claimed', 'in_progress', 'review'].includes(s.status)).length;
-
-  return {
-    schema_version: '1.0',
-    created_at: roadmap.roadmap.created_at ?? '',
-    updated_at: '',
-    plan_path: '',
-    current_layer: 0,
-    summary: {
-      total_steps: allSteps.length,
-      total_layers: roadmap.phases.length,
-      completed,
-      failed,
-      in_progress: inProgress,
-    },
-    steps: Object.fromEntries(
-      roadmap.phases.flatMap((p, li) =>
-        p.steps.map((s) => [s.id, {
-          step_id: s.id,
-          name: s.name,
-          layer: li,
-          status: s.status,
-          teammate_id: s.teammate_id,
-          started_at: s.started_at,
-          completed_at: s.completed_at,
-          review_attempts: s.review_attempts,
-          files_to_modify: s.files_to_modify as string[],
-        }]),
-      ),
-    ),
-    teammates: {},
-  };
-};
-
-const makeBridgedPlan = (roadmap: Roadmap): ExecutionPlan => ({
-  schema_version: '1.0',
-  summary: {
-    total_steps: roadmap.phases.reduce((n, p) => n + p.steps.length, 0),
-    total_layers: roadmap.phases.length,
-    max_parallelism: 1,
-    requires_worktrees: false,
-  },
-  layers: roadmap.phases.map((p, i) => ({
-    layer: i,
-    parallel: false,
-    use_worktrees: false,
-    steps: p.steps.map((s) => ({
-      step_id: s.id,
-      name: s.name,
-      files_to_modify: s.files_to_modify as string[],
-      conflicts_with: [],
-    })),
-  })),
-});
-
 const makeConfig = (projectId: ProjectId): ProjectConfig => ({
   projectId,
   projectPath: `/projects/${projectId}`,
@@ -143,16 +82,14 @@ const createWatcherSpy = () => {
 
 const createTestDeps = (overrides: Partial<RegistryDeps> = {}) => {
   const watcherSpy = createWatcherSpy();
-  const stateChanges: Array<{ projectId: ProjectId; previousState: DeliveryState; newState: DeliveryState }> = [];
+  const stateChanges: Array<{ projectId: ProjectId; previousRoadmap: Roadmap; newRoadmap: Roadmap }> = [];
   const defaultRoadmap = makeRoadmap();
 
   const deps: RegistryDeps = {
     createWatcher: watcherSpy.factory,
     readFile: () => ok('mock-yaml-content'),
     parseRoadmap: () => ok(defaultRoadmap),
-    roadmapToDeliveryState: makeBridgedState,
-    roadmapToExecutionPlan: makeBridgedPlan,
-    onStateChange: (projectId, previousState, newState) => { stateChanges.push({ projectId, previousState, newState }); },
+    onStateChange: (projectId, previousRoadmap, newRoadmap) => { stateChanges.push({ projectId, previousRoadmap, newRoadmap }); },
     ...overrides,
   };
 
@@ -166,7 +103,7 @@ describe('ProjectRegistry', () => {
   const PROJECT_B = makeProjectId('project-b');
 
   describe('add', () => {
-    it('should create a file watcher on the roadmap path and store the entry with bridged state and plan', () => {
+    it('should create a file watcher on the roadmap path and store the entry with roadmap', () => {
       const { deps, watcherSpy, defaultRoadmap } = createTestDeps();
       const registry = createProjectRegistry(deps);
       const config = makeConfig(PROJECT_A);
@@ -176,8 +113,7 @@ describe('ProjectRegistry', () => {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.projectId).toBe(PROJECT_A);
-      expect(result.value.state).toEqual(makeBridgedState(defaultRoadmap));
-      expect(result.value.plan).toEqual(makeBridgedPlan(defaultRoadmap));
+      expect(result.value.roadmap).toEqual(defaultRoadmap);
 
       // Watcher created on the roadmap file path
       expect(watcherSpy.instances).toHaveLength(1);
@@ -208,7 +144,7 @@ describe('ProjectRegistry', () => {
       // Project added with empty roadmap (no watcher)
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.value.state.summary.total_steps).toBe(0);
+      expect(result.value.roadmap.phases).toHaveLength(0);
     });
 
     it('should still add project with empty roadmap when roadmap parsing fails', () => {
@@ -223,7 +159,7 @@ describe('ProjectRegistry', () => {
       // Project added with empty roadmap (no watcher)
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.value.state.summary.total_steps).toBe(0);
+      expect(result.value.roadmap.phases).toHaveLength(0);
     });
   });
 
@@ -256,7 +192,7 @@ describe('ProjectRegistry', () => {
   });
 
   describe('get', () => {
-    it('should return the stored entry with bridged state and plan', () => {
+    it('should return the stored entry with roadmap', () => {
       const { deps, defaultRoadmap } = createTestDeps();
       const registry = createProjectRegistry(deps);
       registry.add(makeConfig(PROJECT_A));
@@ -266,8 +202,7 @@ describe('ProjectRegistry', () => {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.projectId).toBe(PROJECT_A);
-      expect(result.value.state).toEqual(makeBridgedState(defaultRoadmap));
-      expect(result.value.plan).toEqual(makeBridgedPlan(defaultRoadmap));
+      expect(result.value.roadmap).toEqual(defaultRoadmap);
     });
 
     it('should return project_not_found error for unknown project', () => {
@@ -323,7 +258,7 @@ describe('ProjectRegistry', () => {
   });
 
   describe('roadmap change broadcast', () => {
-    it('should call onStateChange with bridged DeliveryState when watcher detects a valid roadmap change', () => {
+    it('should call onStateChange with Roadmap when watcher detects a valid roadmap change', () => {
       const updatedRoadmap = makeRoadmap({
         phases: [{
           id: '01',
@@ -342,16 +277,16 @@ describe('ProjectRegistry', () => {
 
       expect(stateChanges).toHaveLength(1);
       expect(stateChanges[0].projectId).toBe(PROJECT_A);
-      expect(stateChanges[0].newState).toEqual(makeBridgedState(updatedRoadmap));
+      expect(stateChanges[0].newRoadmap).toEqual(updatedRoadmap);
 
       // Stored entry should also reflect the updated roadmap
       const entry = registry.get(PROJECT_A);
       expect(entry.ok).toBe(true);
       if (!entry.ok) return;
-      expect(entry.value.state).toEqual(makeBridgedState(updatedRoadmap));
+      expect(entry.value.roadmap).toEqual(updatedRoadmap);
     });
 
-    it('should pass previous bridged state to onStateChange callback', () => {
+    it('should pass previous roadmap to onStateChange callback', () => {
       const initialRoadmap = makeRoadmap();
       const updatedRoadmap = makeRoadmap({
         phases: [{
@@ -371,10 +306,10 @@ describe('ProjectRegistry', () => {
       watcherSpy.instances[0].onChange('new-yaml-content');
 
       expect(stateChanges).toHaveLength(1);
-      // Previous state is bridged from the initial roadmap
-      expect(stateChanges[0].previousState.steps['01-01'].status).toBe('pending');
-      // New state is bridged from the updated roadmap
-      expect(stateChanges[0].newState.steps['01-01'].status).toBe('in_progress');
+      // Previous roadmap is the initial roadmap
+      expect(stateChanges[0].previousRoadmap.phases[0].steps[0].status).toBe('pending');
+      // New roadmap is the updated roadmap
+      expect(stateChanges[0].newRoadmap.phases[0].steps[0].status).toBe('in_progress');
     });
 
     it('should not broadcast when roadmap parsing fails', () => {
@@ -419,7 +354,7 @@ describe('ProjectRegistry', () => {
       expect(parseErrors[0].error).toBe('bad yaml syntax');
     });
 
-    it('should retain last-known-good state when parsing fails', () => {
+    it('should retain last-known-good roadmap when parsing fails', () => {
       const goodRoadmap = makeRoadmap();
       let callCount = 0;
       const { deps, watcherSpy } = createTestDeps({
@@ -438,7 +373,7 @@ describe('ProjectRegistry', () => {
       const result = registry.get(PROJECT_A);
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.value.state).toEqual(makeBridgedState(goodRoadmap));
+      expect(result.value.roadmap).toEqual(goodRoadmap);
     });
 
     it('should isolate parse errors: invalid YAML in project A does not affect project B', () => {
@@ -479,17 +414,17 @@ describe('ProjectRegistry', () => {
       // Project B gets valid update
       watcherSpy.instances[1].onChange('valid-yaml');
 
-      // Project A retains last-known-good state
+      // Project A retains last-known-good roadmap
       const resultA = registry.get(PROJECT_A);
       expect(resultA.ok).toBe(true);
       if (!resultA.ok) return;
-      expect(resultA.value.state).toEqual(makeBridgedState(roadmapA));
+      expect(resultA.value.roadmap).toEqual(roadmapA);
 
       // Project B received update
       const resultB = registry.get(PROJECT_B);
       expect(resultB.ok).toBe(true);
       if (!resultB.ok) return;
-      expect(resultB.value.state).toEqual(makeBridgedState(updatedB));
+      expect(resultB.value.roadmap).toEqual(updatedB);
 
       // Error was reported only for A
       expect(parseErrors).toHaveLength(1);
@@ -523,17 +458,17 @@ describe('ProjectRegistry', () => {
       // Simulate state change in project A only
       watcherSpy.instances[0].onChange('updated-a-content');
 
-      // Project A should have updated state
+      // Project A should have updated roadmap
       const resultA = registry.get(PROJECT_A);
       expect(resultA.ok).toBe(true);
       if (!resultA.ok) return;
-      expect(resultA.value.state).toEqual(makeBridgedState(updatedA));
+      expect(resultA.value.roadmap).toEqual(updatedA);
 
       // Project B should be unaffected
       const resultB = registry.get(PROJECT_B);
       expect(resultB.ok).toBe(true);
       if (!resultB.ok) return;
-      expect(resultB.value.state).toEqual(makeBridgedState(roadmapB));
+      expect(resultB.value.roadmap).toEqual(roadmapB);
     });
   });
 

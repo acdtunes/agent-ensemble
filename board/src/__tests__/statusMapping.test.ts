@@ -50,7 +50,6 @@ describe('mapStatusToDisplayColumn', () => {
     in_progress: 'in_progress',
     review: 'review',
     approved: 'done',
-    failed: 'in_progress',
   };
 
   it('maps every StepStatus to exactly one DisplayColumn', () => {
@@ -66,7 +65,7 @@ describe('mapStatusToDisplayColumn', () => {
     expect(mapStatusToDisplayColumn(status as any)).toBe(column);
   });
 
-  it('covers all 6 StepStatus values', () => {
+  it('covers all 5 StepStatus values', () => {
     const mappedStatuses = Object.keys(expectedMapping);
     expect(mappedStatuses.sort()).toEqual([...STEP_STATUSES].sort());
   });

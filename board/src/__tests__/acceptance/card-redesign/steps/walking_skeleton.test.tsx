@@ -60,7 +60,7 @@ describe('Walking Skeleton: Andres identifies a task and sees the assigned teamm
     expect(stepId).toBeInTheDocument();
     expect(stepId.className).toMatch(/font-mono/);
     // And the card shows teammate "crafter-02" with a colored label
-    const teammate = screen.getByText('crafter-02');
+    const teammate = screen.getByText(/crafter-02/);
     expect(teammate).toBeInTheDocument();
     expect(teammate.className).toMatch(/text-(?!gray)/);
   });
@@ -114,7 +114,7 @@ describe('Walking Skeleton: Andres clicks a card and reads full step context', (
     // And the dependency "Setup database"
     expect(screen.getByText(/Setup database/)).toBeInTheDocument();
     // And the teammate
-    expect(screen.getByText('crafter-02')).toBeInTheDocument();
+    expect(screen.getByText(/crafter-02/)).toBeInTheDocument();
 
     // And Andres can close the modal
     const closeButton = screen.getByRole('button', { name: /close/i });
@@ -127,13 +127,14 @@ describe('Walking Skeleton: Andres clicks a card and reads full step context', (
 // Walking Skeleton 3: Andres checks delivery progress and sees phase
 // =================================================================
 describe('Walking Skeleton: Andres checks delivery progress and sees the current phase', () => {
-  it('progress header shows "Phase 2 of 3" and step count', () => {
-    // Given a delivery with 3 phases, 7 total steps, 3 completed, on phase 2
+  it('progress header shows "Phase 2 of 3" and done count', () => {
+    // Given a delivery with 3 phases, 7 total steps, 3 done, on phase 2
     const summary = createRoadmapSummary({
       total_steps: 7,
       total_phases: 3,
-      completed: 3,
+      done: 3,
       in_progress: 2,
+      pending: 2,
     });
 
     // When Andres views the progress header
@@ -142,45 +143,42 @@ describe('Walking Skeleton: Andres checks delivery progress and sees the current
         summary={summary}
         currentPhase={2}
         createdAt="2026-03-01T00:00:00Z"
-        now={new Date('2026-03-01T02:00:00Z')}
       />,
     );
 
     // Then the phase indicator shows "Phase 2 of 3"
     expect(screen.getByText(/Phase 2 of 3/)).toBeInTheDocument();
-    // And the progress shows step count
-    expect(screen.getByText(/3\s*\/\s*7/)).toBeInTheDocument();
+    // And the Done count shows 3
+    expect(screen.getByText('3')).toBeInTheDocument();
   });
 });
 
 // =================================================================
 // Walking Skeleton 4: Andres understands delivery progress
-// (Consolidated from US-04 phase indicator scenarios)
 // =================================================================
 describe('Walking Skeleton: Andres understands delivery progress', () => {
-  it('shows "Complete" when all steps are done, replacing phase indicator', () => {
+  it('shows 100% when all steps are done', () => {
     // Given a delivery with 3 phases, all 7 of 7 steps completed
     const summary = createRoadmapSummary({
       total_steps: 7,
       total_phases: 3,
-      completed: 7,
+      done: 7,
       in_progress: 0,
+      pending: 0,
     });
 
     // When Andres views the progress header
     render(
       <ProgressHeader
         summary={summary}
-        currentPhase={1}
+        currentPhase={3}
         createdAt="2026-03-01T00:00:00Z"
-        now={new Date('2026-03-01T02:00:00Z')}
       />,
     );
 
-    // Then the phase indicator shows "Complete"
-    expect(screen.getByText(/Complete/)).toBeInTheDocument();
-    // And neither "Phase" nor "Layer" appears
-    expect(screen.queryByText(/Phase/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Layer/)).not.toBeInTheDocument();
+    // Then the progress shows 100%
+    expect(screen.getByText('100%')).toBeInTheDocument();
+    // And Done shows 7
+    expect(screen.getByText('7')).toBeInTheDocument();
   });
 });

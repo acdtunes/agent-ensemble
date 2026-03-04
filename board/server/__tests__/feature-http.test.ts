@@ -9,8 +9,8 @@
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
-import type { ProjectId, ProjectEntry, FeatureId, FeatureSummary, DeliveryState, ExecutionPlan } from '../../shared/types.js';
-import { ok, err, createProjectId } from '../../shared/types.js';
+import type { ProjectId, ProjectEntry, FeatureId, FeatureSummary, Roadmap, RoadmapStep } from '../../shared/types.js';
+import { ok, err, createProjectId, computeRoadmapSummary } from '../../shared/types.js';
 import {
   createMultiProjectHttpApp,
   createHttpServer,
@@ -22,44 +22,33 @@ import {
 
 const projectAlpha = (createProjectId('alpha') as { ok: true; value: ProjectId }).value;
 
-const makeState = (): DeliveryState => ({
-  schema_version: '1.0',
-  created_at: '2026-03-01T00:00:00Z',
-  updated_at: '2026-03-01T00:00:00Z',
-  plan_path: '.nw-teams/plan.yaml',
-  current_layer: 1,
-  summary: { total_steps: 1, total_layers: 1, completed: 0, failed: 0, in_progress: 0 },
-  steps: {
-    '01-01': {
-      step_id: '01-01',
-      name: 'Test step',
-      layer: 1,
-      status: 'pending',
-      teammate_id: null,
-      started_at: null,
-      completed_at: null,
-      review_attempts: 0,
-      files_to_modify: [],
-    },
-  },
-  teammates: {},
+const makeStep = (overrides: Partial<RoadmapStep> = {}): RoadmapStep => ({
+  id: '01-01',
+  name: 'Test step',
+  files_to_modify: [],
+  dependencies: [],
+  criteria: [],
+  status: 'pending',
+  teammate_id: null,
+  started_at: null,
+  completed_at: null,
+  review_attempts: 0,
+  ...overrides,
 });
 
-const makePlan = (): ExecutionPlan => ({
-  schema_version: '1.0',
-  summary: { total_steps: 1, total_layers: 1, max_parallelism: 1, requires_worktrees: false },
-  layers: [{
-    layer: 1,
-    parallel: false,
-    use_worktrees: false,
-    steps: [{ step_id: '01-01', name: 'Test step', files_to_modify: [] }],
+const makeRoadmap = (overrides: Partial<Roadmap> = {}): Roadmap => ({
+  roadmap: { project_id: 'test', created_at: '2026-03-01T00:00:00Z' },
+  phases: [{
+    id: '01',
+    name: 'Phase 1',
+    steps: [makeStep()],
   }],
+  ...overrides,
 });
 
 const makeEntry = (projectId: ProjectId): ProjectEntry => ({
   projectId,
-  state: makeState(),
-  plan: makePlan(),
+  roadmap: makeRoadmap(),
 });
 
 const makeFeatureSummary = (
@@ -84,18 +73,21 @@ const makeDeps = (overrides: Partial<MultiProjectHttpDeps> = {}): MultiProjectHt
 
   return {
     listProjectSummaries: () =>
-      [...entries.values()].map((e) => ({
-        projectId: e.projectId,
-        name: e.projectId as string,
-        totalSteps: e.state.summary.total_steps,
-        completed: e.state.summary.completed,
-        failed: e.state.summary.failed,
-        inProgress: e.state.summary.in_progress,
-        currentLayer: e.state.current_layer,
-        updatedAt: e.state.updated_at,
-        featureCount: 0,
-        features: [],
-      })),
+      [...entries.values()].map((e) => {
+        const summary = computeRoadmapSummary(e.roadmap);
+        return {
+          projectId: e.projectId,
+          name: e.projectId as string,
+          totalSteps: summary.total_steps,
+          completed: summary.completed,
+          failed: summary.failed,
+          inProgress: summary.in_progress,
+          currentLayer: 1,
+          updatedAt: e.roadmap.roadmap.created_at ?? '',
+          featureCount: 0,
+          features: [],
+        };
+      }),
     getProject: (id) => {
       const entry = entries.get(id);
       return entry ? ok(entry) : err({ type: 'project_not_found', projectId: id });

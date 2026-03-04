@@ -1,62 +1,37 @@
 import { useMemo } from 'react';
-import type { DeliveryState, ExecutionPlan, PlanStep, StepState } from '../../shared/types';
+import type { Roadmap, RoadmapStep, RoadmapPhase } from '../../shared/types';
 import { LayerLane } from './LayerLane';
 
-interface KanbanBoardProps {
-  readonly state: DeliveryState;
-  readonly plan: ExecutionPlan;
+export interface KanbanBoardProps {
+  readonly roadmap: Roadmap;
   readonly onCardClick?: (stepId: string) => void;
 }
 
-const collectAllPlanSteps = (plan: ExecutionPlan): readonly PlanStep[] =>
-  plan.layers.flatMap(layer => layer.steps);
-
-const getStepStatesForLayer = (
-  layer: { readonly steps: readonly PlanStep[] },
-  stateSteps: Readonly<Record<string, StepState>>,
-): readonly StepState[] =>
-  layer.steps
-    .map(planStep => stateSteps[planStep.step_id])
-    .filter((stepState): stepState is StepState => stepState !== undefined);
+const collectAllSteps = (roadmap: Roadmap): readonly RoadmapStep[] =>
+  roadmap.phases.flatMap((phase) => phase.steps);
 
 const computeBlockedStepIds = (
-  stateSteps: Readonly<Record<string, StepState>>,
-  allPlanSteps: readonly PlanStep[],
+  allSteps: readonly RoadmapStep[],
 ): ReadonlySet<string> => {
-  const activeStatuses = new Set(['claimed', 'in_progress']);
-  const blocked = new Set<string>();
-
-  for (const planStep of allPlanSteps) {
-    const state = stateSteps[planStep.step_id];
-    if (!state || state.status !== 'pending') continue;
-
-    const hasActiveConflict = (planStep.conflicts_with ?? []).some(conflictId => {
-      const conflictState = stateSteps[conflictId];
-      return conflictState !== undefined && activeStatuses.has(conflictState.status);
-    });
-
-    if (hasActiveConflict) {
-      blocked.add(planStep.step_id);
-    }
-  }
-
-  return blocked;
+  // For now, no steps are blocked since we don't have conflicts_with in RoadmapStep
+  // In the future, we could track dependencies
+  return new Set<string>();
 };
 
-export const KanbanBoard = ({ state, plan, onCardClick }: KanbanBoardProps) => {
-  const allPlanSteps = useMemo(() => collectAllPlanSteps(plan), [plan]);
+export const KanbanBoard = ({ roadmap, onCardClick }: KanbanBoardProps) => {
+  const allSteps = useMemo(() => collectAllSteps(roadmap), [roadmap]);
   const blockedStepIds = useMemo(
-    () => computeBlockedStepIds(state.steps, allPlanSteps),
-    [state.steps, allPlanSteps],
+    () => computeBlockedStepIds(allSteps),
+    [allSteps],
   );
 
   return (
     <>
-      {plan.layers.map(layer => (
+      {roadmap.phases.map((phase, index) => (
         <LayerLane
-          key={layer.layer}
-          layer={layer}
-          stepStates={getStepStatesForLayer(layer, state.steps)}
+          key={phase.id}
+          phase={phase}
+          phaseIndex={index}
           blockedStepIds={blockedStepIds}
           onCardClick={onCardClick}
         />

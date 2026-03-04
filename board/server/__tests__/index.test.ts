@@ -184,8 +184,7 @@ describe('Multi-project HTTP endpoints', () => {
       expect(body.summary).toEqual({
         total_steps: 2,
         total_phases: 1,
-        completed: 1,
-        failed: 0,
+        done: 1,
         in_progress: 1,
         pending: 0,
       });

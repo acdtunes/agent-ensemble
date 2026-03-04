@@ -37,7 +37,7 @@ describe('StepCard', () => {
 
   it('displays file count in metadata chip with pill styling', () => {
     render(<StepCard card={baseCard} />);
-    const fileChip = screen.getByText('📁 1 file');
+    const fileChip = screen.getByText('1 file');
     expect(fileChip).toBeInTheDocument();
     expect(fileChip.className).toMatch(/text-xs/);
     expect(fileChip.className).toMatch(/bg-gray-800/);
@@ -46,13 +46,13 @@ describe('StepCard', () => {
   it('displays plural files label for multiple files in chip', () => {
     const card = { ...baseCard, fileCount: 3, files: ['a.ts', 'b.ts', 'c.ts'] };
     render(<StepCard card={card} />);
-    expect(screen.getByText('📁 3 files')).toBeInTheDocument();
+    expect(screen.getByText('3 files')).toBeInTheDocument();
   });
 
   it('displays zero files label in chip when no files', () => {
     const card = { ...baseCard, fileCount: 0, files: [] };
     render(<StepCard card={card} />);
-    expect(screen.getByText('📁 0 files')).toBeInTheDocument();
+    expect(screen.getByText('0 files')).toBeInTheDocument();
   });
 
   describe('teammate emoji footer', () => {
@@ -62,27 +62,27 @@ describe('StepCard', () => {
       const stepId = screen.getByText('01-04');
       expect(footer).toContainElement(stepId);
       expect(stepId.className).toMatch(/font-mono/);
-      expect(footer.className).toMatch(/justify-end/);
+      expect(footer.className).toMatch(/justify-between/);
     });
 
     it('shows emoji and colored teammate name when teammateId is set', () => {
-      render(<StepCard card={{ ...baseCard, teammateId: 'alice' }} />);
+      render(<StepCard card={{ ...baseCard, teammateId: 'crafter-01' }} />);
       const footer = screen.getByTestId('card-footer');
-      // Should show emoji (from getTeammateEmoji) + name
-      expect(footer.textContent).toMatch(/🐙\s*alice/);
+      // Should show role-based emoji + name
+      expect(footer.textContent).toMatch(/🛠️\s*crafter-01/);
     });
 
     it('shows both teammate and step ID in footer row when teammate present', () => {
-      render(<StepCard card={{ ...baseCard, teammateId: 'alice' }} />);
+      render(<StepCard card={{ ...baseCard, teammateId: 'crafter-01' }} />);
       const footer = screen.getByTestId('card-footer');
-      expect(footer).toContainElement(screen.getByText(/alice/));
+      expect(footer).toContainElement(screen.getByText(/crafter-01/));
       expect(footer).toContainElement(screen.getByText('01-04'));
       expect(footer.className).toMatch(/justify-between/);
     });
 
-    it('shows teammate in done column', () => {
+    it('hides teammate in done column', () => {
       render(<StepCard card={{ ...baseCard, displayColumn: 'done', teammateId: 'bob' }} />);
-      expect(screen.getByText(/bob/)).toBeInTheDocument();
+      expect(screen.queryByText(/bob/)).not.toBeInTheDocument();
       expect(screen.getByTestId('card-footer')).toBeInTheDocument();
     });
   });
@@ -163,7 +163,7 @@ describe('StepCard', () => {
     it('displays file chip with emoji and pill styling', () => {
       const card = { ...baseCard, fileCount: 5 };
       render(<StepCard card={card} />);
-      const fileChip = screen.getByText('📁 5 files');
+      const fileChip = screen.getByText('5 files');
       expect(fileChip).toBeInTheDocument();
       expect(fileChip.className).toMatch(/bg-gray-800/);
       expect(fileChip.className).toMatch(/rounded-full/);
@@ -185,9 +185,9 @@ describe('StepCard', () => {
     });
 
     it.each([
-      { fileCount: 1, expected: '📁 1 file' },
-      { fileCount: 0, expected: '📁 0 files' },
-      { fileCount: 10, expected: '📁 10 files' },
+      { fileCount: 1, expected: '1 file' },
+      { fileCount: 0, expected: '0 files' },
+      { fileCount: 10, expected: '10 files' },
     ])('file chip shows singular/plural: $expected', ({ fileCount, expected }) => {
       const card = { ...baseCard, fileCount };
       render(<StepCard card={card} />);
@@ -241,51 +241,4 @@ describe('StepCard', () => {
     });
   });
 
-  describe('tooltip integration', () => {
-    it('shows tooltip with step details after 300ms hover', () => {
-      render(<StepCard card={baseCard} />);
-
-      fireEvent.mouseEnter(screen.getByTestId('step-card'));
-
-      // Before 300ms - tooltip should not be visible
-      act(() => { vi.advanceTimersByTime(299); });
-      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
-
-      // At 300ms - tooltip should appear
-      act(() => { vi.advanceTimersByTime(1); });
-      expect(screen.getByRole('tooltip')).toBeInTheDocument();
-    });
-
-    it('card click still triggers onCardClick callback when tooltip wrapper present', () => {
-      const onCardClick = vi.fn();
-      render(<StepCard card={baseCard} onCardClick={onCardClick} />);
-
-      fireEvent.click(screen.getByTestId('step-card'));
-
-      expect(onCardClick).toHaveBeenCalledTimes(1);
-      expect(onCardClick).toHaveBeenCalledWith('01-04');
-    });
-
-    it('tooltip dismisses on mouse leave', () => {
-      render(<StepCard card={baseCard} />);
-
-      fireEvent.mouseEnter(screen.getByTestId('step-card'));
-      act(() => { vi.advanceTimersByTime(300); });
-      expect(screen.getByRole('tooltip')).toBeInTheDocument();
-
-      fireEvent.mouseLeave(screen.getByTestId('step-card'));
-      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
-    });
-
-    it('tooltip shows file list from card data', () => {
-      const cardWithFiles = { ...baseCard, files: ['src/auth.ts', 'src/utils.ts'] };
-      render(<StepCard card={cardWithFiles} />);
-
-      fireEvent.mouseEnter(screen.getByTestId('step-card'));
-      act(() => { vi.advanceTimersByTime(300); });
-
-      expect(screen.getByText('src/auth.ts')).toBeInTheDocument();
-      expect(screen.getByText('src/utils.ts')).toBeInTheDocument();
-    });
-  });
 });

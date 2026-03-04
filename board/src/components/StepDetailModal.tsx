@@ -4,7 +4,7 @@ import type { RoadmapStep, ReviewEntry } from '../../shared/types';
 import { mapStatusToDisplayColumn } from '../utils/statusMapping';
 import { getStatusLabel, getStatusColor } from '../utils/statusColors';
 import { getTeammateColor } from '../utils/teammateColors';
-import { computeDuration } from '../utils/stepDetailUtils';
+import { getTeammateEmoji } from '../utils/teammateEmoji';
 
 // --- Formatting helpers ---
 
@@ -68,7 +68,6 @@ export const StepDetailModal = ({
   const displayColumn = mapStatusToDisplayColumn(step.status);
   const statusLabel = getStatusLabel(displayColumn);
   const statusColor = getStatusColor(displayColumn);
-  const duration = computeDuration(step.started_at, step.completed_at);
 
   return createPortal(
     <div
@@ -86,45 +85,43 @@ export const StepDetailModal = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-gray-800 px-5 py-4">
-          <div className="flex-1">
-            <h2 className="text-lg font-semibold text-gray-100">{step.name}</h2>
-            <div className="mt-1 flex items-center gap-2">
-              <span className="font-mono text-sm text-gray-400">{step.id}</span>
-              <span className="text-gray-700">&middot;</span>
-              <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusColor.bg} ${statusColor.text}`}>
-                {statusLabel}
-              </span>
+        <div className="border-b border-gray-800 px-5 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg font-semibold text-gray-100">{step.name}</h2>
+              <div className="mt-1 flex items-center gap-2">
+                <span className="font-mono text-sm text-gray-400">{step.id}</span>
+                <span className="text-gray-600">·</span>
+                <span className={`text-xs uppercase tracking-wide ${statusColor.text}`}>{statusLabel}</span>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-3">
+              {step.teammate_id !== null && displayColumn !== 'done' && (
+                <span className={`text-sm font-medium ${getTeammateColor(step.teammate_id)}`}>
+                  {getTeammateEmoji(step.teammate_id)} {step.teammate_id}
+                </span>
+              )}
+              <button
+                type="button"
+                aria-label="Close"
+                className="rounded-md border border-gray-700 p-1.5 text-gray-400 transition-colors hover:border-gray-600 hover:bg-gray-800 hover:text-gray-200"
+                onClick={onClose}
+              >
+                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 4l8 8M12 4l-8 8" />
+                </svg>
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            aria-label="Close"
-            className="ml-3 rounded-md border border-gray-700 p-1.5 text-gray-400 transition-colors hover:border-gray-600 hover:bg-gray-800 hover:text-gray-200"
-            onClick={onClose}
-          >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 4l8 8M12 4l-8 8" />
-            </svg>
-          </button>
         </div>
 
         {/* Body */}
         <div className="space-y-3 px-5 py-4">
           {/* Description */}
-          {step.description !== undefined && (
+          {step.description !== undefined && step.description !== '' && (
             <div data-testid="description-section" className="rounded-md border border-gray-800 bg-gray-950/40 px-3 py-2.5">
               <p className="text-sm leading-relaxed text-gray-300">{step.description}</p>
             </div>
-          )}
-
-          {/* Teammate */}
-          {step.teammate_id !== null && (
-            <DetailSection title="Teammate">
-              <span className={`text-sm font-medium ${getTeammateColor(step.teammate_id)}`}>
-                {step.teammate_id}
-              </span>
-            </DetailSection>
           )}
 
           {/* Files */}
@@ -151,23 +148,6 @@ export const StepDetailModal = ({
             </DetailSection>
           )}
 
-          {/* Timing and review attempts */}
-          {step.started_at !== null && (
-            <DetailSection title="Timing">
-              <p className="text-sm text-gray-400">
-                {`Started: ${formatTimestamp(step.started_at)}`}
-                {step.completed_at !== null && ` — Completed: ${formatTimestamp(step.completed_at)}`}
-                {duration !== null && ` (${duration})`}
-                {step.review_attempts > 0 && ` · ${step.review_attempts} review attempts`}
-              </p>
-            </DetailSection>
-          )}
-          {step.started_at === null && step.review_attempts > 0 && (
-            <DetailSection title="Review Attempts">
-              <span className="text-sm text-gray-400">{step.review_attempts}</span>
-            </DetailSection>
-          )}
-
           {/* Review History */}
           {step.review_history !== undefined && step.review_history.length > 0 && (
             <DetailSection title="Review History">
@@ -190,6 +170,7 @@ export const StepDetailModal = ({
             </DetailSection>
           )}
         </div>
+
       </div>
     </div>,
     document.body,

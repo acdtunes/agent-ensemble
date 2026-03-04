@@ -2,8 +2,6 @@ import type {
   ProjectId,
   ProjectEntry,
   ProjectConfig,
-  DeliveryState,
-  ExecutionPlan,
   Roadmap,
   ParseError,
   Result,
@@ -24,9 +22,7 @@ export interface RegistryDeps {
   readonly createWatcher: (filePath: string, onChange: OnChangeCallback) => FileWatcher;
   readonly readFile: (path: string) => Result<string, string>;
   readonly parseRoadmap: (content: string) => Result<Roadmap, ParseError>;
-  readonly roadmapToDeliveryState: (roadmap: Roadmap) => DeliveryState;
-  readonly roadmapToExecutionPlan: (roadmap: Roadmap) => ExecutionPlan;
-  readonly onStateChange: (projectId: ProjectId, previousState: DeliveryState, newState: DeliveryState) => void;
+  readonly onStateChange: (projectId: ProjectId, previousRoadmap: Roadmap, newRoadmap: Roadmap) => void;
   readonly onParseError?: (projectId: ProjectId, error: string) => void;
 }
 
@@ -77,8 +73,7 @@ export const createProjectRegistry = (deps: RegistryDeps): ProjectRegistry => {
 
   const toProjectEntry = (entry: InternalEntry): ProjectEntry => ({
     projectId: entry.config.projectId,
-    state: deps.roadmapToDeliveryState(entry.roadmap),
-    plan: deps.roadmapToExecutionPlan(entry.roadmap),
+    roadmap: entry.roadmap,
   });
 
   const add = (config: ProjectConfig): Result<ProjectEntry, RegistryError> => {
@@ -100,10 +95,9 @@ export const createProjectRegistry = (deps: RegistryDeps): ProjectRegistry => {
       const entry = entries.get(config.projectId);
       if (!entry) return;
 
-      const previousState = deps.roadmapToDeliveryState(entry.roadmap);
+      const previousRoadmap = entry.roadmap;
       entry.roadmap = parsed.value;
-      const newState = deps.roadmapToDeliveryState(parsed.value);
-      deps.onStateChange(config.projectId, previousState, newState);
+      deps.onStateChange(config.projectId, previousRoadmap, parsed.value);
     };
 
     const watcher = hasRoadmap ? deps.createWatcher(roadmapPath, onChange) : null;

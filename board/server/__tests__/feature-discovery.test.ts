@@ -116,9 +116,8 @@ describe('deriveFeatureSummary: computes FeatureSummary from Roadmap', () => {
     expect(summary.hasRoadmap).toBe(true);
     expect(summary.hasExecutionLog).toBe(true);
     expect(summary.totalSteps).toBe(3);
-    expect(summary.completed).toBe(1);
+    expect(summary.done).toBe(1);
     expect(summary.inProgress).toBe(1);
-    expect(summary.failed).toBe(0);
     expect(summary.currentLayer).toBe(0);
     expect(summary.updatedAt).toBe('2026-01-01T03:00:00Z');
   });
@@ -131,9 +130,8 @@ describe('deriveFeatureSummary: computes FeatureSummary from Roadmap', () => {
     expect(summary.hasRoadmap).toBe(false);
     expect(summary.hasExecutionLog).toBe(false);
     expect(summary.totalSteps).toBe(0);
-    expect(summary.completed).toBe(0);
+    expect(summary.done).toBe(0);
     expect(summary.inProgress).toBe(0);
-    expect(summary.failed).toBe(0);
     expect(summary.currentLayer).toBe(0);
     expect(summary.updatedAt).toBe('');
   });
@@ -144,7 +142,7 @@ describe('deriveFeatureSummary: computes FeatureSummary from Roadmap', () => {
     expect(summary.hasRoadmap).toBe(true);
     expect(summary.hasExecutionLog).toBe(false);
     expect(summary.totalSteps).toBe(2);
-    expect(summary.completed).toBe(0);
+    expect(summary.done).toBe(0);
     expect(summary.inProgress).toBe(0);
   });
 
@@ -167,14 +165,14 @@ describe('deriveFeatureSummary: computes FeatureSummary from Roadmap', () => {
     );
   });
 
-  // Property: completed + inProgress + failed <= totalSteps
-  it('property: completed + inProgress + failed <= totalSteps', () => {
+  // Property: done + inProgress <= totalSteps
+  it('property: done + inProgress <= totalSteps', () => {
     const optionalRoadmap = fc.constantFrom(minimalRoadmap, allPendingRoadmap, phaseOneCompleteRoadmap, null);
 
     fc.assert(
       fc.property(optionalRoadmap, (roadmap) => {
         const summary = deriveFeatureSummary(featureId, roadmap);
-        return summary.completed + summary.inProgress + summary.failed <= summary.totalSteps;
+        return summary.done + summary.inProgress <= summary.totalSteps;
       }),
     );
   });

@@ -16,9 +16,9 @@ phases:
   steps:
   - id: 01-01
     name: Add shared browse types
-    files:
+    files_to_modify:
       - board/shared/types.ts
-    dependencies: []
+    deps: []
     criteria:
       - BrowseEntry has readonly fields
     status: approved
@@ -28,9 +28,9 @@ phases:
     review_attempts: 1
   - id: 01-02
     name: Create validation core
-    files:
+    files_to_modify:
       - board/server/browse.ts
-    dependencies:
+    deps:
       - 01-01
     criteria:
       - validateBrowsePath returns Result
@@ -41,9 +41,9 @@ phases:
     review_attempts: 0
   - id: 01-03
     name: Create IO shell adapter
-    files:
+    files_to_modify:
       - board/server/browse.ts
-    dependencies:
+    deps:
       - 01-02
     criteria: []
 `;

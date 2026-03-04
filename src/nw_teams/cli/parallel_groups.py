@@ -35,23 +35,80 @@ class ParallelGroup(NamedTuple):
 
 
 def extract_steps(roadmap: dict) -> list[Step]:
-    """Extract steps from roadmap.yaml.
+    """Extract steps from roadmap.yaml using CANONICAL DES schema.
 
-    Raises ValueError if any step has empty files_to_modify.
+    Canonical field names (from ~/.claude/templates/roadmap-schema.yaml):
+    - phase: id, name, steps
+    - step: id, name, criteria, files_to_modify, deps
+
+    Raises ValueError if:
+    - Missing 'roadmap:' wrapper
+    - Non-canonical field names detected (suggests invalid roadmap)
+    - Any step has empty files_to_modify
     """
     steps = []
+
+    # Validate roadmap wrapper exists
+    if "roadmap" not in roadmap:
+        raise ValueError(
+            "Missing 'roadmap:' wrapper. Roadmap must have canonical DES schema. "
+            "Use `des.cli.roadmap validate` to check, or `/nw:roadmap` to create."
+        )
+
     for phase in roadmap.get("phases", []):
-        phase_id = phase.get("phase_id", phase.get("id", ""))
+        # Strict: require canonical 'id' field
+        phase_id = phase.get("id")
+        if phase_id is None:
+            if "phase_id" in phase:
+                raise ValueError(
+                    f"Phase uses 'phase_id' instead of 'id'. Use canonical DES schema. "
+                    f"Run `des.cli.roadmap validate` to check your roadmap."
+                )
+            raise ValueError(
+                f"Phase missing required 'id' field. Use canonical DES schema."
+            )
+
         for step in phase.get("steps", []):
-            step_id = step.get("step_id", step.get("id", ""))
+            # Strict: require canonical 'id' field
+            step_id = step.get("id")
+            if step_id is None:
+                if "step_id" in step:
+                    raise ValueError(
+                        f"Step uses 'step_id' instead of 'id'. Use canonical DES schema."
+                    )
+                raise ValueError(
+                    f"Step in phase {phase_id} missing required 'id' field."
+                )
+
             name = step.get("name", "")
-            files = step.get("files_to_modify", step.get("implementation_scope", []))
+
+            # Strict: require canonical 'files_to_modify' field
+            files = step.get("files_to_modify")
+            if files is None:
+                if "implementation_scope" in step:
+                    raise ValueError(
+                        f"Step {step_id} uses 'implementation_scope' instead of 'files_to_modify'. "
+                        f"Use canonical DES schema."
+                    )
+                if "files" in step:
+                    raise ValueError(
+                        f"Step {step_id} uses 'files' instead of 'files_to_modify'. "
+                        f"Use canonical DES schema."
+                    )
+                raise ValueError(
+                    f"Step {step_id} missing required 'files_to_modify' field. "
+                    f"nw-teams requires files_to_modify for parallel conflict detection "
+                    f"(DES marks it optional, but nw-teams REQUIRES it)."
+                )
+
             if not files:
                 raise ValueError(
                     f"Step {step_id} ({name}) has empty files_to_modify. "
-                    f"Every step must declare at least one file."
+                    f"nw-teams requires at least one file per step for conflict detection."
                 )
-            blocked_by = step.get("blocked_by", step.get("dependencies", []))
+
+            # Accept both 'deps' (canonical) and 'dependencies' (common alias)
+            blocked_by = step.get("deps", step.get("dependencies", []))
             description = step.get("description", "")
             steps.append(Step(step_id, name, files, blocked_by, phase_id, description))
     return steps

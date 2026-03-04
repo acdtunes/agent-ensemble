@@ -67,19 +67,20 @@ const testRoadmap: Roadmap = {
 describe('KanbanBoard acceptance', () => {
   it('renders phase swim lanes as rows', () => {
     render(<KanbanBoard roadmap={testRoadmap} />);
-    expect(screen.getByText('Phase 1')).toBeInTheDocument();
-    expect(screen.getByText('Phase 2')).toBeInTheDocument();
+    // The component shows "Phase N: Name" format
+    expect(screen.getByText(/Phase 1:/)).toBeInTheDocument();
+    expect(screen.getByText(/Phase 2:/)).toBeInTheDocument();
   });
 
   it('shows phase header with step count', () => {
     render(<KanbanBoard roadmap={testRoadmap} />);
-    const phase1 = screen.getByTestId('phase-phase-1');
+    const phase1 = screen.getByTestId('layer-1');
     expect(within(phase1).getByText(/2 steps/i)).toBeInTheDocument();
   });
 
   it('shows phase progress as approved/total in header', () => {
     render(<KanbanBoard roadmap={testRoadmap} />);
-    const phase1 = screen.getByTestId('phase-phase-1');
+    const phase1 = screen.getByTestId('layer-1');
     expect(within(phase1).getByText(/1\/2/)).toBeInTheDocument();
   });
 
@@ -92,7 +93,7 @@ describe('KanbanBoard acceptance', () => {
 
   it('places step card from approved step in Done column', () => {
     render(<KanbanBoard roadmap={testRoadmap} />);
-    const phase1 = screen.getByTestId('phase-phase-1');
+    const phase1 = screen.getByTestId('layer-1');
     const doneCol = within(phase1).getByTestId('column-done');
     // Step 01-01 is approved → Done column, shows step name and file count
     expect(within(doneCol).getByText('Setup database')).toBeInTheDocument();
@@ -101,7 +102,7 @@ describe('KanbanBoard acceptance', () => {
 
   it('places step card from in_progress step in In Progress column', () => {
     render(<KanbanBoard roadmap={testRoadmap} />);
-    const phase1 = screen.getByTestId('phase-phase-1');
+    const phase1 = screen.getByTestId('layer-1');
     const inProgressCol = within(phase1).getByTestId('column-in_progress');
     // Step 01-02 is in_progress → In Progress column
     expect(within(inProgressCol).getByText('Setup API routes')).toBeInTheDocument();
@@ -110,7 +111,7 @@ describe('KanbanBoard acceptance', () => {
 
   it('does not show review badge on step card even when step has review attempts', () => {
     render(<KanbanBoard roadmap={testRoadmap} />);
-    const phase1 = screen.getByTestId('phase-phase-1');
+    const phase1 = screen.getByTestId('layer-1');
     const doneCol = within(phase1).getByTestId('column-done');
     // Step 01-01 has review_attempts: 2 → but review badge is no longer rendered on cards
     expect(within(doneCol).queryByText(/reviews?$/i)).not.toBeInTheDocument();
@@ -118,7 +119,7 @@ describe('KanbanBoard acceptance', () => {
 
   it('displays status-based color coding on columns', () => {
     render(<KanbanBoard roadmap={testRoadmap} />);
-    const phase1 = screen.getByTestId('phase-phase-1');
+    const phase1 = screen.getByTestId('layer-1');
     const doneCol = within(phase1).getByTestId('column-done');
     expect(doneCol.className).toContain('green');
   });

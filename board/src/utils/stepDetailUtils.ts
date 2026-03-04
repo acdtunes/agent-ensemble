@@ -1,8 +1,8 @@
-import type { ExecutionPlan, PlanStep } from '../../shared/types';
+import type { Roadmap, RoadmapStep } from '../../shared/types';
 
-export const buildPlanStepLookup = (plan: ExecutionPlan): ReadonlyMap<string, PlanStep> =>
+export const buildPlanStepLookup = (roadmap: Roadmap): ReadonlyMap<string, RoadmapStep> =>
   new Map(
-    plan.layers.flatMap(layer => layer.steps.map(step => [step.step_id, step] as const)),
+    roadmap.phases.flatMap((phase) => phase.steps.map((step) => [step.id, step] as const)),
   );
 
 export const computeDuration = (

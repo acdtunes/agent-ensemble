@@ -39,7 +39,7 @@ const validRoadmap: Roadmap = {
     name: 'Phase 2',
     steps: [
       makeStep({ id: '02-01', status: 'in_progress', started_at: '2026-03-01T12:30:00+00:00' }),
-      makeStep({ id: '02-02', status: 'failed', started_at: '2026-03-01T12:30:00+00:00' }),
+      makeStep({ id: '02-02', status: 'review', started_at: '2026-03-01T12:30:00+00:00' }),
       makeStep({ id: '02-03' }),
     ],
   }],
@@ -59,9 +59,8 @@ describe('Multi-project type extensions', () => {
       expect(summary.projectId).toBe('kanban-board');
       expect(summary.name).toBe('kanban-board');
       expect(summary.totalSteps).toBe(5);
-      expect(summary.completed).toBe(2);
-      expect(summary.failed).toBe(1);
-      expect(summary.inProgress).toBe(1);
+      expect(summary.done).toBe(2);
+      expect(summary.inProgress).toBe(2);
       expect(summary.currentLayer).toBe(1);
       expect(summary.updatedAt).toBe('2026-03-01T12:30:00+00:00');
     });

@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "nw-teams"
@@ -9,6 +9,7 @@ description = "Agent Teams coordination for nWave framework"
 requires-python = ">=3.11"
 dependencies = [
     "pyyaml>=6.0",
+    "ruamel.yaml>=0.18",
 ]
 
 [project.optional-dependencies]

@@ -6,12 +6,11 @@ import type { ProjectSummary, ProjectId } from '../../shared/types';
 
 afterEach(cleanup);
 
-const createProject = (overrides: Partial<ProjectSummary> & { projectId: string; name: string }): ProjectSummary => ({
-  projectId: overrides.projectId as ProjectId,
-  name: overrides.name,
+const createProject = (id: string, overrides?: Partial<ProjectSummary>): ProjectSummary => ({
+  projectId: id as ProjectId,
+  name: id,
   totalSteps: 10,
-  completed: 3,
-  failed: 0,
+  done: 3,
   inProgress: 2,
   currentLayer: 2,
   updatedAt: '2026-02-28T12:00:00Z',
@@ -21,9 +20,9 @@ const createProject = (overrides: Partial<ProjectSummary> & { projectId: string;
 });
 
 const testProjects: readonly ProjectSummary[] = [
-  createProject({ projectId: 'auth-feature' as string, name: 'auth-feature', totalSteps: 8, completed: 4, currentLayer: 2 }),
-  createProject({ projectId: 'payment-api' as string, name: 'payment-api', totalSteps: 12, completed: 6, currentLayer: 3 }),
-  createProject({ projectId: 'dashboard-ui' as string, name: 'dashboard-ui', totalSteps: 5, completed: 5, currentLayer: 1, inProgress: 0 }),
+  createProject('auth-feature', { totalSteps: 8, done: 4, currentLayer: 2 }),
+  createProject('payment-api', { totalSteps: 12, done: 6, currentLayer: 3 }),
+  createProject('dashboard-ui', { totalSteps: 5, done: 5, currentLayer: 1, inProgress: 0 }),
 ];
 
 describe('OverviewDashboard acceptance', () => {
@@ -41,10 +40,11 @@ describe('OverviewDashboard acceptance', () => {
     expect(screen.getByText(/100%/)).toBeInTheDocument(); // 5/5
   });
 
-  it('shows current layer number on each card', () => {
+  it('shows current layer as completed phases on each card', () => {
     render(<OverviewDashboard projects={testProjects} onNavigate={() => {}} onAddProject={() => {}} onRemoveProject={() => {}} />);
-    expect(screen.getByText(/Layer 2/)).toBeInTheDocument();
-    expect(screen.getByText(/Layer 3/)).toBeInTheDocument();
+    // The card shows "X done" for phases, not "Layer X"
+    expect(screen.getByText(/2 done/)).toBeInTheDocument();
+    expect(screen.getByText(/3 done/)).toBeInTheDocument();
   });
 
   it('navigates to project board on card click', () => {

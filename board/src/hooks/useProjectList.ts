@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { ProjectSummary, ProjectId } from '../../shared/types';
-import type { ConnectionStatus } from './useDeliveryState';
+import type { ConnectionStatus } from './useRoadmapState';
 
 // --- Message types (project list WS protocol) ---
 
 export type ProjectListMessage =
-  | { readonly type: 'projects_snapshot'; readonly projects: readonly ProjectSummary[] }
+  | { readonly type: 'project_list'; readonly projects: readonly ProjectSummary[] }
   | { readonly type: 'project_added'; readonly project: ProjectSummary }
   | { readonly type: 'project_removed'; readonly projectId: ProjectId };
 
@@ -30,7 +30,7 @@ export const applyProjectMessage = (
   message: ProjectListMessage,
 ): readonly ProjectSummary[] => {
   switch (message.type) {
-    case 'projects_snapshot':
+    case 'project_list':
       return message.projects;
     case 'project_added': {
       const filtered = projects.filter(p => p.projectId !== message.project.projectId);
@@ -73,7 +73,7 @@ export const useProjectList = (url: string): UseProjectListResult => {
       try {
         const message = parseMessage(event.data);
         setProjects(prev => applyProjectMessage(prev, message));
-        if (message.type === 'projects_snapshot') {
+        if (message.type === 'project_list') {
           receivedSnapshotRef.current = true;
         }
       } catch {
