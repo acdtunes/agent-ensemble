@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import {
   FeatureCard,
@@ -105,6 +105,47 @@ describe("FeatureCard", () => {
     expect(screen.getByText("card-redesign")).toBeInTheDocument();
   });
 
+  // =================================================================
+  // Short description display - Test Budget: 4 behaviors x 2 = 8 max
+  // =================================================================
+
+  describe("short description display", () => {
+    it("displays short description with muted styling below feature name", () => {
+      const feature = makeFeature({ shortDescription: "Handles user authentication" });
+      render(<FeatureCard feature={feature} />);
+
+      const description = screen.getByTestId("feature-description");
+      expect(description).toHaveTextContent("Handles user authentication");
+      expect(description.className).toMatch(/text-gray-400|text-gray-500/);
+    });
+
+    it("applies truncation styling for long descriptions", () => {
+      const longDesc = "This is a very long description that should be truncated with ellipsis";
+      const feature = makeFeature({ shortDescription: longDesc });
+      render(<FeatureCard feature={feature} />);
+
+      const description = screen.getByTestId("feature-description");
+      expect(description.className).toMatch(/truncate|line-clamp|overflow-hidden/);
+    });
+
+    it("renders no element when shortDescription is undefined", () => {
+      const feature = makeFeature({ shortDescription: undefined });
+      render(<FeatureCard feature={feature} />);
+
+      expect(screen.queryByTestId("feature-description")).not.toBeInTheDocument();
+    });
+
+    it("renders no element when shortDescription is empty or whitespace-only", () => {
+      const emptyFeature = makeFeature({ shortDescription: "" });
+      const { rerender } = render(<FeatureCard feature={emptyFeature} />);
+      expect(screen.queryByTestId("feature-description")).not.toBeInTheDocument();
+
+      const whitespaceFeature = makeFeature({ shortDescription: "   " });
+      rerender(<FeatureCard feature={whitespaceFeature} />);
+      expect(screen.queryByTestId("feature-description")).not.toBeInTheDocument();
+    });
+  });
+
   it("displays progress metrics for active feature", () => {
     render(<FeatureCard feature={makeFeature()} />);
     expect(screen.getByText("3 of 7")).toBeInTheDocument();
@@ -181,6 +222,98 @@ describe("FeatureCard", () => {
       );
       const inProgressBadge = screen.getByText(/2 in progress/i);
       expect(inProgressBadge).toHaveClass("whitespace-nowrap");
+    });
+  });
+
+  describe("archive functionality", () => {
+    const archiveProps = {
+      projectId: "my-project",
+      onArchiveSuccess: vi.fn(),
+    };
+
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("displays archive button on feature card", () => {
+      render(<FeatureCard feature={makeFeature()} {...archiveProps} />);
+      expect(screen.getByRole("button", { name: /archive/i })).toBeInTheDocument();
+    });
+
+    it("opens confirmation dialog when archive button clicked", async () => {
+      render(<FeatureCard feature={makeFeature()} {...archiveProps} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /archive/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText("Archive Feature?")).toBeInTheDocument();
+        expect(screen.getByText(/Are you sure you want to archive "card-redesign"\?/)).toBeInTheDocument();
+      });
+    });
+
+    it("closes dialog when cancel is clicked", async () => {
+      render(<FeatureCard feature={makeFeature()} {...archiveProps} />);
+
+      fireEvent.click(screen.getByRole("button", { name: /archive/i }));
+      await waitFor(() => {
+        expect(screen.getByText("Archive Feature?")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+      await waitFor(() => {
+        expect(screen.queryByText("Archive Feature?")).not.toBeInTheDocument();
+      });
+    });
+
+    it("calls onArchiveSuccess after successful archive", async () => {
+      // Mock successful fetch
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
+
+      render(<FeatureCard feature={makeFeature()} {...archiveProps} />);
+
+      // Open dialog
+      fireEvent.click(screen.getByRole("button", { name: /archive/i }));
+      await waitFor(() => {
+        expect(screen.getByText("Archive Feature?")).toBeInTheDocument();
+      });
+
+      // Confirm archive - click the amber confirm button inside the dialog
+      const dialogConfirmButton = screen.getAllByRole("button", { name: /archive/i })
+        .find((btn) => btn.classList.contains("bg-amber-600"));
+      fireEvent.click(dialogConfirmButton!);
+
+      await waitFor(() => {
+        expect(archiveProps.onArchiveSuccess).toHaveBeenCalledOnce();
+      });
+
+      // Dialog should close
+      await waitFor(() => {
+        expect(screen.queryByText("Archive Feature?")).not.toBeInTheDocument();
+      });
+    });
+
+    it("does not show archive button when projectId is not provided", () => {
+      render(<FeatureCard feature={makeFeature()} />);
+      expect(screen.queryByRole("button", { name: /archive/i })).not.toBeInTheDocument();
+    });
+
+    it("archive button click does not trigger card onClick", async () => {
+      const onClick = vi.fn();
+      render(
+        <FeatureCard
+          feature={makeFeature()}
+          onClick={onClick}
+          {...archiveProps}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /archive/i }));
+
+      expect(onClick).not.toHaveBeenCalled();
     });
   });
 });
