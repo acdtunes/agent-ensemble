@@ -320,3 +320,124 @@ def test_check_errors_on_unknown_phase(tmp_path, capsys):
     exit_code = main(["check", str(roadmap_file), "--phase", "99"])
 
     assert exit_code == 2
+
+
+# --- Acceptance: start-step writes conflicts_with for file overlap ---
+
+
+ROADMAP_WITH_FILE_CONFLICTS = textwrap.dedent("""\
+    roadmap:
+      project_id: conflict-test
+    phases:
+    - id: '01'
+      name: Foundation
+      steps:
+      - id: 01-01
+        name: Add auth
+        files_to_modify:
+          - src/auth.ts
+          - src/utils.ts
+        status: in_progress
+        teammate_id: crafter-01
+      - id: 01-02
+        name: Add api
+        files_to_modify:
+          - src/auth.ts
+          - src/api.ts
+      - id: 01-03
+        name: Add tests
+        files_to_modify:
+          - tests/auth.test.ts
+""")
+
+
+def test_start_step_writes_conflicts_with_for_file_overlap(tmp_path):
+    """Acceptance: Starting step with file overlap writes conflicts_with array
+    containing IDs of conflicting active steps, and updates those steps mutually."""
+    roadmap_file = tmp_path / "roadmap.yaml"
+    roadmap_file.write_text(ROADMAP_WITH_FILE_CONFLICTS)
+
+    exit_code = main(["start-step", str(roadmap_file), "--step", "01-02", "--teammate", "crafter-02"])
+
+    assert exit_code == 0
+
+    from ruamel.yaml import YAML
+    yaml = YAML()
+    data = yaml.load(roadmap_file.read_text())
+
+    # Find steps
+    step_01 = data["phases"][0]["steps"][0]  # 01-01
+    step_02 = data["phases"][0]["steps"][1]  # 01-02
+
+    # New step has conflicts_with pointing to active conflicting step
+    assert step_02.get("conflicts_with") == ["01-01"]
+
+    # Active step updated with mutual reference
+    assert "01-02" in step_01.get("conflicts_with", [])
+
+
+def test_start_step_no_conflicts_with_when_no_file_overlap(tmp_path):
+    """Acceptance: Starting step with no file overlap does not write conflicts_with."""
+    roadmap_file = tmp_path / "roadmap.yaml"
+    roadmap_file.write_text(ROADMAP_WITH_FILE_CONFLICTS)
+
+    exit_code = main(["start-step", str(roadmap_file), "--step", "01-03", "--teammate", "crafter-03"])
+
+    assert exit_code == 0
+
+    from ruamel.yaml import YAML
+    yaml = YAML()
+    data = yaml.load(roadmap_file.read_text())
+
+    step_03 = data["phases"][0]["steps"][2]  # 01-03
+
+    # No conflicts_with field when no overlap
+    assert "conflicts_with" not in step_03
+
+
+# --- Unit: _compute_conflicting_step_ids pure function ---
+
+
+def test_compute_conflicting_step_ids_returns_ids_of_overlapping_active_steps():
+    """Unit: Pure function returns list of step IDs that share files."""
+    from agent_ensemble.cli.team_state import _compute_conflicting_step_ids
+
+    step = {"id": "02-01", "files_to_modify": ["src/auth.ts", "src/api.ts"]}
+    active_steps = [
+        {"id": "01-01", "files_to_modify": ["src/auth.ts", "src/utils.ts"]},
+        {"id": "01-02", "files_to_modify": ["src/db.ts"]},
+        {"id": "01-03", "files_to_modify": ["src/api.ts"]},
+    ]
+
+    result = _compute_conflicting_step_ids(step, active_steps)
+
+    assert sorted(result) == ["01-01", "01-03"]
+
+
+def test_compute_conflicting_step_ids_excludes_self():
+    """Unit: Function excludes the step itself from conflicts."""
+    from agent_ensemble.cli.team_state import _compute_conflicting_step_ids
+
+    step = {"id": "01-01", "files_to_modify": ["src/auth.ts"]}
+    active_steps = [
+        {"id": "01-01", "files_to_modify": ["src/auth.ts"]},
+        {"id": "01-02", "files_to_modify": ["src/auth.ts"]},
+    ]
+
+    result = _compute_conflicting_step_ids(step, active_steps)
+
+    assert result == ["01-02"]
+
+
+def test_compute_conflicting_step_ids_returns_empty_for_no_overlap():
+    """Unit: Function returns empty list when no file overlap exists."""
+    from agent_ensemble.cli.team_state import _compute_conflicting_step_ids
+
+    step = {"id": "02-01", "files_to_modify": ["src/new.ts"]}
+    active_steps = [
+        {"id": "01-01", "files_to_modify": ["src/auth.ts"]},
+    ]
+
+    result = _compute_conflicting_step_ids(step, active_steps)
+
+    assert result == []

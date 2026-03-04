@@ -176,6 +176,37 @@ def _detect_file_conflicts(step: dict, active_steps: list[dict]) -> list[str]:
     return list(set(conflicting_files))
 
 
+def _compute_conflicting_step_ids(step: dict, active_steps: list[dict]) -> list[str]:
+    """Compute IDs of active steps that share files with the given step.
+
+    Pure function: step dict, active_steps list -> list of conflicting step IDs.
+    """
+    step_files = _get_step_files(step)
+    if not step_files:
+        return []
+
+    conflicting_ids = []
+    for active in active_steps:
+        if active.get("id") == step.get("id"):
+            continue
+        active_files = _get_step_files(active)
+        if step_files & active_files:
+            conflicting_ids.append(active.get("id"))
+
+    return conflicting_ids
+
+
+def _add_conflict_reference(step: dict, conflict_id: str) -> None:
+    """Add a conflict ID to step's conflicts_with list if not present.
+
+    Mutates step dict in place to add conflict reference.
+    """
+    if "conflicts_with" not in step:
+        step["conflicts_with"] = []
+    if conflict_id not in step["conflicts_with"]:
+        step["conflicts_with"].append(conflict_id)
+
+
 def _load_roadmap(path: Path):
     """Load roadmap.yaml with ruamel.yaml for round-trip preservation."""
     yaml = YAML()
@@ -319,6 +350,7 @@ def cmd_start_step(args: list[str]) -> int:
     # Check for file conflicts with active steps
     active_steps = _get_active_steps(data)
     conflicts = _detect_file_conflicts(step, active_steps)
+    conflicting_step_ids = _compute_conflicting_step_ids(step, active_steps)
 
     use_worktree = bool(conflicts)
     worktree_path_str = None
@@ -337,6 +369,15 @@ def cmd_start_step(args: list[str]) -> int:
     step["started_at"] = now
     if use_worktree:
         step["worktree"] = worktree_path_str
+
+    # Write conflicts_with for file overlap (mutual references)
+    if conflicting_step_ids:
+        step["conflicts_with"] = conflicting_step_ids
+        # Update conflicting steps with mutual reference
+        for conflict_id in conflicting_step_ids:
+            conflict_step = _find_step(data, conflict_id)
+            if conflict_step:
+                _add_conflict_reference(conflict_step, step_id)
 
     _save_roadmap(yaml_inst, data, roadmap_file)
 

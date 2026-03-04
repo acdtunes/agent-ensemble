@@ -45,6 +45,8 @@ export interface RoadmapStep {
   readonly completed_at: string | null;
   readonly review_attempts: number;
   readonly review_history?: readonly ReviewEntry[];
+  readonly worktree?: string;
+  readonly conflicts_with?: readonly string[];
 }
 
 export interface RoadmapPhase {
