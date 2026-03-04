@@ -4,6 +4,8 @@ import { getStatusTopBarColor } from '../utils/statusColors';
 import { getCardAnimationClasses } from '../utils/animationClasses';
 import { getTeammateColor } from '../utils/teammateColors';
 import { getTeammateEmoji } from '../utils/teammateEmoji';
+import { Toast } from './Toast';
+import { useToast } from '../hooks/useToast';
 
 const Badge = ({ bg, text, children }: { readonly bg: string; readonly text: string; readonly children: React.ReactNode }) => (
   <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${bg} ${text}`}>{children}</span>
@@ -54,6 +56,13 @@ export const StepCard = ({ card, onCardClick, isHighlighted = false }: StepCardP
   // Only show teammate for active work (not done)
   const showTeammate = card.teammateId !== null && card.displayColumn !== 'done';
   const highlightClasses = isHighlighted ? 'ring-2 ring-amber-400' : '';
+  const toast = useToast();
+
+  const handleStepIdClick = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    navigator.clipboard.writeText(card.stepId);
+    toast.show(`Copied ${card.stepId}`);
+  };
 
   return (
     <div
@@ -95,8 +104,15 @@ export const StepCard = ({ card, onCardClick, isHighlighted = false }: StepCardP
         ) : (
           <span />
         )}
-        <span className="shrink-0 whitespace-nowrap font-mono text-xs text-gray-400">{card.stepId}</span>
+        <span
+          data-testid="step-id"
+          className="shrink-0 whitespace-nowrap font-mono text-xs text-gray-400 cursor-pointer hover:underline hover:text-gray-200"
+          onClick={handleStepIdClick}
+        >
+          {card.stepId}
+        </span>
       </div>
+      <Toast message={toast.message} />
     </div>
   );
 };

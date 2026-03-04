@@ -293,6 +293,59 @@ describe('StepCard', () => {
     });
   });
 
+  describe('click-to-copy step ID', () => {
+    it('copies step ID to clipboard when clicked', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(<StepCard card={baseCard} />);
+      const stepIdElement = screen.getByTestId('step-id');
+      fireEvent.click(stepIdElement);
+
+      expect(writeText).toHaveBeenCalledWith('01-04');
+    });
+
+    it('shows toast with copied message when step ID is clicked', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      render(<StepCard card={baseCard} />);
+      const stepIdElement = screen.getByTestId('step-id');
+      fireEvent.click(stepIdElement);
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(screen.getByRole('status')).toHaveTextContent('Copied 01-04');
+    });
+
+    it('shows pointer cursor on step ID hover', () => {
+      render(<StepCard card={baseCard} />);
+      const stepIdElement = screen.getByTestId('step-id');
+      expect(stepIdElement.className).toMatch(/cursor-pointer/);
+    });
+
+    it('shows visual hover affordance (underline) on step ID', () => {
+      render(<StepCard card={baseCard} />);
+      const stepIdElement = screen.getByTestId('step-id');
+      expect(stepIdElement.className).toMatch(/hover:underline/);
+    });
+
+    it('does not propagate click to card click handler', () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+      const onCardClick = vi.fn();
+
+      render(<StepCard card={baseCard} onCardClick={onCardClick} />);
+      const stepIdElement = screen.getByTestId('step-id');
+      fireEvent.click(stepIdElement);
+
+      expect(writeText).toHaveBeenCalled();
+      expect(onCardClick).not.toHaveBeenCalled();
+    });
+  });
+
   describe('tall card layout', () => {
     it('has minimum height of 160px', () => {
       render(<StepCard card={baseCard} />);
