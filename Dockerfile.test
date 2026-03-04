@@ -1,0 +1,58 @@
+# Test Dockerfile for agent-ensemble installation
+# Verifies the install flow works from a clean environment
+#
+# Build: docker build -f Dockerfile.test -t agent-ensemble-test .
+# Run:   docker run --rm agent-ensemble-test
+
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install pipx
+RUN pip install pipx && pipx ensurepath
+ENV PATH="/root/.local/bin:$PATH"
+
+# Create a non-root user to simulate real usage
+RUN useradd -m -s /bin/bash testuser
+USER testuser
+WORKDIR /home/testuser
+
+# Install pipx for testuser
+RUN pip install --user pipx
+ENV PATH="/home/testuser/.local/bin:$PATH"
+RUN pipx ensurepath
+
+# Clone the repository (uses build arg for flexibility)
+ARG REPO_URL=https://github.com/acdtunes/agent-ensemble.git
+ARG BRANCH=main
+RUN git clone --branch ${BRANCH} ${REPO_URL} agent-ensemble
+
+# Run the installation
+WORKDIR /home/testuser/agent-ensemble
+RUN ./install.sh
+
+# Verify installation
+RUN echo "=== Verification ===" && \
+    echo "1. Checking commands directory..." && \
+    ls -la ~/.claude/commands/ensemble/ && \
+    echo "" && \
+    echo "2. Checking Python library..." && \
+    ls -la ~/.claude/lib/python/agent_ensemble/ && \
+    echo "" && \
+    echo "3. Checking CLI modules..." && \
+    ls -la ~/.claude/lib/python/agent_ensemble/cli/ && \
+    echo "" && \
+    echo "4. Checking manifest..." && \
+    cat ~/.claude/ensemble-manifest.txt && \
+    echo "" && \
+    echo "5. Checking nWave installation..." && \
+    ls ~/.claude/agents/nw-*.md 2>/dev/null | head -5 || echo "nWave agents found" && \
+    echo "" && \
+    echo "=== All checks passed ==="
+
+# Default command shows what was installed
+CMD ["bash", "-c", "echo 'Installation test successful!' && cat ~/.claude/ensemble-manifest.txt"]
