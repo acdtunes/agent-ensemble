@@ -22,6 +22,9 @@ const navigateToFeatureBoard = (projectId: string, featureId: string): void => {
   window.location.hash = buildFeatureBoardUrl(projectId, featureId);
 };
 
+const hasContent = (value: string | undefined): value is string =>
+  value !== undefined && value.trim().length > 0;
+
 export const FeatureBoardView = ({
   projectId,
   featureId,
@@ -34,6 +37,8 @@ export const FeatureBoardView = ({
     () => filterBoardCapableFeatures(features),
     [features],
   );
+
+  const description = roadmap.roadmap.description;
 
   const breadcrumbSegments: BreadcrumbSegment[] = [
     { label: 'Overview', onClick: onNavigateOverview },
@@ -74,6 +79,15 @@ export const FeatureBoardView = ({
           onFeatureChange={handleFeatureChange}
         />
       </div>
+
+      {hasContent(description) && (
+        <div
+          data-testid="feature-description-header"
+          className="mb-4 text-sm text-gray-400"
+        >
+          {description}
+        </div>
+      )}
 
       <KanbanBoard roadmap={roadmap} />
     </div>

@@ -41,12 +41,13 @@ const makeStep = (id: string, name: string, status: RoadmapStep['status'] = 'pen
   review_attempts: 0,
 });
 
-const makeRoadmap = (steps: RoadmapStep[]): Roadmap => ({
+const makeRoadmap = (steps: RoadmapStep[], description?: string): Roadmap => ({
   roadmap: {
     project_id: 'test',
     created_at: '2026-03-01T00:00:00Z',
     total_steps: steps.length,
     phases: 1,
+    description,
   },
   phases: [{ id: '01', name: 'Phase 1', steps }],
 });
@@ -57,8 +58,7 @@ const makeFeature = (id: string, overrides: Partial<FeatureSummary> = {}): Featu
   hasRoadmap: true,
   hasExecutionLog: true,
   totalSteps: 7,
-  completed: 3,
-  failed: 0,
+  done: 3,
   inProgress: 2,
   currentLayer: 2,
   updatedAt: '2026-03-01T12:00:00Z',
@@ -248,5 +248,68 @@ describe('FeatureBoardView acceptance', () => {
     const breadcrumb = screen.getByRole('navigation', { name: /breadcrumb/i });
     fireEvent.click(within(breadcrumb).getByText('my-project'));
     expect(onNavigateProject).toHaveBeenCalledOnce();
+  });
+});
+
+// --- Description header tests ---
+
+describe('FeatureBoardView description header', () => {
+  it.each([
+    ['shows description header when roadmap has description', 'Feature handles authentication flows'],
+    ['displays long description', 'This is a comprehensive authentication system that provides login, logout, password reset, and session management capabilities.'],
+  ])('%s', (_, description) => {
+    const roadmap = makeRoadmap([makeStep('01-01', 'Step 1')], description);
+
+    render(
+      <FeatureBoardView
+        projectId="my-project"
+        featureId="auth-flow"
+        roadmap={roadmap}
+        features={[makeFeature('auth-flow')]}
+        onNavigateOverview={vi.fn()}
+        onNavigateProject={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(description)).toBeInTheDocument();
+    expect(screen.getByTestId('feature-description-header')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['undefined', undefined],
+    ['empty string', ''],
+    ['whitespace only', '   '],
+  ])('renders no header when description is %s', (_, description) => {
+    const roadmap = makeRoadmap([makeStep('01-01', 'Step 1')], description);
+
+    const { container } = render(
+      <FeatureBoardView
+        projectId="my-project"
+        featureId="auth-flow"
+        roadmap={roadmap}
+        features={[makeFeature('auth-flow')]}
+        onNavigateOverview={vi.fn()}
+        onNavigateProject={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector('[data-testid="feature-description-header"]')).toBeNull();
+  });
+
+  it('renders no collapse/expand control', () => {
+    const roadmap = makeRoadmap([makeStep('01-01', 'Step 1')], 'Some description');
+
+    render(
+      <FeatureBoardView
+        projectId="my-project"
+        featureId="auth-flow"
+        roadmap={roadmap}
+        features={[makeFeature('auth-flow')]}
+        onNavigateOverview={vi.fn()}
+        onNavigateProject={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /expand|collapse/i })).not.toBeInTheDocument();
   });
 });
