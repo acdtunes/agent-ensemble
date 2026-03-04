@@ -381,4 +381,97 @@ describe('ProjectFeatureView', () => {
       expect(screen.queryByText('Authentication')).not.toBeInTheDocument();
     });
   });
+
+  // =============================================================
+  // Step 03-02: Filtered header counts
+  // =============================================================
+
+  describe('filtered header counts', () => {
+    const mixedFeatures = [
+      activeFeature('Auth Service'),
+      activeFeature('Auth Provider'),
+      activeFeature('Dashboard'),
+      plannedFeature('User Profile'),
+      plannedFeature('Settings Panel'),
+      completedFeature('Login Flow'),
+      noRoadmapFeature('Legacy Docs'),
+    ];
+
+    // --- Behavior 1: Group headers update counts for filtered results ---
+    it('updates group header counts to reflect filtered results', () => {
+      render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={mixedFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      // Before filtering: Active (3), Planned (2), Completed (1), No Roadmap (1)
+      expect(screen.getByText('Active (3)')).toBeInTheDocument();
+      expect(screen.getByText('Planned (2)')).toBeInTheDocument();
+      expect(screen.getByText('Completed (1)')).toBeInTheDocument();
+      expect(screen.getByText('No Roadmap (1)')).toBeInTheDocument();
+
+      // Filter by "auth" - matches Auth Service, Auth Provider (both Active)
+      const searchInput = screen.getByPlaceholderText('Search features...');
+      fireEvent.change(searchInput, { target: { value: 'auth' } });
+
+      // After filtering: only Active group with 2 matches
+      expect(screen.getByText('Active (2)')).toBeInTheDocument();
+      // Other groups should not appear (0 matches)
+      expect(screen.queryByText(/Planned/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Completed/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/No Roadmap/)).not.toBeInTheDocument();
+    });
+
+    // --- Behavior 2: Empty groups hide their headers after filtering ---
+    it('hides group headers when filtering results in zero matches for that group', () => {
+      render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={mixedFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      // Filter by "profile" - matches only "User Profile" (Planned)
+      const searchInput = screen.getByPlaceholderText('Search features...');
+      fireEvent.change(searchInput, { target: { value: 'profile' } });
+
+      // Only Planned header visible with count 1
+      expect(screen.getByText('Planned (1)')).toBeInTheDocument();
+      // All other group headers hidden
+      expect(screen.queryByText(/Active/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Completed/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/No Roadmap/)).not.toBeInTheDocument();
+    });
+
+    // --- Behavior 3: Multiple groups visible when search matches across groups ---
+    it('shows multiple group headers when search matches features in different groups', () => {
+      render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={mixedFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      // Filter by "o" - matches: Auth Provider, Dashboard (Active), User Profile (Planned), Login Flow (Completed), Legacy Docs (No Roadmap)
+      const searchInput = screen.getByPlaceholderText('Search features...');
+      fireEvent.change(searchInput, { target: { value: 'o' } });
+
+      // Active: Auth Provider + Dashboard (2), Planned: User Profile (1), Completed: Login Flow (1), No Roadmap: Legacy Docs (1)
+      expect(screen.getByText('Active (2)')).toBeInTheDocument();
+      expect(screen.getByText('Planned (1)')).toBeInTheDocument();
+      expect(screen.getByText('Completed (1)')).toBeInTheDocument();
+      expect(screen.getByText('No Roadmap (1)')).toBeInTheDocument();
+    });
+  });
 });
