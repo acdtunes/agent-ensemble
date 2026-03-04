@@ -1,12 +1,12 @@
 """CLI: Git worktree management for parallel teammates.
 
 Usage:
-    python -m nw_teams.cli.worktree create STEP_ID [--base BRANCH]
-    python -m nw_teams.cli.worktree list
-    python -m nw_teams.cli.worktree merge STEP_ID [--into BRANCH]
-    python -m nw_teams.cli.worktree merge-all [--into BRANCH] [--plan PLAN_PATH]
-    python -m nw_teams.cli.worktree cleanup [--all | STEP_ID]
-    python -m nw_teams.cli.worktree status
+    python -m agent_ensemble.cli.worktree create STEP_ID [--base BRANCH]
+    python -m agent_ensemble.cli.worktree list
+    python -m agent_ensemble.cli.worktree merge STEP_ID [--into BRANCH]
+    python -m agent_ensemble.cli.worktree merge-all [--into BRANCH] [--plan PLAN_PATH]
+    python -m agent_ensemble.cli.worktree cleanup [--all | STEP_ID]
+    python -m agent_ensemble.cli.worktree status
 
 Exit codes:
     0 = Success
@@ -130,7 +130,7 @@ def cmd_create(args: list[str]) -> int:
 
 
 def cmd_list(args: list[str]) -> int:
-    """List all nw-teams worktrees."""
+    """List all agent-ensemble worktrees."""
     result = run_git(["worktree", "list", "--porcelain"])
 
     worktrees = []
@@ -151,17 +151,17 @@ def cmd_list(args: list[str]) -> int:
     if current:
         worktrees.append(current)
 
-    # Filter to nw-teams worktrees
+    # Filter to agent-ensemble worktrees
     nw_worktrees = [
         wt for wt in worktrees
         if wt.get("branch", "").startswith(f"refs/heads/{BRANCH_PREFIX}")
     ]
 
     if not nw_worktrees:
-        print("No nw-teams worktrees found.")
+        print("No agent-ensemble worktrees found.")
         return 0
 
-    print(f"=== nw-teams Worktrees ({len(nw_worktrees)}) ===")
+    print(f"=== agent-ensemble Worktrees ({len(nw_worktrees)}) ===")
     for wt in nw_worktrees:
         branch = wt["branch"].replace("refs/heads/", "")
         step_id = branch.replace(BRANCH_PREFIX, "")
@@ -328,7 +328,7 @@ def cmd_cleanup(args: list[str]) -> int:
 
     step_ids = []
     if cleanup_all:
-        # Get all nw-teams worktree branches
+        # Get all agent-ensemble worktree branches
         result = run_git(["worktree", "list", "--porcelain"])
         for line in result.stdout.strip().split("\n"):
             if line.startswith(f"branch refs/heads/{BRANCH_PREFIX}"):
@@ -364,7 +364,7 @@ def cmd_cleanup(args: list[str]) -> int:
 
 
 def cmd_status(args: list[str]) -> int:
-    """Show status of all nw-teams worktrees."""
+    """Show status of all agent-ensemble worktrees."""
     result = run_git(["worktree", "list", "--porcelain"])
 
     worktrees = []
@@ -419,10 +419,10 @@ def cmd_status(args: list[str]) -> int:
         ))
 
     if not nw_worktrees:
-        print("No nw-teams worktrees found.")
+        print("No agent-ensemble worktrees found.")
         return 0
 
-    print(f"=== nw-teams Worktree Status ===")
+    print(f"=== agent-ensemble Worktree Status ===")
     print()
     for wt in nw_worktrees:
         status_marker = "DIRTY" if wt.has_changes else "clean"
@@ -441,7 +441,7 @@ def main(argv: list[str] | None = None) -> int:
         argv = sys.argv[1:]
 
     if not argv:
-        print("Usage: python -m nw_teams.cli.worktree {create|list|merge|merge-all|cleanup|status} [OPTIONS]")
+        print("Usage: python -m agent_ensemble.cli.worktree {create|list|merge|merge-all|cleanup|status} [OPTIONS]")
         return 2
 
     subcommand = argv[0]

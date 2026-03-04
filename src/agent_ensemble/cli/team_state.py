@@ -1,12 +1,12 @@
 """CLI: Track team state via roadmap.yaml (unified format).
 
 Usage:
-    python -m nw_teams.cli.team_state start-step ROADMAP_PATH --step STEP_ID --teammate TEAMMATE_ID
-    python -m nw_teams.cli.team_state transition ROADMAP_PATH --step STEP_ID --status STATUS
-    python -m nw_teams.cli.team_state complete-step ROADMAP_PATH --step STEP_ID
-    python -m nw_teams.cli.team_state update ROADMAP_PATH --step STEP_ID --status STATUS [--teammate TEAMMATE_ID]
-    python -m nw_teams.cli.team_state show ROADMAP_PATH
-    python -m nw_teams.cli.team_state check ROADMAP_PATH --phase PHASE_ID
+    python -m agent_ensemble.cli.team_state start-step ROADMAP_PATH --step STEP_ID --teammate TEAMMATE_ID
+    python -m agent_ensemble.cli.team_state transition ROADMAP_PATH --step STEP_ID --status STATUS
+    python -m agent_ensemble.cli.team_state complete-step ROADMAP_PATH --step STEP_ID
+    python -m agent_ensemble.cli.team_state update ROADMAP_PATH --step STEP_ID --status STATUS [--teammate TEAMMATE_ID]
+    python -m agent_ensemble.cli.team_state show ROADMAP_PATH
+    python -m agent_ensemble.cli.team_state check ROADMAP_PATH --phase PHASE_ID
 
 Exit codes:
     0 = Success / All complete
@@ -618,7 +618,7 @@ def main(argv: list[str] | None = None) -> int:
         argv = sys.argv[1:]
 
     if not argv:
-        print("Usage: python -m nw_teams.cli.team_state {start-step|transition|complete-step|update|show|check} [OPTIONS]")
+        print("Usage: python -m agent_ensemble.cli.team_state {start-step|transition|complete-step|update|show|check} [OPTIONS]")
         return 2
 
     subcommand = argv[0]

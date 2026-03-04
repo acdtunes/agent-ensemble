@@ -1,8 +1,8 @@
 """CLI: Normalize roadmap.yaml files to unified format.
 
 Usage:
-    python -m nw_teams.cli.migrate_roadmap <ROADMAP_PATH> [--dry-run]
-    python -m nw_teams.cli.migrate_roadmap --scan <ROOT_DIR> [--dry-run]
+    python -m agent_ensemble.cli.migrate_roadmap <ROADMAP_PATH> [--dry-run]
+    python -m agent_ensemble.cli.migrate_roadmap --scan <ROOT_DIR> [--dry-run]
 
 Detects Style A (feature_id / step_id / phase_id / blocked_by / acceptance_criteria)
 and normalizes to Style B (roadmap wrapper / id / dependencies / criteria).
@@ -272,8 +272,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # Single file mode
     if not args:
-        print("Usage: python -m nw_teams.cli.migrate_roadmap <ROADMAP_PATH> [--dry-run]")
-        print("       python -m nw_teams.cli.migrate_roadmap --scan <ROOT_DIR> [--dry-run]")
+        print("Usage: python -m agent_ensemble.cli.migrate_roadmap <ROADMAP_PATH> [--dry-run]")
+        print("       python -m agent_ensemble.cli.migrate_roadmap --scan <ROOT_DIR> [--dry-run]")
         return 2
 
     roadmap_path = Path(args[0])

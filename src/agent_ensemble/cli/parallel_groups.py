@@ -1,7 +1,7 @@
 """CLI: Analyze roadmap and identify parallel execution groups.
 
 Usage:
-    python -m nw_teams.cli.parallel_groups analyze ROADMAP_PATH
+    python -m agent_ensemble.cli.parallel_groups analyze ROADMAP_PATH
 
 Exit codes:
     0 = Success
@@ -97,14 +97,14 @@ def extract_steps(roadmap: dict) -> list[Step]:
                     )
                 raise ValueError(
                     f"Step {step_id} missing required 'files_to_modify' field. "
-                    f"nw-teams requires files_to_modify for parallel conflict detection "
-                    f"(DES marks it optional, but nw-teams REQUIRES it)."
+                    f"agent-ensemble requires files_to_modify for parallel conflict detection "
+                    f"(DES marks it optional, but agent-ensemble REQUIRES it)."
                 )
 
             if not files:
                 raise ValueError(
                     f"Step {step_id} ({name}) has empty files_to_modify. "
-                    f"nw-teams requires at least one file per step for conflict detection."
+                    f"agent-ensemble requires at least one file per step for conflict detection."
                 )
 
             # Accept both 'deps' (canonical) and 'dependencies' (common alias)
@@ -241,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
         argv = sys.argv[1:]
 
     if not argv:
-        print("Usage: python -m nw_teams.cli.parallel_groups analyze [OPTIONS]")
+        print("Usage: python -m agent_ensemble.cli.parallel_groups analyze [OPTIONS]")
         return 2
 
     subcommand = argv[0]
