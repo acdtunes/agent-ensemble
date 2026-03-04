@@ -260,4 +260,125 @@ describe('ProjectFeatureView', () => {
       expect(header).toHaveClass('col-span-full');
     });
   });
+
+  // =============================================================
+  // Step 03-01: Search input with real-time filtering
+  // =============================================================
+
+  describe('search input with real-time filtering', () => {
+    const searchFeatures = [
+      activeFeature('Authentication'),
+      activeFeature('Dashboard'),
+      plannedFeature('User Profile'),
+      completedFeature('Login'),
+      noRoadmapFeature('Settings'),
+    ];
+
+    // --- Behavior 1: Search input visible with placeholder ---
+    it('displays search input with placeholder above feature grid', () => {
+      render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={searchFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search features...');
+      expect(searchInput).toBeInTheDocument();
+      expect(searchInput).toHaveAttribute('type', 'text');
+
+      // Verify search input appears before grid
+      const grid = screen.getByTestId('feature-grid');
+      expect(searchInput.compareDocumentPosition(grid)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+
+    // --- Behavior 2: Real-time filtering (parametrized for case-insensitivity) ---
+    it.each([
+      ['auth', ['Authentication']],
+      ['AUTH', ['Authentication']],
+      ['Auth', ['Authentication']],
+      ['dash', ['Dashboard']],
+      ['user', ['User Profile']],
+      ['log', ['Login']],
+      ['set', ['Settings']],
+      ['a', ['Authentication', 'Dashboard']], // Matches auth, dash (contains 'a')
+    ])('filters features case-insensitively: "%s" shows %j', (searchTerm, expectedNames) => {
+      render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={searchFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search features...');
+      fireEvent.change(searchInput, { target: { value: searchTerm } });
+
+      // All expected names should be visible
+      for (const name of expectedNames) {
+        expect(screen.getByText(name)).toBeInTheDocument();
+      }
+
+      // Features not in expected list should NOT be visible
+      const allNames = ['Authentication', 'Dashboard', 'User Profile', 'Login', 'Settings'];
+      const hiddenNames = allNames.filter((n) => !expectedNames.includes(n));
+      for (const name of hiddenNames) {
+        expect(screen.queryByText(name)).not.toBeInTheDocument();
+      }
+    });
+
+    // --- Behavior 3: Clearing search restores full list ---
+    it('clearing search input restores all features', () => {
+      render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={searchFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search features...');
+
+      // Type to filter
+      fireEvent.change(searchInput, { target: { value: 'auth' } });
+      expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
+
+      // Clear the search
+      fireEvent.change(searchInput, { target: { value: '' } });
+
+      // All features restored
+      expect(screen.getByText('Authentication')).toBeInTheDocument();
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('User Profile')).toBeInTheDocument();
+      expect(screen.getByText('Login')).toBeInTheDocument();
+      expect(screen.getByText('Settings')).toBeInTheDocument();
+    });
+
+    // --- Behavior 4: No matches displays message ---
+    it('displays "No features match your search" when no matches', () => {
+      render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={searchFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      const searchInput = screen.getByPlaceholderText('Search features...');
+      fireEvent.change(searchInput, { target: { value: 'xyz-nonexistent' } });
+
+      expect(screen.getByText('No features match your search')).toBeInTheDocument();
+      // No feature cards visible
+      expect(screen.queryByText('Authentication')).not.toBeInTheDocument();
+    });
+  });
 });

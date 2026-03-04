@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import type { FeatureSummary } from '../../shared/types';
 import { Breadcrumb, type BreadcrumbSegment } from './Breadcrumb';
 import { FeatureCard } from './FeatureCard';
 import { StatusGroupHeader } from './StatusGroupHeader';
 import { groupFeaturesByStatus, type FeatureGroup } from '../utils/featureGrouping';
+import { filterFeaturesBySearch } from '../utils/featureSearch';
 
 interface ProjectFeatureViewProps {
   readonly projectId: string;
@@ -26,6 +28,16 @@ const filterNonEmptyGroups = (groups: readonly FeatureGroup[]): readonly Feature
 
 // --- Component ---
 
+// --- Search empty state ---
+
+const NoSearchResults = () => (
+  <div className="col-span-full flex flex-col items-center justify-center py-12 text-gray-400">
+    <p className="text-lg">No features match your search</p>
+  </div>
+);
+
+// --- Component ---
+
 export const ProjectFeatureView = ({
   projectId,
   features,
@@ -33,12 +45,18 @@ export const ProjectFeatureView = ({
   onNavigateFeatureBoard,
   onNavigateFeatureDocs,
 }: ProjectFeatureViewProps) => {
+  const [searchTerm, setSearchTerm] = useState('');
+
   const breadcrumbSegments: BreadcrumbSegment[] = [
     { label: 'Overview', onClick: onNavigateOverview },
     { label: projectId },
   ];
 
-  const groups = filterNonEmptyGroups(groupFeaturesByStatus(features));
+  // Filter features BEFORE grouping
+  const filteredFeatures = filterFeaturesBySearch(features, searchTerm);
+  const groups = filterNonEmptyGroups(groupFeaturesByStatus(filteredFeatures));
+  const hasSearchResults = filteredFeatures.length > 0;
+  const isSearching = searchTerm.trim() !== '';
 
   return (
     <div>
@@ -49,19 +67,35 @@ export const ProjectFeatureView = ({
       {features.length === 0 ? (
         <EmptyState />
       ) : (
-        <div
-          data-testid="feature-grid"
-          className="grid grid-cols-1 gap-3 lg:grid-cols-4 xl:grid-cols-6"
-        >
-          {groups.map((group) => (
-            <GroupSection
-              key={group.key}
-              group={group}
-              onNavigateFeatureBoard={onNavigateFeatureBoard}
-              onNavigateFeatureDocs={onNavigateFeatureDocs}
+        <>
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search features..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
             />
-          ))}
-        </div>
+          </div>
+
+          <div
+            data-testid="feature-grid"
+            className="grid grid-cols-1 gap-3 lg:grid-cols-4 xl:grid-cols-6"
+          >
+            {isSearching && !hasSearchResults ? (
+              <NoSearchResults />
+            ) : (
+              groups.map((group) => (
+                <GroupSection
+                  key={group.key}
+                  group={group}
+                  onNavigateFeatureBoard={onNavigateFeatureBoard}
+                  onNavigateFeatureDocs={onNavigateFeatureDocs}
+                />
+              ))
+            )}
+          </div>
+        </>
       )}
     </div>
   );
