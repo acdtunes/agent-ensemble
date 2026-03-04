@@ -17,7 +17,7 @@ import textwrap
 
 import pytest
 
-from nw_teams.cli.migrate_roadmap import (
+from agent_ensemble.cli.migrate_roadmap import (
     StepStatus,
     detect_format,
     derive_step_statuses,

@@ -18,7 +18,7 @@ import textwrap
 
 import pytest
 
-from nw_teams.cli.team_state import main
+from agent_ensemble.cli.team_state import main
 
 
 # --- Fixtures ---

@@ -2,7 +2,7 @@
 
 import pytest
 
-from nw_teams.cli.parallel_groups import (
+from agent_ensemble.cli.parallel_groups import (
     Step,
     extract_steps,
     identify_parallel_groups,
