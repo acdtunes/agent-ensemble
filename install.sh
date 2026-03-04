@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Install ensemble into ~/.claude/
-# Creates symlinks so the repo stays the source of truth.
+# Install agent-ensemble into ~/.claude/
+# Copies files so the installation is independent of the source repo.
 # Also installs nWave dependency if not present.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
+VERSION="0.1.0"
 
-echo "Installing ensemble from $SCRIPT_DIR"
+echo "Installing agent-ensemble v$VERSION"
 echo ""
 
 # 0. Check/Install nWave dependency
@@ -58,7 +59,10 @@ fi
 
 echo ""
 
-# 1. Cleanup old nw-teams symlinks (migration)
+# 1. Cleanup old installations (symlinks or directories)
+echo "=== Cleaning up old installations ==="
+
+# Remove old nw-teams symlinks (migration from old name)
 if [ -L "$CLAUDE_DIR/commands/nw-teams" ]; then
     echo "  Removing old symlink: commands/nw-teams"
     rm "$CLAUDE_DIR/commands/nw-teams"
@@ -68,31 +72,56 @@ if [ -L "$CLAUDE_DIR/lib/python/nw_teams" ]; then
     rm "$CLAUDE_DIR/lib/python/nw_teams"
 fi
 
-# 3. Symlink commands
-echo "=== Installing ensemble commands ==="
-mkdir -p "$CLAUDE_DIR/commands"
+# Remove old ensemble symlinks (migration from symlink-based install)
 if [ -L "$CLAUDE_DIR/commands/ensemble" ]; then
+    echo "  Removing old symlink: commands/ensemble"
     rm "$CLAUDE_DIR/commands/ensemble"
-elif [ -d "$CLAUDE_DIR/commands/ensemble" ]; then
-    BACKUP="$CLAUDE_DIR/commands/ensemble.bak.$(date +%s)"
-    echo "  Backing up existing directory -> $BACKUP"
-    mv "$CLAUDE_DIR/commands/ensemble" "$BACKUP"
 fi
-ln -s "$SCRIPT_DIR/commands" "$CLAUDE_DIR/commands/ensemble"
-echo "  Linked commands -> $CLAUDE_DIR/commands/ensemble"
-
-# 5. Symlink Python package
-echo "=== Installing Python library ==="
-mkdir -p "$CLAUDE_DIR/lib/python"
 if [ -L "$CLAUDE_DIR/lib/python/agent_ensemble" ]; then
+    echo "  Removing old symlink: lib/python/agent_ensemble"
     rm "$CLAUDE_DIR/lib/python/agent_ensemble"
-elif [ -d "$CLAUDE_DIR/lib/python/agent_ensemble" ]; then
-    BACKUP="$CLAUDE_DIR/lib/python/agent_ensemble.bak.$(date +%s)"
-    echo "  Backing up existing directory -> $BACKUP"
-    mv "$CLAUDE_DIR/lib/python/agent_ensemble" "$BACKUP"
 fi
-ln -s "$SCRIPT_DIR/src/agent_ensemble" "$CLAUDE_DIR/lib/python/agent_ensemble"
-echo "  Linked Python package -> $CLAUDE_DIR/lib/python/agent_ensemble"
+
+# Remove old ensemble directories (will be replaced)
+if [ -d "$CLAUDE_DIR/commands/ensemble" ]; then
+    echo "  Removing old directory: commands/ensemble"
+    rm -rf "$CLAUDE_DIR/commands/ensemble"
+fi
+if [ -d "$CLAUDE_DIR/lib/python/agent_ensemble" ]; then
+    echo "  Removing old directory: lib/python/agent_ensemble"
+    rm -rf "$CLAUDE_DIR/lib/python/agent_ensemble"
+fi
+
+echo ""
+
+# 2. Copy commands
+echo "=== Installing ensemble commands ==="
+mkdir -p "$CLAUDE_DIR/commands/ensemble"
+cp -r "$SCRIPT_DIR/commands/"* "$CLAUDE_DIR/commands/ensemble/"
+COMMAND_COUNT=$(ls -1 "$CLAUDE_DIR/commands/ensemble/"*.md 2>/dev/null | wc -l | tr -d ' ')
+echo "  Copied $COMMAND_COUNT commands to ~/.claude/commands/ensemble/"
+
+# 3. Copy Python library
+echo "=== Installing Python library ==="
+mkdir -p "$CLAUDE_DIR/lib/python/agent_ensemble"
+cp -r "$SCRIPT_DIR/src/agent_ensemble/"* "$CLAUDE_DIR/lib/python/agent_ensemble/"
+# Remove __pycache__ directories from copied files
+find "$CLAUDE_DIR/lib/python/agent_ensemble" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+CLI_COUNT=$(ls -1 "$CLAUDE_DIR/lib/python/agent_ensemble/cli/"*.py 2>/dev/null | grep -v __init__ | wc -l | tr -d ' ')
+echo "  Copied Python library with $CLI_COUNT CLI modules to ~/.claude/lib/python/agent_ensemble/"
+
+# 4. Write manifest for tracking
+echo "=== Writing manifest ==="
+MANIFEST_FILE="$CLAUDE_DIR/ensemble-manifest.txt"
+cat > "$MANIFEST_FILE" << EOF
+# agent-ensemble installation manifest
+version=$VERSION
+installed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+source_dir=$SCRIPT_DIR
+commands_dir=$CLAUDE_DIR/commands/ensemble
+python_dir=$CLAUDE_DIR/lib/python/agent_ensemble
+EOF
+echo "  Created manifest at $MANIFEST_FILE"
 
 echo ""
 echo "=== Installation complete ==="
@@ -115,3 +144,6 @@ echo '  { "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" } }'
 echo ""
 echo "Optional: Run the feature dashboard:"
 echo "  cd board && npm install && npm run dev"
+echo ""
+echo "To update: git pull && ./install.sh"
+echo "To uninstall: rm -rf ~/.claude/commands/ensemble ~/.claude/lib/python/agent_ensemble ~/.claude/ensemble-manifest.txt"

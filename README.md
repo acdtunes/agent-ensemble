@@ -179,9 +179,10 @@ git pull
 ## Uninstalling
 
 ```bash
-# Remove symlinks
+# Remove installed files
 rm -rf ~/.claude/commands/ensemble
 rm -rf ~/.claude/lib/python/agent_ensemble
+rm -f ~/.claude/ensemble-manifest.txt
 
 # Optionally remove nWave
 pipx uninstall nwave-ai
