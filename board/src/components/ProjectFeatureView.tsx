@@ -3,8 +3,14 @@ import type { FeatureSummary } from '../../shared/types';
 import { Breadcrumb, type BreadcrumbSegment } from './Breadcrumb';
 import { FeatureCard } from './FeatureCard';
 import { StatusGroupHeader } from './StatusGroupHeader';
+import { StatusFilterControls } from './StatusFilterControls';
 import { groupFeaturesByStatus, type FeatureGroup } from '../utils/featureGrouping';
 import { filterFeaturesBySearch } from '../utils/featureSearch';
+import {
+  filterFeaturesByStatus,
+  buildStatusFilterOptions,
+  type StatusFilterValue,
+} from '../utils/featureStatusFilter';
 
 interface ProjectFeatureViewProps {
   readonly projectId: string;
@@ -46,17 +52,22 @@ export const ProjectFeatureView = ({
   onNavigateFeatureDocs,
 }: ProjectFeatureViewProps) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('all');
 
   const breadcrumbSegments: BreadcrumbSegment[] = [
     { label: 'Overview', onClick: onNavigateOverview },
     { label: projectId },
   ];
 
-  // Filter features BEFORE grouping
-  const filteredFeatures = filterFeaturesBySearch(features, searchTerm);
+  // Apply filters: search first, then status filter
+  // Status filter counts are based on search-filtered results
+  const searchFiltered = filterFeaturesBySearch(features, searchTerm);
+  const statusFilterOptions = buildStatusFilterOptions(searchFiltered);
+  const filteredFeatures = filterFeaturesByStatus(searchFiltered, statusFilter);
+
   const groups = filterNonEmptyGroups(groupFeaturesByStatus(filteredFeatures));
-  const hasSearchResults = filteredFeatures.length > 0;
-  const isSearching = searchTerm.trim() !== '';
+  const hasResults = filteredFeatures.length > 0;
+  const isFiltering = searchTerm.trim() !== '' || statusFilter !== 'all';
 
   return (
     <div>
@@ -68,13 +79,18 @@ export const ProjectFeatureView = ({
         <EmptyState />
       ) : (
         <>
-          <div className="mb-4">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <input
               type="text"
               placeholder="Search features..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 sm:w-64"
+            />
+            <StatusFilterControls
+              options={statusFilterOptions}
+              selected={statusFilter}
+              onSelect={setStatusFilter}
             />
           </div>
 
@@ -82,7 +98,7 @@ export const ProjectFeatureView = ({
             data-testid="feature-grid"
             className="grid grid-cols-1 gap-3 lg:grid-cols-4 xl:grid-cols-6"
           >
-            {isSearching && !hasSearchResults ? (
+            {isFiltering && !hasResults ? (
               <NoSearchResults />
             ) : (
               groups.map((group) => (

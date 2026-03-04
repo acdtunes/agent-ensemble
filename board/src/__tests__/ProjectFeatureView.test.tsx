@@ -190,10 +190,10 @@ describe('ProjectFeatureView', () => {
         />,
       );
 
-      // Active group has 2 features
-      expect(screen.getByText('Active (2)')).toBeInTheDocument();
-      // Planned group has 1 feature
-      expect(screen.getByText('Planned (1)')).toBeInTheDocument();
+      // Active group header has 2 features
+      expect(screen.getByRole('heading', { name: 'Active (2)' })).toBeInTheDocument();
+      // Planned group header has 1 feature
+      expect(screen.getByRole('heading', { name: 'Planned (1)' })).toBeInTheDocument();
     });
 
     // --- Behavior 2: Empty groups do not display headers ---
@@ -210,11 +210,12 @@ describe('ProjectFeatureView', () => {
         />,
       );
 
-      expect(screen.getByText('Active (1)')).toBeInTheDocument();
-      // Empty groups should not render headers
-      expect(screen.queryByText(/Planned/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Completed/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/No Roadmap/)).not.toBeInTheDocument();
+      // Active group header should be present
+      expect(screen.getByRole('heading', { name: 'Active (1)' })).toBeInTheDocument();
+      // Empty groups should not render headers (filter buttons still exist but not group headers)
+      expect(screen.queryByRole('heading', { name: /Planned/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /Completed/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /No Roadmap/ })).not.toBeInTheDocument();
     });
 
     // --- Behavior 3: Features without roadmaps appear after status groups ---
@@ -409,22 +410,22 @@ describe('ProjectFeatureView', () => {
         />,
       );
 
-      // Before filtering: Active (3), Planned (2), Completed (1), No Roadmap (1)
-      expect(screen.getByText('Active (3)')).toBeInTheDocument();
-      expect(screen.getByText('Planned (2)')).toBeInTheDocument();
-      expect(screen.getByText('Completed (1)')).toBeInTheDocument();
-      expect(screen.getByText('No Roadmap (1)')).toBeInTheDocument();
+      // Before filtering: Active (3), Planned (2), Completed (1), No Roadmap (1) as group headers
+      expect(screen.getByRole('heading', { name: 'Active (3)' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Planned (2)' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Completed (1)' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'No Roadmap (1)' })).toBeInTheDocument();
 
       // Filter by "auth" - matches Auth Service, Auth Provider (both Active)
       const searchInput = screen.getByPlaceholderText('Search features...');
       fireEvent.change(searchInput, { target: { value: 'auth' } });
 
-      // After filtering: only Active group with 2 matches
-      expect(screen.getByText('Active (2)')).toBeInTheDocument();
-      // Other groups should not appear (0 matches)
-      expect(screen.queryByText(/Planned/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Completed/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/No Roadmap/)).not.toBeInTheDocument();
+      // After filtering: only Active group header with 2 matches
+      expect(screen.getByRole('heading', { name: 'Active (2)' })).toBeInTheDocument();
+      // Other group headers should not appear (0 matches)
+      expect(screen.queryByRole('heading', { name: /Planned/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /Completed/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /No Roadmap/ })).not.toBeInTheDocument();
     });
 
     // --- Behavior 2: Empty groups hide their headers after filtering ---
@@ -443,12 +444,12 @@ describe('ProjectFeatureView', () => {
       const searchInput = screen.getByPlaceholderText('Search features...');
       fireEvent.change(searchInput, { target: { value: 'profile' } });
 
-      // Only Planned header visible with count 1
-      expect(screen.getByText('Planned (1)')).toBeInTheDocument();
+      // Only Planned group header visible with count 1
+      expect(screen.getByRole('heading', { name: 'Planned (1)' })).toBeInTheDocument();
       // All other group headers hidden
-      expect(screen.queryByText(/Active/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Completed/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/No Roadmap/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /Active/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /Completed/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /No Roadmap/ })).not.toBeInTheDocument();
     });
 
     // --- Behavior 3: Multiple groups visible when search matches across groups ---
@@ -468,10 +469,149 @@ describe('ProjectFeatureView', () => {
       fireEvent.change(searchInput, { target: { value: 'o' } });
 
       // Active: Auth Provider + Dashboard (2), Planned: User Profile (1), Completed: Login Flow (1), No Roadmap: Legacy Docs (1)
-      expect(screen.getByText('Active (2)')).toBeInTheDocument();
-      expect(screen.getByText('Planned (1)')).toBeInTheDocument();
-      expect(screen.getByText('Completed (1)')).toBeInTheDocument();
-      expect(screen.getByText('No Roadmap (1)')).toBeInTheDocument();
+      // Use heading role to distinguish from filter buttons
+      expect(screen.getByRole('heading', { name: 'Active (2)' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Planned (1)' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Completed (1)' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'No Roadmap (1)' })).toBeInTheDocument();
+    });
+  });
+
+  // =============================================================
+  // Step 03-03: Status filter controls
+  // =============================================================
+
+  describe('status filter controls', () => {
+    const statusFeatures = [
+      activeFeature('Auth Service'),
+      activeFeature('Dashboard'),
+      plannedFeature('User Profile'),
+      plannedFeature('Settings'),
+      completedFeature('Login'),
+      noRoadmapFeature('Docs'),
+    ];
+
+    // --- Behavior 1: Status filter visible with All/Active/Planned/Completed ---
+    it('displays status filter with all options and counts', () => {
+      render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={statusFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      // Filter group should be visible
+      expect(screen.getByRole('group', { name: 'Filter by status' })).toBeInTheDocument();
+
+      // All options with counts (All = 6, Active = 2, Planned = 2, Completed = 1)
+      expect(screen.getByRole('button', { name: 'All (6)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Active (2)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Planned (2)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Completed (1)' })).toBeInTheDocument();
+    });
+
+    // --- Behavior 2: "All" selected by default ---
+    it('has "All" selected by default', () => {
+      render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={statusFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByRole('button', { name: 'All (6)' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Active (2)' })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    // --- Behavior 3: Selecting filter shows only features in that status ---
+    it('filters to show only selected status when clicked', () => {
+      render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={statusFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      // Click "Active" filter
+      fireEvent.click(screen.getByRole('button', { name: 'Active (2)' }));
+
+      // Only Active features visible
+      expect(screen.getByText('Auth Service')).toBeInTheDocument();
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
+
+      // Other features not visible
+      expect(screen.queryByText('User Profile')).not.toBeInTheDocument();
+      expect(screen.queryByText('Settings')).not.toBeInTheDocument();
+      expect(screen.queryByText('Login')).not.toBeInTheDocument();
+      expect(screen.queryByText('Docs')).not.toBeInTheDocument();
+
+      // Active filter is now selected
+      expect(screen.getByRole('button', { name: 'Active (2)' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    // --- Behavior 4: Status filter and search compose as intersection ---
+    it('composes search and status filter as intersection', () => {
+      render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={statusFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      // Search for "set" - matches only: Settings (planned)
+      const searchInput = screen.getByPlaceholderText('Search features...');
+      fireEvent.change(searchInput, { target: { value: 'set' } });
+
+      // Click "Planned" filter (count should show 1)
+      fireEvent.click(screen.getByRole('button', { name: 'Planned (1)' }));
+
+      // Only Settings visible (intersection of search "set" AND status "planned")
+      expect(screen.getByText('Settings')).toBeInTheDocument();
+
+      // Other features not visible
+      expect(screen.queryByText('Auth Service')).not.toBeInTheDocument();
+      expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
+      expect(screen.queryByText('User Profile')).not.toBeInTheDocument();
+      expect(screen.queryByText('Login')).not.toBeInTheDocument();
+      expect(screen.queryByText('Docs')).not.toBeInTheDocument();
+    });
+
+    // --- Behavior 5: Filter counts update when search text changes ---
+    it('updates filter counts when search changes', () => {
+      render(
+        <ProjectFeatureView
+          projectId="nw-teams"
+          features={statusFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      // Initially: All (6), Active (2), Planned (2), Completed (1)
+      expect(screen.getByRole('button', { name: 'All (6)' })).toBeInTheDocument();
+
+      // Search for "s" - matches: Auth Service (active), Dashboard (active), User Profile (planned), Settings (planned), Docs (no-roadmap)
+      const searchInput = screen.getByPlaceholderText('Search features...');
+      fireEvent.change(searchInput, { target: { value: 's' } });
+
+      // Counts update: All (5), Active (2), Planned (2), Completed (0)
+      expect(screen.getByRole('button', { name: 'All (5)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Active (2)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Planned (2)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Completed (0)' })).toBeInTheDocument();
     });
   });
 });
