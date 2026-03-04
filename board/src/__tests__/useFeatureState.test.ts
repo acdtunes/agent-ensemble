@@ -1,64 +1,117 @@
 /**
  * Unit tests for useFeatureState hook.
  *
- * Driving port: useFeatureState(projectId, featureId)
- * Tests: single /roadmap endpoint fetch, loading/error states, no double-fetch
+ * Driving port: useFeatureState(projectId, featureId, wsUrl)
+ * Tests: WebSocket subscription, realtime updates, connection states
  *
  * Acceptance criteria:
- * - Hook fetches single /roadmap endpoint (not /plan + /state)
- * - Hook returns Roadmap and computed summary
- * - Loading and error states handled
- * - No double-fetch of plan + state
+ * - Hook subscribes to WebSocket with projectId AND featureId
+ * - Hook receives init message and returns roadmap with computed summary
+ * - Hook receives update messages and updates roadmap in realtime
+ * - Connection status reflects WebSocket state
+ * - Loading state true until init received
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
+import type { ServerWSMessage, Roadmap } from '../../shared/types';
+
+// --- WebSocket mock ---
+
+type MessageHandler = (event: { data: string }) => void;
+type EventHandler = () => void;
+
+class MockWebSocket {
+  static instances: MockWebSocket[] = [];
+  static OPEN = 1;
+  static CLOSED = 3;
+
+  url: string;
+  readyState = MockWebSocket.OPEN;
+  onopen: EventHandler | null = null;
+  onmessage: MessageHandler | null = null;
+  onerror: EventHandler | null = null;
+  onclose: EventHandler | null = null;
+  sentMessages: string[] = [];
+
+  constructor(url: string) {
+    this.url = url;
+    MockWebSocket.instances.push(this);
+    // Simulate async open
+    setTimeout(() => this.onopen?.(), 0);
+  }
+
+  send(data: string): void {
+    this.sentMessages.push(data);
+  }
+
+  close(): void {
+    this.readyState = MockWebSocket.CLOSED;
+    this.onclose?.();
+  }
+
+  // Test helpers
+  simulateMessage(msg: ServerWSMessage): void {
+    this.onmessage?.({ data: JSON.stringify(msg) });
+  }
+
+  simulateError(): void {
+    this.onerror?.();
+  }
+
+  simulateClose(): void {
+    this.readyState = MockWebSocket.CLOSED;
+    this.onclose?.();
+  }
+}
 
 const HOOK_PATH = ['..', 'hooks', 'useFeatureState'].join('/');
 
-// --- Fetch mock helpers ---
-
-type FetchResponse = Partial<Response>;
-
-const jsonResponse = (status: number, body: unknown): FetchResponse => ({
-  ok: status >= 200 && status < 300,
-  status,
-  json: () => Promise.resolve(body),
-});
-
-const createRoutedFetch = (routes: Record<string, FetchResponse>) =>
-  vi.fn().mockImplementation((url: string) => {
-    for (const [pattern, response] of Object.entries(routes)) {
-      if (url.includes(pattern)) return Promise.resolve(response);
-    }
-    return Promise.resolve(jsonResponse(404, { error: 'Not found' }));
-  });
-
 // --- Fixtures ---
 
-const makeRoadmapResponse = () => ({
+const makeRoadmap = (): Roadmap => ({
   roadmap: { project_id: 'my-project', created_at: '2026-03-01T00:00:00Z', total_steps: 2, phases: 1 },
   phases: [{
     id: '01',
     name: 'Foundation',
     steps: [
       {
-        id: '01-01', name: 'Step A', files_to_modify: [], dependencies: [], criteria: [],
+        id: '01-01', name: 'Step A', files_to_modify: [], deps: [], criteria: [],
         status: 'approved', teammate_id: 'crafter-01',
         started_at: '2026-03-01T01:00:00Z', completed_at: '2026-03-01T02:00:00Z', review_attempts: 1,
       },
       {
-        id: '01-02', name: 'Step B', files_to_modify: [], dependencies: [], criteria: [],
+        id: '01-02', name: 'Step B', files_to_modify: [], deps: [], criteria: [],
         status: 'in_progress', teammate_id: 'crafter-02',
-        started_at: '2026-03-01T03:00:00Z', completed_at: null, review_attempts: 0,
+        started_at: '2026-03-01T03:00:00Z', review_attempts: 0,
       },
     ],
   }],
-  summary: { total_steps: 2, total_phases: 1, completed: 1, failed: 0, in_progress: 1, pending: 0 },
+});
+
+const makeUpdatedRoadmap = (): Roadmap => ({
+  roadmap: { project_id: 'my-project', created_at: '2026-03-01T00:00:00Z', total_steps: 2, phases: 1 },
+  phases: [{
+    id: '01',
+    name: 'Foundation',
+    steps: [
+      {
+        id: '01-01', name: 'Step A', files_to_modify: [], deps: [], criteria: [],
+        status: 'approved', teammate_id: 'crafter-01',
+        started_at: '2026-03-01T01:00:00Z', completed_at: '2026-03-01T02:00:00Z', review_attempts: 1,
+      },
+      {
+        id: '01-02', name: 'Step B', files_to_modify: [], deps: [], criteria: [],
+        status: 'approved', teammate_id: 'crafter-02',
+        started_at: '2026-03-01T03:00:00Z', completed_at: '2026-03-01T04:00:00Z', review_attempts: 1,
+      },
+    ],
+  }],
 });
 
 beforeEach(() => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, {})));
+  MockWebSocket.instances = [];
+  vi.stubGlobal('WebSocket', MockWebSocket);
 });
 
 afterEach(() => {
@@ -66,120 +119,221 @@ afterEach(() => {
 });
 
 describe('useFeatureState', () => {
-  it('fetches single /roadmap endpoint and returns roadmap with summary', async () => {
-    const response = makeRoadmapResponse();
-    vi.stubGlobal('fetch', createRoutedFetch({
-      '/roadmap': jsonResponse(200, response),
-    }));
-
+  it('subscribes with projectId and featureId on connect', async () => {
     const { useFeatureState } = await import(/* @vite-ignore */ HOOK_PATH);
-    const { result } = renderHook(() => useFeatureState('my-project', 'auth-flow'));
+    renderHook(() => useFeatureState('my-project', 'auth-flow', 'ws://localhost:3001'));
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances.length).toBe(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    await waitFor(() => {
+      expect(ws.sentMessages.length).toBeGreaterThan(0);
+    });
+
+    const subscribeMsg = JSON.parse(ws.sentMessages[0]);
+    expect(subscribeMsg).toEqual({
+      type: 'subscribe',
+      projectId: 'my-project',
+      featureId: 'auth-flow',
+    });
+  });
+
+  it('returns roadmap and summary after receiving init message', async () => {
+    const { useFeatureState } = await import(/* @vite-ignore */ HOOK_PATH);
+    const { result } = renderHook(() => useFeatureState('my-project', 'auth-flow', 'ws://localhost:3001'));
 
     expect(result.current.loading).toBe(true);
+    expect(result.current.connectionStatus).toBe('connecting');
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances.length).toBe(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    const roadmap = makeRoadmap();
+
+    act(() => {
+      ws.simulateMessage({
+        type: 'init',
+        projectId: 'my-project',
+        featureId: 'auth-flow',
+        roadmap,
+      });
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.roadmap).toEqual({ roadmap: response.roadmap, phases: response.phases });
-    expect(result.current.summary).toEqual(response.summary);
+    expect(result.current.roadmap).toEqual(roadmap);
+    expect(result.current.summary).toEqual({
+      total_steps: 2,
+      total_phases: 1,
+      done: 1,
+      in_progress: 1,
+      pending: 0,
+    });
     expect(result.current.error).toBeNull();
-    expect(fetch).toHaveBeenCalledWith('/api/projects/my-project/features/auth-flow/roadmap');
-    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('does not fetch /plan or /state endpoints', async () => {
-    vi.stubGlobal('fetch', createRoutedFetch({
-      '/roadmap': jsonResponse(200, makeRoadmapResponse()),
-    }));
-
+  it('updates roadmap on receiving update message', async () => {
     const { useFeatureState } = await import(/* @vite-ignore */ HOOK_PATH);
-    const { result } = renderHook(() => useFeatureState('my-project', 'auth-flow'));
+    const { result } = renderHook(() => useFeatureState('my-project', 'auth-flow', 'ws://localhost:3001'));
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances.length).toBe(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+    const roadmap = makeRoadmap();
+
+    act(() => {
+      ws.simulateMessage({
+        type: 'init',
+        projectId: 'my-project',
+        featureId: 'auth-flow',
+        roadmap,
+      });
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
 
-    const calls = (fetch as ReturnType<typeof vi.fn>).mock.calls.map(c => c[0] as string);
-    expect(calls.some((url: string) => url.includes('/plan'))).toBe(false);
-    expect(calls.some((url: string) => url.includes('/state'))).toBe(false);
-  });
+    const updatedRoadmap = makeUpdatedRoadmap();
 
-  it('returns error when roadmap is not found (404)', async () => {
-    vi.stubGlobal('fetch', createRoutedFetch({
-      '/roadmap': jsonResponse(404, { error: 'Feature roadmap not found' }),
-    }));
-
-    const { useFeatureState } = await import(/* @vite-ignore */ HOOK_PATH);
-    const { result } = renderHook(() => useFeatureState('my-project', 'auth-flow'));
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+    act(() => {
+      ws.simulateMessage({
+        type: 'update',
+        projectId: 'my-project',
+        featureId: 'auth-flow',
+        roadmap: updatedRoadmap,
+        roadmapTransitions: [{ stepId: '01-02', from: 'in_progress', to: 'approved' }],
+      });
     });
 
+    await waitFor(() => {
+      expect(result.current.roadmap).toEqual(updatedRoadmap);
+    });
+
+    expect(result.current.summary?.done).toBe(2);
+    expect(result.current.summary?.in_progress).toBe(0);
+    expect(result.current.transitions.length).toBe(1);
+  });
+
+  it('ignores messages for different features', async () => {
+    const { useFeatureState } = await import(/* @vite-ignore */ HOOK_PATH);
+    const { result } = renderHook(() => useFeatureState('my-project', 'auth-flow', 'ws://localhost:3001'));
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances.length).toBe(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+
+    act(() => {
+      ws.simulateMessage({
+        type: 'init',
+        projectId: 'my-project',
+        featureId: 'other-feature',
+        roadmap: makeRoadmap(),
+      });
+    });
+
+    // Should still be loading because we didn't get OUR init
+    expect(result.current.loading).toBe(true);
     expect(result.current.roadmap).toBeNull();
-    expect(result.current.summary).toBeNull();
-    expect(result.current.error).toBe('Feature roadmap not found');
   });
 
-  it('returns error on network failure', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
-
-    const { useFeatureState } = await import(/* @vite-ignore */ HOOK_PATH);
-    const { result } = renderHook(() => useFeatureState('my-project', 'auth-flow'));
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
-
-    expect(result.current.roadmap).toBeNull();
-    expect(result.current.summary).toBeNull();
-    expect(result.current.error).toBe('Failed to load feature data');
-  });
-
-  it('re-fetches when featureId changes', async () => {
-    const response = makeRoadmapResponse();
-    const fetchMock = createRoutedFetch({
-      '/roadmap': jsonResponse(200, response),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
+  it('resubscribes when featureId changes', async () => {
     const { useFeatureState } = await import(/* @vite-ignore */ HOOK_PATH);
     const { result, rerender } = renderHook(
-      ({ featureId }: { featureId: string }) => useFeatureState('my-project', featureId),
+      ({ featureId }: { featureId: string }) => useFeatureState('my-project', featureId, 'ws://localhost:3001'),
       { initialProps: { featureId: 'auth-flow' } },
     );
 
     await waitFor(() => {
+      expect(MockWebSocket.instances.length).toBe(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+
+    act(() => {
+      ws.simulateMessage({
+        type: 'init',
+        projectId: 'my-project',
+        featureId: 'auth-flow',
+        roadmap: makeRoadmap(),
+      });
+    });
+
+    await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
 
-    fetchMock.mockClear();
+    ws.sentMessages = [];
 
     rerender({ featureId: 'user-profile' });
 
     await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+      expect(ws.sentMessages.length).toBe(2);
     });
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/projects/my-project/features/user-profile/roadmap');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const unsubscribeMsg = JSON.parse(ws.sentMessages[0]);
+    const subscribeMsg = JSON.parse(ws.sentMessages[1]);
+
+    expect(unsubscribeMsg).toEqual({
+      type: 'unsubscribe',
+      projectId: 'my-project',
+      featureId: 'auth-flow',
+    });
+    expect(subscribeMsg).toEqual({
+      type: 'subscribe',
+      projectId: 'my-project',
+      featureId: 'user-profile',
+    });
+
+    expect(result.current.loading).toBe(true);
+    expect(result.current.roadmap).toBeNull();
   });
 
-  it('returns error on non-404 server error', async () => {
-    vi.stubGlobal('fetch', createRoutedFetch({
-      '/roadmap': jsonResponse(500, { error: 'Internal server error' }),
-    }));
-
+  it('shows disconnected status on WebSocket close', async () => {
     const { useFeatureState } = await import(/* @vite-ignore */ HOOK_PATH);
-    const { result } = renderHook(() => useFeatureState('my-project', 'auth-flow'));
+    const { result } = renderHook(() => useFeatureState('my-project', 'auth-flow', 'ws://localhost:3001'));
 
     await waitFor(() => {
-      expect(result.current.loading).toBe(false);
+      expect(result.current.connectionStatus).toBe('connected');
     });
 
-    expect(result.current.roadmap).toBeNull();
-    expect(result.current.summary).toBeNull();
-    expect(result.current.error).toBe('Internal server error');
+    const ws = MockWebSocket.instances[0];
+
+    act(() => {
+      ws.simulateClose();
+    });
+
+    await waitFor(() => {
+      expect(result.current.connectionStatus).toBe('disconnected');
+    });
+  });
+
+  it('sets error on WebSocket error', async () => {
+    const { useFeatureState } = await import(/* @vite-ignore */ HOOK_PATH);
+    const { result } = renderHook(() => useFeatureState('my-project', 'auth-flow', 'ws://localhost:3001'));
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances.length).toBe(1);
+    });
+
+    const ws = MockWebSocket.instances[0];
+
+    act(() => {
+      ws.simulateError();
+    });
+
+    await waitFor(() => {
+      expect(result.current.error).toBe('WebSocket error');
+    });
   });
 });
