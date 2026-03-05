@@ -124,6 +124,16 @@ class TestSaveExeclog:
         assert loaded["project_id"] == "test-project"
         assert loaded["events"][0]["sid"] == "01-01"
 
+    def test_saves_yaml_format(self, tmp_path: Path):
+        execlog_path = tmp_path / "execution-log.yaml"
+
+        save_execlog(SAMPLE_EXECLOG_DATA, execlog_path, fmt="yaml")
+
+        data, fmt = load_execlog(execlog_path)
+        assert fmt == "yaml"
+        assert data["project_id"] == "test-project"
+        assert data["events"][0]["sid"] == "01-01"
+
 
 # --- migrate_execlog_to_json: converts to deliver/execution-log.json ---
 

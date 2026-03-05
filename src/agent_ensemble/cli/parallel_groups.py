@@ -3,6 +3,9 @@
 Usage:
     python -m agent_ensemble.cli.parallel_groups analyze ROADMAP_PATH
 
+Supports both YAML (.yaml, .yml) and JSON (.json) roadmap formats.
+Uses roadmap_adapter for format-agnostic loading.
+
 Exit codes:
     0 = Success
     1 = Validation errors
@@ -15,7 +18,7 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
-import yaml
+from agent_ensemble.adapters.roadmap_adapter import load_roadmap
 
 
 class Step(NamedTuple):
@@ -35,7 +38,9 @@ class ParallelGroup(NamedTuple):
 
 
 def extract_steps(roadmap: dict) -> list[Step]:
-    """Extract steps from roadmap.yaml using CANONICAL DES schema.
+    """Extract steps from roadmap file using CANONICAL DES schema.
+
+    Supports both YAML and JSON formats (loaded via roadmap_adapter).
 
     Canonical field names (from ~/.claude/templates/roadmap-schema.yaml):
     - phase: id, name, steps
@@ -223,7 +228,12 @@ def cmd_analyze(args: list[str]) -> int:
         print(f"Error: file not found: {roadmap_path}", file=sys.stderr)
         return 2
 
-    roadmap = yaml.safe_load(roadmap_path.read_text())
+    try:
+        roadmap, _ = load_roadmap(roadmap_path)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 2
+
     steps = extract_steps(roadmap)
 
     if not steps:
@@ -241,7 +251,8 @@ def main(argv: list[str] | None = None) -> int:
         argv = sys.argv[1:]
 
     if not argv:
-        print("Usage: python -m agent_ensemble.cli.parallel_groups analyze [OPTIONS]")
+        print("Usage: python -m agent_ensemble.cli.parallel_groups analyze ROADMAP_PATH")
+        print("       Supports both YAML (.yaml, .yml) and JSON (.json) formats.")
         return 2
 
     subcommand = argv[0]
