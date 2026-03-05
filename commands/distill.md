@@ -82,7 +82,7 @@ Create an agent team for parallel acceptance test design.
 
 **Naming Convention**: `designer-{story_id}` paired with `reviewer-{story_id}`
 
-**MAXIMIZE PARALLELISM**: Spawn ALL designer+reviewer pairs simultaneously in a SINGLE message with multiple Task tool calls.
+**MAXIMIZE PARALLELISM**: Spawn ALL designer+reviewer pairs simultaneously in a SINGLE message with multiple Agent tool calls.
 
 **Designer Template**:
 ```

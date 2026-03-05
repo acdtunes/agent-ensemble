@@ -547,3 +547,81 @@ def test_complete_step_clears_all_conflict_references(tmp_path):
 
     # Step 01-03 had [01-01, 01-02], now only has 01-01
     assert step_03.get("conflicts_with") == ["01-01"]
+
+
+# --- Acceptance: JSON roadmap format support ---
+
+
+ROADMAP_JSON_CONTENT = {
+    "roadmap": {
+        "project_id": "json-test-project",
+        "created_at": "2026-03-01T00:00:00Z",
+    },
+    "phases": [
+        {
+            "id": "01",
+            "name": "Foundation",
+            "steps": [
+                {
+                    "id": "01-01",
+                    "name": "Add types",
+                    "files_to_modify": ["src/types.ts"],
+                    "dependencies": [],
+                },
+                {
+                    "id": "01-02",
+                    "name": "Add parser",
+                    "files_to_modify": ["src/parser.ts"],
+                    "dependencies": ["01-01"],
+                },
+            ],
+        }
+    ],
+}
+
+
+def test_update_works_with_json_roadmap(tmp_path):
+    """Acceptance: update command reads/writes JSON roadmap files."""
+    import json
+    roadmap_file = tmp_path / "roadmap.json"
+    roadmap_file.write_text(json.dumps(ROADMAP_JSON_CONTENT, indent=2))
+
+    exit_code = main(["update", str(roadmap_file), "--step", "01-01", "--status", "claimed", "--teammate", "crafter-01"])
+
+    assert exit_code == 0
+
+    data = json.loads(roadmap_file.read_text())
+    step = data["phases"][0]["steps"][0]
+    assert step["status"] == "claimed"
+    assert step["teammate_id"] == "crafter-01"
+    assert step["started_at"] is not None
+
+
+def test_complete_step_works_with_json_roadmap(tmp_path):
+    """Acceptance: complete-step command reads/writes JSON roadmap files."""
+    import json
+    roadmap_content = {
+        "roadmap": {"project_id": "json-complete-test"},
+        "phases": [{
+            "id": "01",
+            "name": "Phase 1",
+            "steps": [{
+                "id": "01-01",
+                "name": "Step 1",
+                "status": "review",
+                "teammate_id": "crafter-01",
+                "files_to_modify": [],
+            }],
+        }],
+    }
+    roadmap_file = tmp_path / "roadmap.json"
+    roadmap_file.write_text(json.dumps(roadmap_content, indent=2))
+
+    exit_code = main(["complete-step", str(roadmap_file), "--step", "01-01"])
+
+    assert exit_code == 0
+
+    data = json.loads(roadmap_file.read_text())
+    step = data["phases"][0]["steps"][0]
+    assert step["status"] == "approved"
+    assert step["completed_at"] is not None

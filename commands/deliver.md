@@ -15,11 +15,11 @@ This command uses deterministic CLI scripts for coordination:
 # Set PYTHONPATH for all CLI commands
 export PYTHONPATH=$HOME/.claude/lib/python
 
-# Analyze roadmap for parallel groups
-python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/roadmap.yaml
+# Analyze roadmap for parallel groups (supports roadmap.yaml or roadmap.json)
+python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/
 
 # Generate execution plan
-python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .ensemble/plan.yaml
+python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/ --output .ensemble/plan.yaml
 
 # Initialize team state
 python -m agent_ensemble.cli.team_state init --plan .ensemble/plan.yaml --output .ensemble/state.yaml
@@ -85,11 +85,11 @@ You are the **Team Lead** — a Claude AI session that orchestrates but does NOT
 Use the CLI to analyze the roadmap and generate an execution plan:
 
 ```bash
-# Analyze and display parallel groups
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/roadmap.yaml
+# Analyze and display parallel groups (auto-detects roadmap.yaml or roadmap.json)
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/
 
 # Generate execution plan
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .ensemble/plan.yaml
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/ --output .ensemble/plan.yaml
 
 # Initialize team state tracking
 mkdir -p .ensemble
@@ -133,7 +133,7 @@ For each parallel layer, spawn:
 - **N Crafter teammates** (one per step in the layer): Execute TDD cycle
 - **N Reviewer teammates** (one per crafter): Each crafter gets a dedicated reviewer to avoid bottlenecks
 
-**Spawn order**: Spawn ALL crafter+reviewer pairs in a SINGLE message with multiple Task tool calls. Do NOT spawn them one at a time.
+**Spawn order**: Spawn ALL crafter+reviewer pairs in a SINGLE message with multiple Agent tool calls. Do NOT spawn them one at a time.
 
 **IMPORTANT — Agent Types and Model**:
 - Crafters MUST use `subagent_type: nw-software-crafter`
@@ -340,7 +340,7 @@ If all layers complete:
 The execution plan includes per-step `conflicts_with` annotations (cross-layer):
 
 ```bash
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/roadmap.yaml --output .ensemble/plan.yaml
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/ --output .ensemble/plan.yaml
 ```
 
 Plan output for conflicting steps:
@@ -606,7 +606,7 @@ PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree cleanu
 User: /ensemble:deliver auth-feature
 
 Lead (you):
-1. Read docs/feature/auth-feature/roadmap.yaml
+1. Read docs/feature/auth-feature/roadmap.{yaml,json}
 2. Analyze: 3 layers (3 steps, 2 steps, 1 step)
 3. Layer 1: spawn 3 crafter+reviewer pairs (all at once), assign tasks
 4. Monitor: wait for all 3 crafters APPROVED

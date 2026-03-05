@@ -1,22 +1,24 @@
 """Acceptance tests for review-history-persistence feature.
 
-Tests validate that reviewer feedback is persisted in roadmap.yaml as structured
+Tests validate that reviewer feedback is persisted in roadmap files as structured
 review_history entries, enabling the board UI to display complete review audit trails.
 
 Walking Skeleton Strategy:
 - First test enabled: test_transition_records_rejection_with_feedback
 - Simplest E2E path proving user value: reviewer feedback captured and persisted
 
-Test Budget: 9 scenarios covering:
+Test Budget: 12 scenarios covering:
 - Walking skeleton (1): rejection with feedback via transition
 - Happy path (3): approval, rejection, multi-cycle accumulation
 - Backward compatibility (2): commands without new flags
 - Validation (2): invalid outcome, outcome without feedback
 - State consistency (1): both roadmap.yaml and state.yaml updated
+- JSON format support (3): transition, complete-step, multi-cycle with JSON
 """
 
 from __future__ import annotations
 
+import json
 import textwrap
 from datetime import datetime
 
@@ -78,10 +80,78 @@ ROADMAP_WITH_EXISTING_REJECTION = textwrap.dedent("""\
 """)
 
 
+# --- JSON Fixtures ---
+
+
+ROADMAP_JSON_WITH_STEP_IN_REVIEW = {
+    "roadmap": {
+        "project_id": "auth-feature-json",
+        "created_at": "2026-03-01T00:00:00Z",
+    },
+    "phases": [
+        {
+            "id": "01",
+            "name": "Foundation",
+            "steps": [
+                {
+                    "id": "01-02",
+                    "name": "Build API routes",
+                    "status": "review",
+                    "review_attempts": 1,
+                    "teammate_id": "crafter-01-02",
+                    "files_to_modify": ["src/routes.ts"],
+                    "dependencies": [],
+                    "criteria": ["API routes implemented"],
+                }
+            ],
+        }
+    ],
+}
+
+
+ROADMAP_JSON_WITH_EXISTING_REJECTION = {
+    "roadmap": {
+        "project_id": "auth-feature-json",
+        "created_at": "2026-03-01T00:00:00Z",
+    },
+    "phases": [
+        {
+            "id": "01",
+            "name": "Foundation",
+            "steps": [
+                {
+                    "id": "01-02",
+                    "name": "Build API routes",
+                    "status": "review",
+                    "review_attempts": 2,
+                    "teammate_id": "crafter-01-02",
+                    "files_to_modify": ["src/routes.ts"],
+                    "dependencies": [],
+                    "criteria": ["API routes implemented"],
+                    "review_history": [
+                        {
+                            "cycle": 1,
+                            "timestamp": "2026-03-01T10:15:00Z",
+                            "outcome": "rejected",
+                            "feedback": "Missing error handling for expired tokens.",
+                        }
+                    ],
+                }
+            ],
+        }
+    ],
+}
+
+
 def _load_yaml(path):
     """Load YAML file for assertions."""
     yaml = YAML()
     return yaml.load(path.read_text())
+
+
+def _load_json(path):
+    """Load JSON file for assertions."""
+    return json.loads(path.read_text())
 
 
 def _get_step(data, step_id):
@@ -386,3 +456,110 @@ def test_review_history_written_to_both_roadmap_and_state(tmp_path):
 
     # Note: state.yaml consistency would be verified here if implemented
     # The feature spec mentions state.yaml but current CLI may not use it
+
+
+# --- JSON Format Support: Dual-format testing ---
+
+
+def test_transition_records_rejection_with_json_roadmap(tmp_path):
+    """JSON format: transition command records rejection with feedback to JSON roadmap.
+
+    Observable Outcome: roadmap.json contains review_history entry with rejection feedback.
+    """
+    roadmap_file = tmp_path / "roadmap.json"
+    roadmap_file.write_text(json.dumps(ROADMAP_JSON_WITH_STEP_IN_REVIEW, indent=2))
+
+    exit_code = main([
+        "transition",
+        str(roadmap_file),
+        "--step", "01-02",
+        "--status", "in_progress",
+        "--outcome", "rejected",
+        "--feedback", "Missing error handling for expired tokens."
+    ])
+
+    assert exit_code == 0
+
+    data = _load_json(roadmap_file)
+    step = _get_step(data, "01-02")
+
+    # Step transitioned to in_progress
+    assert step["status"] == "in_progress"
+
+    # Review history entry exists
+    assert "review_history" in step
+    assert len(step["review_history"]) == 1
+
+    entry = step["review_history"][0]
+    assert entry["cycle"] == 1
+    assert entry["outcome"] == "rejected"
+    assert entry["feedback"] == "Missing error handling for expired tokens."
+    assert _is_valid_iso8601(entry["timestamp"])
+
+
+def test_complete_step_records_approval_with_json_roadmap(tmp_path):
+    """JSON format: complete-step command records approval with feedback to JSON roadmap.
+
+    Observable Outcome: roadmap.json contains review_history entry with approval feedback.
+    """
+    roadmap_file = tmp_path / "roadmap.json"
+    roadmap_file.write_text(json.dumps(ROADMAP_JSON_WITH_STEP_IN_REVIEW, indent=2))
+
+    exit_code = main([
+        "complete-step",
+        str(roadmap_file),
+        "--step", "01-02",
+        "--outcome", "approved",
+        "--feedback", "All issues addressed. Authentication flow is correct."
+    ])
+
+    assert exit_code == 0
+
+    data = _load_json(roadmap_file)
+    step = _get_step(data, "01-02")
+
+    # Step marked approved
+    assert step["status"] == "approved"
+
+    # Review history entry exists
+    assert "review_history" in step
+    assert len(step["review_history"]) == 1
+
+    entry = step["review_history"][0]
+    assert entry["cycle"] == 1
+    assert entry["outcome"] == "approved"
+    assert entry["feedback"] == "All issues addressed. Authentication flow is correct."
+
+
+def test_multiple_review_cycles_accumulate_with_json_roadmap(tmp_path):
+    """JSON format: multiple review cycles accumulated in JSON roadmap.
+
+    Observable Outcome: review_history in JSON contains entries for each cycle in order.
+    """
+    roadmap_file = tmp_path / "roadmap.json"
+    roadmap_file.write_text(json.dumps(ROADMAP_JSON_WITH_EXISTING_REJECTION, indent=2))
+
+    exit_code = main([
+        "complete-step",
+        str(roadmap_file),
+        "--step", "01-02",
+        "--outcome", "approved",
+        "--feedback", "All issues addressed. Ready to merge."
+    ])
+
+    assert exit_code == 0
+
+    data = _load_json(roadmap_file)
+    step = _get_step(data, "01-02")
+
+    # Review history has 2 entries
+    assert len(step["review_history"]) == 2
+
+    # First entry unchanged (rejection from cycle 1)
+    assert step["review_history"][0]["cycle"] == 1
+    assert step["review_history"][0]["outcome"] == "rejected"
+
+    # Second entry is approval from cycle 2
+    assert step["review_history"][1]["cycle"] == 2
+    assert step["review_history"][1]["outcome"] == "approved"
+    assert step["review_history"][1]["feedback"] == "All issues addressed. Ready to merge."

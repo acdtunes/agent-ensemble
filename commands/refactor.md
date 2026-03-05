@@ -172,7 +172,7 @@ PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state upda
 
 **Naming Convention**: `crafter-{step_id}` paired with `reviewer-{step_id}`
 
-**MAXIMIZE PARALLELISM**: Spawn ALL crafter+reviewer pairs simultaneously in a SINGLE message with multiple Task tool calls.
+**MAXIMIZE PARALLELISM**: Spawn ALL crafter+reviewer pairs simultaneously in a SINGLE message with multiple Agent tool calls.
 
 **Crafter Template (shared directory)**:
 ```

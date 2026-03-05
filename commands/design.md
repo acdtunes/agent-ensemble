@@ -59,7 +59,7 @@ Create an agent team for cross-discipline architecture design.
 
 **Naming Convention**: `solution-architect`, `data-architect`, `platform-architect`
 
-**Spawn ALL three simultaneously** in a SINGLE message with multiple Task tool calls.
+**Spawn ALL three simultaneously** in a SINGLE message with multiple Agent tool calls.
 
 **Solution Architect Template**:
 ```

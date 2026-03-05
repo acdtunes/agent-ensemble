@@ -1,4 +1,4 @@
-"""CLI: Track team state via roadmap.yaml (unified format).
+"""CLI: Track team state via roadmap files (JSON or YAML format).
 
 Usage:
     python -m agent_ensemble.cli.team_state start-step ROADMAP_PATH --step STEP_ID --teammate TEAMMATE_ID
@@ -21,7 +21,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ruamel.yaml import YAML
+from agent_ensemble.adapters.roadmap_adapter import (
+    RoadmapFormat,
+    load_roadmap,
+    save_roadmap,
+)
 
 
 # --- Constants ---
@@ -42,6 +46,7 @@ BRANCH_PREFIX = "worktree-crafter-"
 
 
 # --- Git helpers ---
+
 
 def _run_git(args: list[str], check: bool = True) -> subprocess.CompletedProcess:
     """Run a git command."""
@@ -149,6 +154,7 @@ def _cleanup_worktree(step_id: str) -> None:
 
 # --- Roadmap data helpers ---
 
+
 def _get_step_files(step: dict) -> set[str]:
     """Get files_to_modify from a step."""
     return set(step.get("files_to_modify", []))
@@ -241,17 +247,18 @@ def _clear_conflict_references(steps: list[dict], completed_step_id: str) -> Non
             del step["conflicts_with"]
 
 
-def _load_roadmap(path: Path):
-    """Load roadmap.yaml with ruamel.yaml for round-trip preservation."""
-    yaml = YAML()
-    yaml.preserve_quotes = True
-    return yaml, yaml.load(path.read_text())
+def _load_roadmap(path: Path) -> tuple[dict, RoadmapFormat]:
+    """Load roadmap from file, delegating to roadmap adapter.
+
+    Returns:
+        Tuple of (data, format) for use with _save_roadmap.
+    """
+    return load_roadmap(path)
 
 
-def _save_roadmap(yaml_instance, data: dict, path: Path) -> None:
-    """Write roadmap.yaml preserving comments and formatting."""
-    with open(path, "w") as f:
-        yaml_instance.dump(data, f)
+def _save_roadmap(data: dict, path: Path, *, fmt: RoadmapFormat) -> None:
+    """Write roadmap to file, delegating to roadmap adapter."""
+    save_roadmap(data, path, fmt=fmt)
 
 
 def _all_steps(data: dict) -> list[dict]:
@@ -304,6 +311,7 @@ def _compute_phase_status(steps: list[dict]) -> str:
 
 # --- CLI infrastructure ---
 
+
 def _parse_args(args: list[str], named_flags: list[str]) -> tuple[dict[str, str | None], str | None, str | None]:
     """Parse CLI args with named --flags and a positional roadmap path.
 
@@ -346,6 +354,7 @@ def _validate_roadmap_file(roadmap_path: str | None) -> Path | None:
 
 # --- Command handlers ---
 
+
 def cmd_start_step(args: list[str]) -> int:
     """Start a step: detect conflicts, create worktree if needed, set in_progress.
 
@@ -369,7 +378,7 @@ def cmd_start_step(args: list[str]) -> int:
     if not roadmap_file:
         return 2
 
-    yaml_inst, data = _load_roadmap(roadmap_file)
+    data, fmt = _load_roadmap(roadmap_file)
 
     step = _find_step(data, step_id)
     if step is None:
@@ -413,7 +422,7 @@ def cmd_start_step(args: list[str]) -> int:
             if conflict_step:
                 _add_conflict_reference(conflict_step, step_id)
 
-    _save_roadmap(yaml_inst, data, roadmap_file)
+    _save_roadmap(data, roadmap_file, fmt=fmt)
 
     if use_worktree:
         print(f"STARTED {step_id} [WORKTREE] {worktree_path_str}")
@@ -460,7 +469,7 @@ def cmd_transition(args: list[str]) -> int:
     if not roadmap_file:
         return 2
 
-    yaml_inst, data = _load_roadmap(roadmap_file)
+    data, fmt = _load_roadmap(roadmap_file)
 
     step = _find_step(data, step_id)
     if step is None:
@@ -500,7 +509,7 @@ def cmd_transition(args: list[str]) -> int:
             step["review_history"] = []
         step["review_history"].append(review_entry)
 
-    _save_roadmap(yaml_inst, data, roadmap_file)
+    _save_roadmap(data, roadmap_file, fmt=fmt)
 
     print(f"TRANSITIONED {step_id}: {current_status} -> {new_status}")
     return 0
@@ -539,7 +548,7 @@ def cmd_complete_step(args: list[str]) -> int:
     if not roadmap_file:
         return 2
 
-    yaml_inst, data = _load_roadmap(roadmap_file)
+    data, fmt = _load_roadmap(roadmap_file)
 
     step = _find_step(data, step_id)
     if step is None:
@@ -571,7 +580,7 @@ def cmd_complete_step(args: list[str]) -> int:
     # Clear conflict references from all steps
     _clear_conflict_references(_all_steps(data), step_id)
 
-    _save_roadmap(yaml_inst, data, roadmap_file)
+    _save_roadmap(data, roadmap_file, fmt=fmt)
 
     # Handle worktree merge if applicable
     had_worktree = step.get("worktree") is not None
@@ -595,7 +604,7 @@ def cmd_complete_step(args: list[str]) -> int:
 
 
 def cmd_update(args: list[str]) -> int:
-    """Update step status in roadmap.yaml."""
+    """Update step status in roadmap file."""
     parsed, roadmap_path, error_arg = _parse_args(args, ["step", "status", "teammate"])
     if error_arg:
         print(f"Unknown argument: {error_arg}", file=sys.stderr)
@@ -617,7 +626,7 @@ def cmd_update(args: list[str]) -> int:
     if not roadmap_file:
         return 2
 
-    yaml, data = _load_roadmap(roadmap_file)
+    data, fmt = _load_roadmap(roadmap_file)
 
     step = _find_step(data, step_id)
     if step is None:
@@ -640,7 +649,7 @@ def cmd_update(args: list[str]) -> int:
     if status == "review":
         step["review_attempts"] = step.get("review_attempts", 0) + 1
 
-    _save_roadmap(yaml, data, roadmap_file)
+    _save_roadmap(data, roadmap_file, fmt=fmt)
 
     print(f"Updated {step_id}: -> {status}")
     return 0
@@ -656,7 +665,7 @@ def cmd_show(args: list[str]) -> int:
     if not roadmap_file:
         return 2
 
-    yaml, data = _load_roadmap(roadmap_file)
+    data, _fmt = _load_roadmap(roadmap_file)
     summary = _compute_summary(data)
 
     print("=== Roadmap Progress ===")
@@ -704,7 +713,7 @@ def cmd_check(args: list[str]) -> int:
     if not roadmap_file:
         return 2
 
-    yaml, data = _load_roadmap(roadmap_file)
+    data, _fmt = _load_roadmap(roadmap_file)
 
     phase = _find_phase(data, phase_id)
     if phase is None:
@@ -734,6 +743,7 @@ def cmd_check(args: list[str]) -> int:
 
 
 # --- Entry point ---
+
 
 def main(argv: list[str] | None = None) -> int:
     if argv is None:

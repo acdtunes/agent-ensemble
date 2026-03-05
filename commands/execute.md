@@ -9,9 +9,9 @@ Execute parallel feature delivery using Claude Code Agent Teams. You (the Lead) 
 
 ## CLI Tools
 
-This command uses deterministic CLI scripts for coordination. The **atomic commands** (start-step, transition, complete-step) are the PRIMARY interface — they update roadmap.yaml directly, preventing the Lead from forgetting status updates.
+This command uses deterministic CLI scripts for coordination. The **atomic commands** (start-step, transition, complete-step) are the PRIMARY interface — they update the roadmap directly, preventing the Lead from forgetting status updates.
 
-**Note**: All state is tracked directly in `roadmap.yaml` — there is no separate state file.
+**Note**: All state is tracked directly in the roadmap file (YAML or JSON) — there is no separate state file. The CLI auto-detects format via `deliver/roadmap.json`, `roadmap.json`, or `roadmap.yaml` in priority order.
 
 ```bash
 # Set PYTHONPATH for all CLI commands
@@ -20,22 +20,23 @@ export PYTHONPATH=$HOME/.claude/lib/python
 # --- Setup ---
 
 # Analyze roadmap for parallel groups (displays layer analysis)
-python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/roadmap.yaml
+# CLI auto-detects format: deliver/roadmap.json, roadmap.json, or roadmap.yaml
+python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/deliver/roadmap.json
 
 # --- Atomic Commands (MANDATORY — use these, not raw update) ---
 
-# Start a step: checks worktree need → creates worktree if needed → updates roadmap.yaml
+# Start a step: checks worktree need → creates worktree if needed → updates roadmap
 # Output: "STARTED {step_id} [WORKTREE]" with path, or "STARTED {step_id} [SHARED]"
 python -m agent_ensemble.cli.team_state start-step \
-  docs/feature/{project-id}/roadmap.yaml \
+  docs/feature/{project-id}/deliver/roadmap.json \
   --step {step_id} \
   --teammate crafter-{step_id}
 
 # Transition step status (e.g. in_progress → review, review → in_progress for revision)
-# Updates roadmap.yaml atomically
+# Updates roadmap atomically
 # Optional: --outcome and --feedback record review_history entries
 python -m agent_ensemble.cli.team_state transition \
-  docs/feature/{project-id}/roadmap.yaml \
+  docs/feature/{project-id}/deliver/roadmap.json \
   --step {step_id} \
   --status {review|in_progress|failed} \
   [--outcome approved|rejected] \
@@ -45,7 +46,7 @@ python -m agent_ensemble.cli.team_state transition \
 # Output: "COMPLETED {step_id}", "COMPLETED {step_id} MERGE_OK", or "COMPLETED {step_id} MERGE_CONFLICT"
 # Optional: --outcome and --feedback record review_history entries before merge
 python -m agent_ensemble.cli.team_state complete-step \
-  docs/feature/{project-id}/roadmap.yaml \
+  docs/feature/{project-id}/deliver/roadmap.json \
   --step {step_id} \
   [--outcome approved|rejected] \
   [--feedback "Reviewer feedback text"]
@@ -53,10 +54,10 @@ python -m agent_ensemble.cli.team_state complete-step \
 # --- Monitoring ---
 
 # Show roadmap progress
-python -m agent_ensemble.cli.team_state show docs/feature/{project-id}/roadmap.yaml
+python -m agent_ensemble.cli.team_state show docs/feature/{project-id}/deliver/roadmap.json
 
 # Check if a phase is complete
-python -m agent_ensemble.cli.team_state check docs/feature/{project-id}/roadmap.yaml --phase {phase_id}
+python -m agent_ensemble.cli.team_state check docs/feature/{project-id}/deliver/roadmap.json --phase {phase_id}
 
 # --- Worktree Commands (fallbacks if complete-step merge fails) ---
 
@@ -121,13 +122,16 @@ You are the **Team Lead** — a Claude AI session that orchestrates but does NOT
 **Step 0a: Check if roadmap exists**
 
 ```bash
+# Check v2.0.0 location first, then fallbacks
+ls docs/feature/{project-id}/deliver/roadmap.json 2>/dev/null || \
+ls docs/feature/{project-id}/roadmap.json 2>/dev/null || \
 ls docs/feature/{project-id}/roadmap.yaml
 ```
 
 **If roadmap does NOT exist:**
 1. Tell the user to create a roadmap first:
    ```
-   Roadmap not found at docs/feature/{project-id}/roadmap.yaml.
+   Roadmap not found at docs/feature/{project-id}/deliver/roadmap.json (or fallback locations).
 
    Please create one by running:
      /nw:roadmap @nw-solution-architect "{feature-goal-description}"
@@ -139,7 +143,8 @@ ls docs/feature/{project-id}/roadmap.yaml
 **Step 0b: Validate schema**
 
 ```bash
-PYTHONPATH=$HOME/.claude/lib/python python3 -m des.cli.roadmap validate docs/feature/{project-id}/roadmap.yaml
+# CLI auto-detects format from the path
+PYTHONPATH=$HOME/.claude/lib/python python3 -m des.cli.roadmap validate docs/feature/{project-id}/deliver/roadmap.json
 ```
 
 **Exit codes:**
@@ -165,8 +170,8 @@ This gate exists because the parallel_groups CLI is lenient and will accept malf
 Use the CLI to analyze the roadmap for parallel execution groups:
 
 ```bash
-# Analyze and display parallel groups
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/roadmap.yaml
+# Analyze and display parallel groups (CLI auto-detects format)
+PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/deliver/roadmap.json
 ```
 
 The CLI will output:
@@ -206,9 +211,10 @@ For each parallel layer, spawn:
 - **N Crafter teammates** (one per step in the layer): Execute TDD cycle
 - Reviewers are spawned lazily — see "Reviewer Spawning Protocol" below
 
-**Spawn order**: Spawn ALL crafters in a SINGLE message with multiple Task tool calls. Do NOT spawn them one at a time.
+**Spawn order**: Spawn ALL crafters in a SINGLE message with multiple Agent tool calls. Do NOT spawn them one at a time.
 
-**IMPORTANT — Agent Types and Model**:
+**IMPORTANT — Agent Tool Usage**:
+- Use the `Agent` tool (NOT `Task`) for spawning all teammates
 - Crafters MUST use `subagent_type: nw-software-crafter`
 - Reviewer MUST use `subagent_type: nw-software-crafter-reviewer`
 - Support agents: `nw-researcher`, `nw-troubleshooter`, `nw-platform-architect`
@@ -231,7 +237,7 @@ DO NOT dictate implementation details, file contents, or code in the prompt.
 Give the crafter the step requirements and let it drive TDD autonomously.
 
 ```
-Spawn a crafter teammate (subagent_type: nw-software-crafter, name: crafter-{step_id}) with this prompt:
+Use the Agent tool (subagent_type: nw-software-crafter, name: crafter-{step_id}) with this prompt:
 
 "You are crafter-{step_id} on the {team} team. Project root: {project_root}
 
@@ -255,7 +261,7 @@ Only mark your task complete after reviewer APPROVED.
 Check TaskList after completing for next available work."
 ```
 
-**Reviewer spawning**: Reviewers are NOT spawned here. See "Reviewer Spawning Protocol" below Phase 4 for when and how the Lead spawns reviewers on demand.
+**Reviewer spawning**: Reviewers are NOT spawned here. See "Reviewer Spawning Protocol" below Phase 4 for when and how the Lead spawns reviewers on demand using the Agent tool.
 
 ### Phase 4: Populate Task List and Assign
 
@@ -277,7 +283,7 @@ Reviewers are spawned **lazily by the Lead** — only when a crafter signals it 
 **When a crafter messages the Lead**: "Step {step_id} ready for review. Files: {files_modified}"
 
 **1st review (reviewer does not exist yet)**:
-1. Spawn `reviewer-{step_id}` using the reviewer prompt below
+1. Spawn `reviewer-{step_id}` using the Agent tool with the reviewer prompt below
 2. Message the newly spawned reviewer with the crafter's review request (files to review)
 
 **On NEEDS_REVISION (reviewer already running)**:
@@ -285,7 +291,7 @@ Reviewers are spawned **lazily by the Lead** — only when a crafter signals it 
 2. Lead records rejection in review_history:
    ```bash
    python -m agent_ensemble.cli.team_state transition \
-     docs/feature/{project-id}/roadmap.yaml \
+     docs/feature/{project-id}/deliver/roadmap.json \
      --step {step_id} --status in_progress \
      --outcome rejected --feedback "Reviewer feedback summary"
    ```
@@ -297,7 +303,7 @@ Reviewers are spawned **lazily by the Lead** — only when a crafter signals it 
 2. Lead runs `complete-step` with review outcome (marks approved + records review_history + merges worktree if used):
    ```bash
    python -m agent_ensemble.cli.team_state complete-step \
-     docs/feature/{project-id}/roadmap.yaml \
+     docs/feature/{project-id}/deliver/roadmap.json \
      --step {step_id} \
      --outcome approved --feedback "Approved: meets quality standards"
    ```
@@ -305,7 +311,7 @@ Reviewers are spawned **lazily by the Lead** — only when a crafter signals it 
 
 **Spawn prompt for Reviewer** (used by Lead when crafter signals readiness):
 ```
-Spawn a reviewer teammate (subagent_type: nw-software-crafter-reviewer, name: reviewer-{step_id}, model: opus) with this prompt:
+Use the Agent tool (subagent_type: nw-software-crafter-reviewer, name: reviewer-{step_id}, model: opus) with this prompt:
 
 "You are reviewer-{step_id} on the {team} team. Project root: {project_root}
 
@@ -339,9 +345,9 @@ Example: Layer 2 has steps A (dep: 1-1) and B (dep: 1-2, 1-3). If 1-1 finishes f
 **MANDATORY PRE-SPAWN — run `start-step` BEFORE every crafter spawn:**
 
 ```bash
-# Single atomic command: checks worktree need → creates if needed → updates roadmap.yaml
+# Single atomic command: checks worktree need → creates if needed → updates roadmap
 PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state start-step \
-  docs/feature/{project-id}/roadmap.yaml \
+  docs/feature/{project-id}/deliver/roadmap.json \
   --step {step_id} \
   --teammate crafter-{step_id}
 ```
@@ -350,13 +356,13 @@ PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state star
 - `STARTED {step_id} [SHARED]` → use standard spawn prompt (shared directory)
 - `STARTED {step_id} [WORKTREE]` + worktree path → use WORKTREE spawn prompt (see "Worktree Isolation" section)
 
-**IMPORTANT**: `start-step` updates roadmap.yaml to `in_progress` BEFORE returning. This means the NEXT `start-step` call will see this step as active and correctly detect file conflicts. You MUST call `start-step` SEQUENTIALLY for each crafter — do NOT batch them. The order matters for conflict detection.
+**IMPORTANT**: `start-step` updates the roadmap to `in_progress` BEFORE returning. This means the NEXT `start-step` call will see this step as active and correctly detect file conflicts. You MUST call `start-step` SEQUENTIALLY for each crafter — do NOT batch them. The order matters for conflict detection.
 
 **Sequence for spawning N crafters in a layer:**
 1. `start-step` for crafter A → read output (SHARED or WORKTREE)
-2. Spawn crafter A with appropriate prompt
+2. Spawn crafter A with Agent tool using appropriate prompt
 3. `start-step` for crafter B → state now shows A as active, detects conflicts correctly
-4. Spawn crafter B with appropriate prompt
+4. Spawn crafter B with Agent tool using appropriate prompt
 5. ... repeat for all crafters in the layer
 
 After all `start-step` calls complete, crafters run in parallel — only the startup is sequential.
@@ -366,16 +372,16 @@ While teammates are working:
 1. **Monitor progress**: Use CLI to track state
    ```bash
    # Show roadmap progress
-   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state show docs/feature/{project-id}/roadmap.yaml
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state show docs/feature/{project-id}/deliver/roadmap.json
 
    # Transition step to review when crafter signals readiness
    PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state transition \
-     docs/feature/{project-id}/roadmap.yaml \
+     docs/feature/{project-id}/deliver/roadmap.json \
      --step {step_id} --status review
 
    # Check if phase is complete
    PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state check \
-     docs/feature/{project-id}/roadmap.yaml --phase {phase_id}
+     docs/feature/{project-id}/deliver/roadmap.json --phase {phase_id}
    ```
 
 2. **Handle blockers**: If a crafter messages you "Blocked on unknown X":
@@ -415,15 +421,15 @@ PYTHONPATH=$HOME/.claude/lib/python python -m des.cli.verify_deliver_integrity d
 ### Phase 7: Next Layer or Finalize
 
 **With eager spawning, layers blur**: Because you eagerly spawn next-layer steps as soon as their deps are met, there is no clean "layer boundary". Instead of waiting for an entire layer to complete before starting the next, you continuously:
-1. Complete the step atomically (updates roadmap.yaml + merges worktree):
+1. Complete the step atomically (updates roadmap + merges worktree):
    ```bash
    PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state complete-step \
-     docs/feature/{project-id}/roadmap.yaml \
+     docs/feature/{project-id}/deliver/roadmap.json \
      --step {step_id}
    ```
 2. Shut down the reviewer immediately after approval, then the crafter after completion
 3. Check if any new steps are unblocked by this approval
-4. If yes, use `start-step` to spawn a fresh crafter (handles worktree detection automatically)
+4. If yes, use `start-step` to spawn a fresh crafter via Agent tool (handles worktree detection automatically)
 5. `start-step` will detect file conflicts with still-running steps and create worktrees as needed
 
 This means Phases 5-7 are a continuous loop, not discrete stages.
@@ -480,7 +486,7 @@ This means Phases 5-7 are a continuous loop, not discrete stages.
 1. **Identify refactoring targets** — Scan the files modified during delivery. Group by module/area:
    ```bash
    # List all files modified during delivery (from roadmap tracking)
-   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state show docs/feature/{project-id}/roadmap.yaml
+   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state show docs/feature/{project-id}/deliver/roadmap.json
    ```
 
 2. **Group independent targets** — Files that don't overlap can be refactored in parallel. Files within the same module should go to a single crafter.
@@ -489,7 +495,7 @@ This means Phases 5-7 are a continuous loop, not discrete stages.
 
 **Refactoring Crafter Template**:
 ```
-Spawn a crafter teammate (subagent_type: nw-software-crafter, name: refactor-{area}, model: opus) with this prompt:
+Use the Agent tool (subagent_type: nw-software-crafter, name: refactor-{area}, model: opus) with this prompt:
 
 "You are refactor-{area} on the {team} team. Project root: {project_root}
 
@@ -520,7 +526,7 @@ You are using nw-software-crafter methodology."
 
 **Refactoring Reviewer Template** (used by Lead when refactoring crafter signals completion):
 ```
-Spawn a reviewer teammate (subagent_type: nw-software-crafter-reviewer, name: refactor-reviewer-{area}, model: opus) with this prompt:
+Use the Agent tool (subagent_type: nw-software-crafter-reviewer, name: refactor-reviewer-{area}, model: opus) with this prompt:
 
 "You are refactor-reviewer-{area} on the {team} team. Project root: {project_root}
 
@@ -573,7 +579,7 @@ If all layers and refactoring pass complete:
 
 Worktree detection and creation is handled automatically by `start-step`. The Lead does NOT manually check for conflicts or create worktrees.
 
-**How it works**: `start-step` checks the step's files against all currently active steps in roadmap.yaml. If overlap is found, it creates a worktree before marking the step as in_progress. The output tells the Lead which spawn prompt to use:
+**How it works**: `start-step` checks the step's files against all currently active steps in the roadmap. If overlap is found, it creates a worktree before marking the step as in_progress. The output tells the Lead which spawn prompt to use:
 - `STARTED {step_id} [SHARED]` → standard spawn prompt
 - `STARTED {step_id} [WORKTREE]` + path → worktree spawn prompt (below)
 
@@ -582,7 +588,7 @@ Worktree detection and creation is handled automatically by `start-step`. The Le
 When `start-step` outputs `[WORKTREE]`, use this spawn prompt instead of the standard one:
 
 ```
-Spawn a crafter teammate with this prompt:
+Use the Agent tool (subagent_type: nw-software-crafter) with this prompt:
 
 "You are a crafter teammate executing step {step_id}: {step_name}.
 
@@ -613,9 +619,9 @@ The reviewer does NOT need a worktree. It can read files from any worktree path 
 Merges happen **automatically** when `complete-step` is called. The Lead does NOT manually call `merge-on-approve`.
 
 ```bash
-# Single command: marks approved in roadmap.yaml, then merges worktree if used
+# Single command: marks approved in roadmap, then merges worktree if used
 PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state complete-step \
-  docs/feature/{project-id}/roadmap.yaml \
+  docs/feature/{project-id}/deliver/roadmap.json \
   --step {step_id}
 ```
 
@@ -659,9 +665,9 @@ PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree cleanu
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  1. START-STEP (atomic)                                          │
-│     ├── Checks file conflicts with active steps in roadmap.yaml  │
+│     ├── Checks file conflicts with active steps in roadmap       │
 │     ├── Creates worktree if conflicts found                      │
-│     ├── Updates roadmap.yaml → in_progress                       │
+│     ├── Updates roadmap → in_progress                            │
 │     └── Output: STARTED [SHARED] or STARTED [WORKTREE] + path   │
 │                                                                  │
 │  2. SPAWN CRAFTER (Lead uses output to choose prompt)            │
@@ -670,7 +676,7 @@ PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree cleanu
 │  3. CRAFTER WORKS → signals Lead "ready for review"              │
 │                                                                  │
 │  4. TRANSITION (atomic) → review                                 │
-│     └── Updates roadmap.yaml → review                            │
+│     └── Updates roadmap → review                                 │
 │                                                                  │
 │  5. LEAD SPAWNS REVIEWER → APPROVED or NEEDS_REVISION            │
 │     ├── On NEEDS_REVISION: transition --outcome rejected         │
@@ -679,7 +685,7 @@ PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree cleanu
 │                                                                  │
 │  6. COMPLETE-STEP (atomic) with --outcome approved               │
 │     ├── Records review_history entry (cycle, feedback)           │
-│     ├── Updates roadmap.yaml → approved                          │
+│     ├── Updates roadmap → approved                               │
 │     ├── Merges worktree branch if used (automatic)               │
 │     └── Output: COMPLETED, COMPLETED MERGE_OK, or MERGE_CONFLICT│
 │                                                                  │
@@ -723,16 +729,16 @@ PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree cleanu
 User: /agent-ensemble:execute auth-feature
 
 Lead (you):
-1. Read docs/feature/auth-feature/roadmap.yaml
+1. Read docs/feature/auth-feature/deliver/roadmap.json (or fallback to roadmap.yaml)
 2. Analyze: 3 layers (3 steps, 2 steps, 1 step)
-3. Layer 1: spawn 3 crafters (all at once), assign tasks
-4. Monitor: as each crafter signals readiness, spawn reviewer on demand, wait for APPROVED
-5. Layer 2: spawn 2 new crafters, assign tasks
-6. Monitor: spawn reviewers on demand, wait for APPROVED
-7. Layer 3: spawn 1 crafter
-8. Monitor: spawn reviewer on demand, wait for APPROVED
+3. Layer 1: spawn 3 crafters via Agent tool (all at once), assign tasks
+4. Monitor: as each crafter signals readiness, spawn reviewer via Agent tool on demand, wait for APPROVED
+5. Layer 2: spawn 2 new crafters via Agent tool, assign tasks
+6. Monitor: spawn reviewers via Agent tool on demand, wait for APPROVED
+7. Layer 3: spawn 1 crafter via Agent tool
+8. Monitor: spawn reviewer via Agent tool on demand, wait for APPROVED
 9. Integration verification: smoke test the feature end-to-end, fix any integration gaps
-10. Refactoring pass: group modified files into 2 areas, spawn 2 refactoring crafters (reviewers on demand)
+10. Refactoring pass: group modified files into 2 areas, spawn 2 refactoring crafters via Agent tool (reviewers on demand)
 11. Monitor: wait for refactoring APPROVED, run full test suite
 12. Clean up team, report summary (including refactoring improvements)
 ```
