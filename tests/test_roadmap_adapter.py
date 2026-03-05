@@ -161,7 +161,10 @@ class TestSaveRoadmap:
 
 
 class TestMigrateYamlToJson:
-    def test_creates_deliver_directory_and_json(self, tmp_path: Path):
+    @pytest.mark.parametrize("deliver_exists", [False, True])
+    def test_migrates_yaml_to_json_in_deliver(self, tmp_path: Path, deliver_exists: bool):
+        if deliver_exists:
+            (tmp_path / "deliver").mkdir()
         yaml_path = tmp_path / "roadmap.yaml"
         yaml_path.write_text(SAMPLE_YAML)
 
@@ -171,14 +174,3 @@ class TestMigrateYamlToJson:
         assert json_path.exists()
         loaded = json.loads(json_path.read_text())
         assert loaded["roadmap"]["project_id"] == "test-project"
-
-    def test_uses_existing_deliver_directory(self, tmp_path: Path):
-        deliver = tmp_path / "deliver"
-        deliver.mkdir()
-        yaml_path = tmp_path / "roadmap.yaml"
-        yaml_path.write_text(SAMPLE_YAML)
-
-        json_path = migrate_yaml_to_json(tmp_path)
-
-        assert json_path == deliver / "roadmap.json"
-        assert json_path.exists()
