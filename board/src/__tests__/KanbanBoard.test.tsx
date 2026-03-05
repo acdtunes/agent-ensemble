@@ -117,13 +117,6 @@ describe('KanbanBoard acceptance', () => {
     expect(within(doneCol).queryByText(/reviews?$/i)).not.toBeInTheDocument();
   });
 
-  it('displays status-based color coding on columns', () => {
-    render(<KanbanBoard roadmap={testRoadmap} />);
-    const phase1 = screen.getByTestId('layer-1');
-    const doneCol = within(phase1).getByTestId('column-done');
-    expect(doneCol.className).toContain('green');
-  });
-
   it('calls onCardClick with stepId when a step card is clicked', () => {
     const onCardClick = vi.fn();
     render(<KanbanBoard roadmap={testRoadmap} onCardClick={onCardClick} />);

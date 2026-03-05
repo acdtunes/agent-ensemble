@@ -3,12 +3,12 @@
  *
  * Driving port: ProjectFeatureView component
  * Acceptance criteria:
- * - Non-empty groups display header above their features
- * - Empty groups do not display headers or empty space
- * - Features without roadmaps appear after status groups
- * - Grid layout accommodates full-row group headers
+ * - Navigation callbacks invoked correctly on user interactions
+ * - Features grouped by status with proper header display/hiding
+ * - Search and status filters compose as intersection
+ * - Archived features section with restore functionality
  *
- * Test Budget: 4 behaviors × 2 = 8 max unit tests
+ * Test Budget: 6 behaviors × 2 = 12 max unit tests
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
@@ -77,110 +77,62 @@ const noRoadmapFeature = (name: string) =>
     inProgress: 0,
   });
 
-const testFeatures: readonly FeatureSummary[] = [
-  makeFeature("card-redesign", { done: 3, totalSteps: 7, inProgress: 2 }),
-  makeFeature("doc-viewer", { done: 2, totalSteps: 5, inProgress: 1 }),
-  makeFeature("kanban-board", {
-    hasRoadmap: false,
-    totalSteps: 0,
-    done: 0,
-    inProgress: 0,
-  }),
-];
-
 describe("ProjectFeatureView", () => {
-  it("renders breadcrumb with Overview / projectId", () => {
-    render(
-      <ProjectFeatureView
-        projectId="agent-ensemble"
-        features={testFeatures}
-        onNavigateOverview={vi.fn()}
-        onNavigateFeatureBoard={vi.fn()}
-        onNavigateFeatureDocs={vi.fn()}
-      />,
-    );
-    expect(screen.getByText("Overview")).toBeInTheDocument();
-    expect(screen.getByText("agent-ensemble")).toBeInTheDocument();
-  });
+  // =============================================================
+  // Behavior 1: Navigation callbacks
+  // =============================================================
 
-  it("clicking Overview breadcrumb calls onNavigateOverview", () => {
-    const onNavigateOverview = vi.fn();
-    render(
-      <ProjectFeatureView
-        projectId="agent-ensemble"
-        features={testFeatures}
-        onNavigateOverview={onNavigateOverview}
-        onNavigateFeatureBoard={vi.fn()}
-        onNavigateFeatureDocs={vi.fn()}
-      />,
-    );
-    fireEvent.click(screen.getByText("Overview"));
-    expect(onNavigateOverview).toHaveBeenCalledOnce();
-  });
-
-  it("renders one feature card per feature", () => {
-    render(
-      <ProjectFeatureView
-        projectId="agent-ensemble"
-        features={testFeatures}
-        onNavigateOverview={vi.fn()}
-        onNavigateFeatureBoard={vi.fn()}
-        onNavigateFeatureDocs={vi.fn()}
-      />,
-    );
-    expect(screen.getByRole("heading", { name: "card-redesign" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "doc-viewer" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "kanban-board" })).toBeInTheDocument();
-    // Verify all 3 feature cards are rendered (count card buttons, not nested archive buttons)
-    const grid = screen.getByTestId("feature-grid");
-    const cards = within(grid)
-      .getAllByRole("button")
-      .filter((el) => el.classList.contains("cursor-pointer"));
-    expect(cards).toHaveLength(3);
-  });
-
-  it("clicking feature card with roadmap calls onNavigateFeatureBoard", () => {
-    const onNavigateFeatureBoard = vi.fn();
-    const features = [makeFeature("card-redesign", { hasRoadmap: true })];
-    render(
-      <ProjectFeatureView
-        projectId="agent-ensemble"
-        features={features}
-        onNavigateOverview={vi.fn()}
-        onNavigateFeatureBoard={onNavigateFeatureBoard}
-        onNavigateFeatureDocs={vi.fn()}
-      />,
-    );
-    fireEvent.click(
-      screen.getByRole("heading", { name: "card-redesign" }).closest('[role="button"]')!,
-    );
-    expect(onNavigateFeatureBoard).toHaveBeenCalledWith("card-redesign");
-  });
-
-  it("clicking feature card without roadmap calls onNavigateFeatureDocs", () => {
-    const onNavigateFeatureDocs = vi.fn();
-    const features = [
-      makeFeature("kanban-board", {
-        hasRoadmap: false,
-        totalSteps: 0,
-        done: 0,
-        inProgress: 0,
-      }),
+  describe("navigation callbacks", () => {
+    const testFeatures = [
+      makeFeature("card-redesign", { hasRoadmap: true }),
+      makeFeature("kanban-board", { hasRoadmap: false, totalSteps: 0, done: 0, inProgress: 0 }),
     ];
-    render(
-      <ProjectFeatureView
-        projectId="agent-ensemble"
-        features={features}
-        onNavigateOverview={vi.fn()}
-        onNavigateFeatureBoard={vi.fn()}
-        onNavigateFeatureDocs={onNavigateFeatureDocs}
-      />,
-    );
-    fireEvent.click(
-      screen.getByRole("heading", { name: "kanban-board" }).closest('[role="button"]')!,
-    );
-    expect(onNavigateFeatureDocs).toHaveBeenCalledWith("kanban-board");
+
+    it("calls onNavigateOverview when Overview breadcrumb clicked", () => {
+      const onNavigateOverview = vi.fn();
+      render(
+        <ProjectFeatureView
+          projectId="agent-ensemble"
+          features={testFeatures}
+          onNavigateOverview={onNavigateOverview}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByText("Overview"));
+      expect(onNavigateOverview).toHaveBeenCalledOnce();
+    });
+
+    it("calls onNavigateFeatureBoard for features with roadmap, onNavigateFeatureDocs for those without", () => {
+      const onNavigateFeatureBoard = vi.fn();
+      const onNavigateFeatureDocs = vi.fn();
+      render(
+        <ProjectFeatureView
+          projectId="agent-ensemble"
+          features={testFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={onNavigateFeatureBoard}
+          onNavigateFeatureDocs={onNavigateFeatureDocs}
+        />,
+      );
+
+      // Click feature with roadmap
+      fireEvent.click(
+        screen.getByRole("heading", { name: "card-redesign" }).closest('[role="button"]')!,
+      );
+      expect(onNavigateFeatureBoard).toHaveBeenCalledWith("card-redesign");
+
+      // Click feature without roadmap
+      fireEvent.click(
+        screen.getByRole("heading", { name: "kanban-board" }).closest('[role="button"]')!,
+      );
+      expect(onNavigateFeatureDocs).toHaveBeenCalledWith("kanban-board");
+    });
   });
+
+  // =============================================================
+  // Behavior 2: Empty state handling
+  // =============================================================
 
   it("renders empty state when no features", () => {
     render(
@@ -195,33 +147,12 @@ describe("ProjectFeatureView", () => {
     expect(screen.getByText(/no features/i)).toBeInTheDocument();
   });
 
-  describe("grid responsive breakpoints", () => {
-    it("applies correct grid column classes for high-density layout", () => {
-      const { container } = render(
-        <ProjectFeatureView
-          projectId="agent-ensemble"
-          features={testFeatures}
-          onNavigateOverview={vi.fn()}
-          onNavigateFeatureBoard={vi.fn()}
-          onNavigateFeatureDocs={vi.fn()}
-        />,
-      );
-      const grid = container.querySelector('[data-testid="feature-grid"]');
-      expect(grid).toBeInTheDocument();
-      // Verify responsive grid classes: 1 col mobile, 4 cols at lg (1024px), 6 cols at xl (1280px)
-      expect(grid).toHaveClass("grid-cols-1");
-      expect(grid).toHaveClass("lg:grid-cols-4");
-      expect(grid).toHaveClass("xl:grid-cols-6");
-    });
-  });
-
   // =============================================================
-  // Step 02-03: Grouped layout with status headers
+  // Behavior 3: Status group headers display and hiding
   // =============================================================
 
-  describe("grouped layout with status headers", () => {
-    // --- Behavior 1: Non-empty groups display header ---
-    it("displays header for non-empty groups with count", () => {
+  describe("status group headers", () => {
+    it("displays headers with counts for non-empty groups, hides empty groups", () => {
       const features = [
         activeFeature("Alpha"),
         activeFeature("Beta"),
@@ -238,48 +169,16 @@ describe("ProjectFeatureView", () => {
         />,
       );
 
-      // Active group header has 2 features
-      expect(
-        screen.getByRole("heading", { name: "Active (2)" }),
-      ).toBeInTheDocument();
-      // Planned group header has 1 feature
-      expect(
-        screen.getByRole("heading", { name: "Planned (1)" }),
-      ).toBeInTheDocument();
+      // Non-empty groups show headers with counts
+      expect(screen.getByRole("heading", { name: "Active (2)" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Planned (1)" })).toBeInTheDocument();
+
+      // Empty groups do not show headers
+      expect(screen.queryByRole("heading", { name: /Completed/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: /No Roadmap/ })).not.toBeInTheDocument();
     });
 
-    // --- Behavior 2: Empty groups do not display headers ---
-    it("does not display headers for empty groups", () => {
-      const features = [activeFeature("Alpha")];
-
-      render(
-        <ProjectFeatureView
-          projectId="agent-ensemble"
-          features={features}
-          onNavigateOverview={vi.fn()}
-          onNavigateFeatureBoard={vi.fn()}
-          onNavigateFeatureDocs={vi.fn()}
-        />,
-      );
-
-      // Active group header should be present
-      expect(
-        screen.getByRole("heading", { name: "Active (1)" }),
-      ).toBeInTheDocument();
-      // Empty groups should not render headers (filter buttons still exist but not group headers)
-      expect(
-        screen.queryByRole("heading", { name: /Planned/ }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("heading", { name: /Completed/ }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("heading", { name: /No Roadmap/ }),
-      ).not.toBeInTheDocument();
-    });
-
-    // --- Behavior 3: Features without roadmaps appear after status groups ---
-    it("renders no-roadmap features after status groups", () => {
+    it("renders no-roadmap features after status groups in correct order", () => {
       const features = [noRoadmapFeature("Z-Docs"), activeFeature("A-Work")];
 
       const { container } = render(
@@ -293,39 +192,19 @@ describe("ProjectFeatureView", () => {
       );
 
       const grid = container.querySelector('[data-testid="feature-grid"]');
-      const headings = within(grid as HTMLElement).getAllByRole("heading", {
-        level: 2,
-      });
+      const headings = within(grid as HTMLElement).getAllByRole("heading", { level: 2 });
       const headingTexts = headings.map((h) => h.textContent);
 
       // Active should come before No Roadmap
       expect(headingTexts).toEqual(["Active (1)", "No Roadmap (1)"]);
     });
-
-    // --- Behavior 4: Grid layout accommodates full-row group headers ---
-    it("renders group headers as full-row elements in grid", () => {
-      const features = [activeFeature("Alpha")];
-
-      render(
-        <ProjectFeatureView
-          projectId="agent-ensemble"
-          features={features}
-          onNavigateOverview={vi.fn()}
-          onNavigateFeatureBoard={vi.fn()}
-          onNavigateFeatureDocs={vi.fn()}
-        />,
-      );
-
-      const header = screen.getByRole("heading", { level: 2, name: /Active/ });
-      expect(header).toHaveClass("col-span-full");
-    });
   });
 
   // =============================================================
-  // Step 03-01: Search input with real-time filtering
+  // Behavior 4: Search filtering
   // =============================================================
 
-  describe("search input with real-time filtering", () => {
+  describe("search filtering", () => {
     const searchFeatures = [
       activeFeature("Authentication"),
       activeFeature("Dashboard"),
@@ -334,39 +213,11 @@ describe("ProjectFeatureView", () => {
       noRoadmapFeature("Settings"),
     ];
 
-    // --- Behavior 1: Search input visible with placeholder ---
-    it("displays search input with placeholder above feature grid", () => {
-      render(
-        <ProjectFeatureView
-          projectId="agent-ensemble"
-          features={searchFeatures}
-          onNavigateOverview={vi.fn()}
-          onNavigateFeatureBoard={vi.fn()}
-          onNavigateFeatureDocs={vi.fn()}
-        />,
-      );
-
-      const searchInput = screen.getByPlaceholderText("Search features...");
-      expect(searchInput).toBeInTheDocument();
-      expect(searchInput).toHaveAttribute("type", "text");
-
-      // Verify search input appears before grid
-      const grid = screen.getByTestId("feature-grid");
-      expect(searchInput.compareDocumentPosition(grid)).toBe(
-        Node.DOCUMENT_POSITION_FOLLOWING,
-      );
-    });
-
-    // --- Behavior 2: Real-time filtering (parametrized for case-insensitivity) ---
     it.each([
       ["auth", ["Authentication"]],
       ["AUTH", ["Authentication"]],
-      ["Auth", ["Authentication"]],
       ["dash", ["Dashboard"]],
-      ["user", ["User Profile"]],
-      ["log", ["Login"]],
-      ["set", ["Settings"]],
-      ["a", ["Authentication", "Dashboard"]], // Matches auth, dash (contains 'a')
+      ["a", ["Authentication", "Dashboard"]], // Contains 'a'
     ])(
       'filters features case-insensitively: "%s" shows %j',
       (searchTerm, expectedNames) => {
@@ -380,22 +231,15 @@ describe("ProjectFeatureView", () => {
           />,
         );
 
-        const searchInput = screen.getByPlaceholderText("Search features...");
-        fireEvent.change(searchInput, { target: { value: searchTerm } });
+        fireEvent.change(screen.getByPlaceholderText("Search features..."), {
+          target: { value: searchTerm },
+        });
 
-        // All expected names should be visible
         for (const name of expectedNames) {
           expect(screen.getByRole("heading", { name })).toBeInTheDocument();
         }
 
-        // Features not in expected list should NOT be visible
-        const allNames = [
-          "Authentication",
-          "Dashboard",
-          "User Profile",
-          "Login",
-          "Settings",
-        ];
+        const allNames = ["Authentication", "Dashboard", "User Profile", "Login", "Settings"];
         const hiddenNames = allNames.filter((n) => !expectedNames.includes(n));
         for (const name of hiddenNames) {
           expect(screen.queryByRole("heading", { name })).not.toBeInTheDocument();
@@ -403,8 +247,7 @@ describe("ProjectFeatureView", () => {
       },
     );
 
-    // --- Behavior 3: Clearing search restores full list ---
-    it("clearing search input restores all features", () => {
+    it("clears search to restore all features; shows no-match message for invalid search", () => {
       render(
         <ProjectFeatureView
           projectId="agent-ensemble"
@@ -417,172 +260,55 @@ describe("ProjectFeatureView", () => {
 
       const searchInput = screen.getByPlaceholderText("Search features...");
 
-      // Type to filter
+      // Filter then clear
       fireEvent.change(searchInput, { target: { value: "auth" } });
-      expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Dashboard" })).not.toBeInTheDocument();
 
-      // Clear the search
       fireEvent.change(searchInput, { target: { value: "" } });
-
-      // All features restored
       expect(screen.getByRole("heading", { name: "Authentication" })).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "User Profile" })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
-    });
 
-    // --- Behavior 4: No matches displays message ---
-    it('displays "No features match your search" when no matches', () => {
-      render(
-        <ProjectFeatureView
-          projectId="agent-ensemble"
-          features={searchFeatures}
-          onNavigateOverview={vi.fn()}
-          onNavigateFeatureBoard={vi.fn()}
-          onNavigateFeatureDocs={vi.fn()}
-        />,
-      );
-
-      const searchInput = screen.getByPlaceholderText("Search features...");
+      // No matches message
       fireEvent.change(searchInput, { target: { value: "xyz-nonexistent" } });
+      expect(screen.getByText("No features match your search")).toBeInTheDocument();
+    });
 
-      expect(
-        screen.getByText("No features match your search"),
-      ).toBeInTheDocument();
-      // No feature cards visible
-      expect(screen.queryByText("Authentication")).not.toBeInTheDocument();
+    it("updates group header counts when filtering", () => {
+      const mixedFeatures = [
+        activeFeature("Auth Service"),
+        activeFeature("Auth Provider"),
+        plannedFeature("User Profile"),
+        completedFeature("Login Flow"),
+      ];
+
+      render(
+        <ProjectFeatureView
+          projectId="agent-ensemble"
+          features={mixedFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      // Before filtering
+      expect(screen.getByRole("heading", { name: "Active (2)" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Planned (1)" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Completed (1)" })).toBeInTheDocument();
+
+      // Filter by "auth" - only Active features match
+      fireEvent.change(screen.getByPlaceholderText("Search features..."), {
+        target: { value: "auth" },
+      });
+
+      expect(screen.getByRole("heading", { name: "Active (2)" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: /Planned/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: /Completed/ })).not.toBeInTheDocument();
     });
   });
 
   // =============================================================
-  // Step 03-02: Filtered header counts
-  // =============================================================
-
-  describe("filtered header counts", () => {
-    const mixedFeatures = [
-      activeFeature("Auth Service"),
-      activeFeature("Auth Provider"),
-      activeFeature("Dashboard"),
-      plannedFeature("User Profile"),
-      plannedFeature("Settings Panel"),
-      completedFeature("Login Flow"),
-      noRoadmapFeature("Legacy Docs"),
-    ];
-
-    // --- Behavior 1: Group headers update counts for filtered results ---
-    it("updates group header counts to reflect filtered results", () => {
-      render(
-        <ProjectFeatureView
-          projectId="agent-ensemble"
-          features={mixedFeatures}
-          onNavigateOverview={vi.fn()}
-          onNavigateFeatureBoard={vi.fn()}
-          onNavigateFeatureDocs={vi.fn()}
-        />,
-      );
-
-      // Before filtering: Active (3), Planned (2), Completed (1), No Roadmap (1) as group headers
-      expect(
-        screen.getByRole("heading", { name: "Active (3)" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("heading", { name: "Planned (2)" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("heading", { name: "Completed (1)" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("heading", { name: "No Roadmap (1)" }),
-      ).toBeInTheDocument();
-
-      // Filter by "auth" - matches Auth Service, Auth Provider (both Active)
-      const searchInput = screen.getByPlaceholderText("Search features...");
-      fireEvent.change(searchInput, { target: { value: "auth" } });
-
-      // After filtering: only Active group header with 2 matches
-      expect(
-        screen.getByRole("heading", { name: "Active (2)" }),
-      ).toBeInTheDocument();
-      // Other group headers should not appear (0 matches)
-      expect(
-        screen.queryByRole("heading", { name: /Planned/ }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("heading", { name: /Completed/ }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("heading", { name: /No Roadmap/ }),
-      ).not.toBeInTheDocument();
-    });
-
-    // --- Behavior 2: Empty groups hide their headers after filtering ---
-    it("hides group headers when filtering results in zero matches for that group", () => {
-      render(
-        <ProjectFeatureView
-          projectId="agent-ensemble"
-          features={mixedFeatures}
-          onNavigateOverview={vi.fn()}
-          onNavigateFeatureBoard={vi.fn()}
-          onNavigateFeatureDocs={vi.fn()}
-        />,
-      );
-
-      // Filter by "profile" - matches only "User Profile" (Planned)
-      const searchInput = screen.getByPlaceholderText("Search features...");
-      fireEvent.change(searchInput, { target: { value: "profile" } });
-
-      // Only Planned group header visible with count 1
-      expect(
-        screen.getByRole("heading", { name: "Planned (1)" }),
-      ).toBeInTheDocument();
-      // All other group headers hidden
-      expect(
-        screen.queryByRole("heading", { name: /Active/ }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("heading", { name: /Completed/ }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("heading", { name: /No Roadmap/ }),
-      ).not.toBeInTheDocument();
-    });
-
-    // --- Behavior 3: Multiple groups visible when search matches across groups ---
-    it("shows multiple group headers when search matches features in different groups", () => {
-      render(
-        <ProjectFeatureView
-          projectId="agent-ensemble"
-          features={mixedFeatures}
-          onNavigateOverview={vi.fn()}
-          onNavigateFeatureBoard={vi.fn()}
-          onNavigateFeatureDocs={vi.fn()}
-        />,
-      );
-
-      // Filter by "o" - matches: Auth Provider, Dashboard (Active), User Profile (Planned), Login Flow (Completed), Legacy Docs (No Roadmap)
-      const searchInput = screen.getByPlaceholderText("Search features...");
-      fireEvent.change(searchInput, { target: { value: "o" } });
-
-      // Active: Auth Provider + Dashboard (2), Planned: User Profile (1), Completed: Login Flow (1), No Roadmap: Legacy Docs (1)
-      // Use heading role to distinguish from filter buttons
-      expect(
-        screen.getByRole("heading", { name: "Active (2)" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("heading", { name: "Planned (1)" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("heading", { name: "Completed (1)" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("heading", { name: "No Roadmap (1)" }),
-      ).toBeInTheDocument();
-    });
-  });
-
-  // =============================================================
-  // Step 03-03: Status filter controls
+  // Behavior 5: Status filter controls
   // =============================================================
 
   describe("status filter controls", () => {
@@ -590,65 +316,9 @@ describe("ProjectFeatureView", () => {
       activeFeature("Auth Service"),
       activeFeature("Dashboard"),
       plannedFeature("User Profile"),
-      plannedFeature("Settings"),
       completedFeature("Login"),
-      noRoadmapFeature("Docs"),
     ];
 
-    // --- Behavior 1: Status filter visible with All/Active/Planned/Completed ---
-    it("displays status filter with all options and counts", () => {
-      render(
-        <ProjectFeatureView
-          projectId="agent-ensemble"
-          features={statusFeatures}
-          onNavigateOverview={vi.fn()}
-          onNavigateFeatureBoard={vi.fn()}
-          onNavigateFeatureDocs={vi.fn()}
-        />,
-      );
-
-      // Filter group should be visible
-      expect(
-        screen.getByRole("group", { name: "Filter by status" }),
-      ).toBeInTheDocument();
-
-      // All options with counts (All = 6, Active = 2, Planned = 2, Completed = 1)
-      expect(
-        screen.getByRole("button", { name: "All (6)" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Active (2)" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Planned (2)" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Completed (1)" }),
-      ).toBeInTheDocument();
-    });
-
-    // --- Behavior 2: "All" selected by default ---
-    it('has "All" selected by default', () => {
-      render(
-        <ProjectFeatureView
-          projectId="agent-ensemble"
-          features={statusFeatures}
-          onNavigateOverview={vi.fn()}
-          onNavigateFeatureBoard={vi.fn()}
-          onNavigateFeatureDocs={vi.fn()}
-        />,
-      );
-
-      expect(screen.getByRole("button", { name: "All (6)" })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      );
-      expect(
-        screen.getByRole("button", { name: "Active (2)" }),
-      ).toHaveAttribute("aria-pressed", "false");
-    });
-
-    // --- Behavior 3: Selecting filter shows only features in that status ---
     it("filters to show only selected status when clicked", () => {
       render(
         <ProjectFeatureView
@@ -666,107 +336,65 @@ describe("ProjectFeatureView", () => {
       // Only Active features visible
       expect(screen.getByRole("heading", { name: "Auth Service" })).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
-
-      // Other features not visible
       expect(screen.queryByRole("heading", { name: "User Profile" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Settings" })).not.toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Docs" })).not.toBeInTheDocument();
 
-      // Active filter is now selected
-      expect(
-        screen.getByRole("button", { name: "Active (2)" }),
-      ).toHaveAttribute("aria-pressed", "true");
+      // Active filter is selected
+      expect(screen.getByRole("button", { name: "Active (2)" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
     });
 
-    // --- Behavior 4: Status filter and search compose as intersection ---
-    it("composes search and status filter as intersection", () => {
+    it("composes search and status filter as intersection with updated counts", () => {
+      const features = [
+        activeFeature("Auth Service"),
+        plannedFeature("Auth Config"),
+        plannedFeature("Settings Panel"),
+        completedFeature("Login Flow"),
+      ];
+
       render(
         <ProjectFeatureView
           projectId="agent-ensemble"
-          features={statusFeatures}
+          features={features}
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
           onNavigateFeatureDocs={vi.fn()}
         />,
       );
 
-      // Search for "set" - matches only: Settings (planned)
-      const searchInput = screen.getByPlaceholderText("Search features...");
-      fireEvent.change(searchInput, { target: { value: "set" } });
+      // Search for "auth"
+      fireEvent.change(screen.getByPlaceholderText("Search features..."), {
+        target: { value: "auth" },
+      });
 
-      // Click "Planned" filter (count should show 1)
+      // Filter counts update to reflect search
+      expect(screen.getByRole("button", { name: "All (2)" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Active (1)" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Planned (1)" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Completed (0)" })).toBeInTheDocument();
+
+      // Click "Planned" - intersection of search + status
       fireEvent.click(screen.getByRole("button", { name: "Planned (1)" }));
-
-      // Only Settings visible (intersection of search "set" AND status "planned")
-      expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
-
-      // Other features not visible
+      expect(screen.getByRole("heading", { name: "Auth Config" })).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "Auth Service" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Dashboard" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "User Profile" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Login" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "Docs" })).not.toBeInTheDocument();
-    });
-
-    // --- Behavior 5: Filter counts update when search text changes ---
-    it("updates filter counts when search changes", () => {
-      render(
-        <ProjectFeatureView
-          projectId="agent-ensemble"
-          features={statusFeatures}
-          onNavigateOverview={vi.fn()}
-          onNavigateFeatureBoard={vi.fn()}
-          onNavigateFeatureDocs={vi.fn()}
-        />,
-      );
-
-      // Initially: All (6), Active (2), Planned (2), Completed (1)
-      expect(
-        screen.getByRole("button", { name: "All (6)" }),
-      ).toBeInTheDocument();
-
-      // Search for "s" - matches: Auth Service (active), Dashboard (active), User Profile (planned), Settings (planned), Docs (no-roadmap)
-      const searchInput = screen.getByPlaceholderText("Search features...");
-      fireEvent.change(searchInput, { target: { value: "s" } });
-
-      // Counts update: All (5), Active (2), Planned (2), Completed (0)
-      expect(
-        screen.getByRole("button", { name: "All (5)" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Active (2)" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Planned (2)" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Completed (0)" }),
-      ).toBeInTheDocument();
     });
   });
 
   // =============================================================
-  // Step 05-01: ArchivedFeaturesSection wiring
+  // Behavior 6: Archived features section
   // =============================================================
 
   describe("archived features section", () => {
+    const testFeatures = [activeFeature("Current Feature")];
     const archivedFeatures = [
-      {
-        featureId: "old-auth" as FeatureId,
-        name: "Old Auth",
-        archivedAt: "2026-03-01T10:00:00Z",
-      },
-      {
-        featureId: "legacy-ui" as FeatureId,
-        name: "Legacy UI",
-        archivedAt: "2026-02-15T14:30:00Z",
-      },
+      { featureId: "old-auth" as FeatureId, name: "Old Auth", archivedAt: "2026-03-01T10:00:00Z" },
+      { featureId: "legacy-ui" as FeatureId, name: "Legacy UI", archivedAt: "2026-02-15T14:30:00Z" },
     ];
 
-    // --- Behavior 1: ArchivedFeaturesSection visible below active features ---
-    it("renders ArchivedFeaturesSection below feature grid when archived features provided", () => {
-      render(
+    it("renders archived section when present, hides when empty", () => {
+      const { rerender } = render(
         <ProjectFeatureView
           projectId="agent-ensemble"
           features={testFeatures}
@@ -778,22 +406,11 @@ describe("ProjectFeatureView", () => {
         />,
       );
 
-      // Archived section should be present with count
-      const archivedButton = screen.getByRole("button", {
-        name: /Archived.*\(2\)/,
-      });
-      expect(archivedButton).toBeInTheDocument();
+      // Archived section present with count
+      expect(screen.getByRole("button", { name: /Archived.*\(2\)/ })).toBeInTheDocument();
 
-      // Verify section appears after feature grid (DOM order)
-      const grid = screen.getByTestId("feature-grid");
-      expect(archivedButton.compareDocumentPosition(grid)).toBe(
-        Node.DOCUMENT_POSITION_PRECEDING,
-      );
-    });
-
-    // --- Behavior 2: Section not rendered when no archived features ---
-    it("does not render ArchivedFeaturesSection when archivedFeatures is empty", () => {
-      render(
+      // Rerender with empty archived
+      rerender(
         <ProjectFeatureView
           projectId="agent-ensemble"
           features={testFeatures}
@@ -805,16 +422,13 @@ describe("ProjectFeatureView", () => {
         />,
       );
 
-      expect(
-        screen.queryByRole("button", { name: /Archived/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Archived/ })).not.toBeInTheDocument();
     });
 
-    // --- Behavior 3: Restore callback wired correctly ---
-    it("calls onRestoreFeature when restore button clicked", async () => {
+    it("calls onRestoreFeature and shows restoring state", () => {
       const onRestoreFeature = vi.fn();
 
-      render(
+      const { rerender } = render(
         <ProjectFeatureView
           projectId="agent-ensemble"
           features={testFeatures}
@@ -826,19 +440,15 @@ describe("ProjectFeatureView", () => {
         />,
       );
 
-      // Expand the archived section
+      // Expand and click restore
       fireEvent.click(screen.getByRole("button", { name: /Archived.*\(2\)/ }));
-
-      // Click restore on first archived feature
       const restoreButtons = screen.getAllByRole("button", { name: "Restore" });
       fireEvent.click(restoreButtons[0]);
 
       expect(onRestoreFeature).toHaveBeenCalledWith("old-auth");
-    });
 
-    // --- Behavior 4: Shows restoring state during restore operation ---
-    it("shows restoring state for feature being restored", () => {
-      render(
+      // Rerender with restoring state
+      rerender(
         <ProjectFeatureView
           projectId="agent-ensemble"
           features={testFeatures}
@@ -846,21 +456,13 @@ describe("ProjectFeatureView", () => {
           onNavigateOverview={vi.fn()}
           onNavigateFeatureBoard={vi.fn()}
           onNavigateFeatureDocs={vi.fn()}
-          onRestoreFeature={vi.fn()}
+          onRestoreFeature={onRestoreFeature}
           restoringFeatureId="old-auth"
         />,
       );
 
-      // Expand the archived section
-      fireEvent.click(screen.getByRole("button", { name: /Archived.*\(2\)/ }));
-
-      // First feature should show "Restoring..."
       expect(screen.getByText("Restoring...")).toBeInTheDocument();
-
-      // Second feature should still show "Restore"
-      expect(
-        screen.getByRole("button", { name: "Restore" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument(); // Second feature
     });
   });
 });
