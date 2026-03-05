@@ -1,12 +1,14 @@
 """CLI: Normalize roadmap.yaml files to unified format.
 
 Usage:
-    python -m agent_ensemble.cli.migrate_roadmap <ROADMAP_PATH> [--dry-run]
+    python -m agent_ensemble.cli.migrate_roadmap <ROADMAP_PATH> [--dry-run] [--output-format json]
     python -m agent_ensemble.cli.migrate_roadmap --scan <ROOT_DIR> [--dry-run]
 
 Detects Style A (feature_id / step_id / phase_id / blocked_by / acceptance_criteria)
 and normalizes to Style B (roadmap wrapper / id / dependencies / criteria).
 Optionally embeds step statuses from execution-log.yaml if present.
+
+With --output-format json, writes to deliver/roadmap.json (v2.0.0 format).
 
 Exit codes:
     0 = Success (all files migrated or already normalized)
@@ -16,6 +18,7 @@ Exit codes:
 
 from __future__ import annotations
 
+import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,7 +27,14 @@ from typing import Literal
 from ruamel.yaml import YAML
 
 
+DEPRECATION_WARNING = (
+    "DEPRECATION: roadmap.yaml format is deprecated. "
+    "Use --output-format json to migrate to deliver/roadmap.json (nWave v2.0.0 format)."
+)
+
+
 # --- Types ---
+
 
 @dataclass(frozen=True)
 class StepStatus:
@@ -34,6 +44,7 @@ class StepStatus:
 
 
 # --- Format detection ---
+
 
 def detect_format(data: dict) -> Literal["style_a", "style_b"]:
     """Detect roadmap format by checking for Style A markers."""
@@ -46,6 +57,7 @@ def detect_format(data: dict) -> Literal["style_a", "style_b"]:
 
 
 # --- Style A normalization ---
+
 
 def _normalize_step(step: dict) -> dict:
     """Normalize a single step from Style A to Style B."""
@@ -76,7 +88,6 @@ def _normalize_phase(phase: dict) -> dict:
 def normalize_style_a(data: dict) -> dict:
     """Restructure Style A roadmap to Style B format."""
     phases = [_normalize_phase(p) for p in data.get("phases", [])]
-    total_steps = sum(len(p["steps"]) for p in phases)
     return {
         "roadmap": {
             "project_id": data.get("feature_id", ""),
@@ -87,13 +98,14 @@ def normalize_style_a(data: dict) -> dict:
 
 # --- Execution log status derivation ---
 
+
 def derive_step_statuses(events: list[dict]) -> dict[str, StepStatus]:
     """Derive step statuses from execution-log events.
 
     Rules:
-    - COMMIT + EXECUTED → approved
-    - Any FAILED event → failed
-    - Any other event → in_progress
+    - COMMIT + EXECUTED -> approved
+    - Any FAILED event -> failed
+    - Any other event -> in_progress
     - started_at = first event timestamp per step
     - completed_at = COMMIT event timestamp
     """
@@ -130,6 +142,7 @@ def derive_step_statuses(events: list[dict]) -> dict[str, StepStatus]:
 
 
 # --- Status embedding ---
+
 
 def embed_statuses(data: dict, statuses: dict[str, StepStatus]) -> dict:
     """Merge step statuses into roadmap phases (returns new dict)."""
@@ -174,6 +187,14 @@ def _write_yaml(data: dict, path: Path) -> None:
         yaml.dump(data, f)
 
 
+def _write_json(data: dict, path: Path) -> None:
+    """Write roadmap data as JSON to deliver/ subdirectory."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+
+
 def _find_roadmaps(root: Path) -> list[Path]:
     """Recursively find roadmap.yaml files, skipping known directories."""
     results = []
@@ -188,8 +209,28 @@ def _find_roadmaps(root: Path) -> list[Path]:
 
 # --- Migration pipeline ---
 
-def migrate_one(roadmap_path: Path, *, dry_run: bool) -> str:
-    """Migrate a single roadmap.yaml. Returns a status message."""
+OutputFormat = Literal["yaml", "json"]
+
+
+def migrate_one(
+    roadmap_path: Path,
+    *,
+    dry_run: bool,
+    output_format: OutputFormat = "yaml",
+    emit_deprecation: bool = True,
+) -> str:
+    """Migrate a single roadmap.yaml. Returns a status message.
+
+    Args:
+        roadmap_path: Path to roadmap.yaml file.
+        dry_run: If True, show changes without writing.
+        output_format: Output format - 'yaml' (in-place) or 'json' (deliver/roadmap.json).
+        emit_deprecation: If True, emit deprecation warning for YAML files.
+    """
+    # Emit deprecation warning for YAML format
+    if emit_deprecation and roadmap_path.suffix.lower() in (".yaml", ".yml"):
+        print(DEPRECATION_WARNING, file=sys.stderr)
+
     data = _load_yaml(roadmap_path)
     if data is None:
         return f"SKIP (empty): {roadmap_path}"
@@ -218,7 +259,8 @@ def migrate_one(roadmap_path: Path, *, dry_run: bool) -> str:
                     has_new_statuses = True
                     break
 
-    if not needs_migration and not has_new_statuses:
+    # For JSON output, always proceed (creating deliver/roadmap.json)
+    if output_format == "yaml" and not needs_migration and not has_new_statuses:
         return f"SKIP (already normalized): {roadmap_path}"
 
     # Embed statuses only for steps that don't already have them
@@ -228,22 +270,49 @@ def migrate_one(roadmap_path: Path, *, dry_run: bool) -> str:
     if dry_run:
         changes = []
         if needs_migration:
-            changes.append("normalize Style A → B")
+            changes.append("normalize Style A -> B")
         if has_new_statuses:
             changes.append(f"embed {len(statuses)} step statuses from execution-log")
+        if output_format == "json":
+            changes.append("output to deliver/roadmap.json")
         return f"WOULD MIGRATE ({', '.join(changes)}): {roadmap_path}"
 
-    _write_yaml(normalized, roadmap_path)
+    # Write output
+    if output_format == "json":
+        json_path = roadmap_path.parent / "deliver" / "roadmap.json"
+        _write_json(normalized, json_path)
+        changes = ["migrated to deliver/roadmap.json"]
+    else:
+        _write_yaml(normalized, roadmap_path)
+        changes = []
 
-    changes = []
     if needs_migration:
-        changes.append("normalized Style A → B")
+        changes.append("normalized Style A -> B")
     if has_new_statuses:
         changes.append(f"embedded {len(statuses)} step statuses")
+
     return f"MIGRATED ({', '.join(changes)}): {roadmap_path}"
 
 
 # --- CLI entry point ---
+
+
+def _parse_output_format(args: list[str]) -> tuple[OutputFormat, list[str]]:
+    """Parse --output-format flag from args. Returns (format, remaining_args)."""
+    if "--output-format" not in args:
+        return ("yaml", args)
+
+    idx = args.index("--output-format")
+    if idx + 1 >= len(args):
+        return ("yaml", args)
+
+    fmt_value = args[idx + 1]
+    remaining = args[:idx] + args[idx + 2 :]
+
+    if fmt_value == "json":
+        return ("json", remaining)
+    return ("yaml", remaining)
+
 
 def main(argv: list[str] | None = None) -> int:
     if argv is None:
@@ -251,6 +320,9 @@ def main(argv: list[str] | None = None) -> int:
 
     dry_run = "--dry-run" in argv
     args = [a for a in argv if a != "--dry-run"]
+
+    # Parse output format
+    output_format, args = _parse_output_format(args)
 
     # --scan mode
     if "--scan" in args:
@@ -267,13 +339,18 @@ def main(argv: list[str] | None = None) -> int:
             print(f"No roadmap.yaml files found under {root}")
             return 0
         for path in roadmaps:
-            print(migrate_one(path, dry_run=dry_run))
+            print(migrate_one(path, dry_run=dry_run, output_format=output_format))
         return 0
 
     # Single file mode
     if not args:
-        print("Usage: python -m agent_ensemble.cli.migrate_roadmap <ROADMAP_PATH> [--dry-run]")
-        print("       python -m agent_ensemble.cli.migrate_roadmap --scan <ROOT_DIR> [--dry-run]")
+        print(
+            "Usage: python -m agent_ensemble.cli.migrate_roadmap <ROADMAP_PATH> "
+            "[--dry-run] [--output-format json]"
+        )
+        print(
+            "       python -m agent_ensemble.cli.migrate_roadmap --scan <ROOT_DIR> [--dry-run]"
+        )
         return 2
 
     roadmap_path = Path(args[0])
@@ -281,7 +358,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: file not found: {roadmap_path}", file=sys.stderr)
         return 1
 
-    print(migrate_one(roadmap_path, dry_run=dry_run))
+    print(migrate_one(roadmap_path, dry_run=dry_run, output_format=output_format))
     return 0
 
 

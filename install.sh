@@ -9,69 +9,19 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 VERSION="0.1.0"
 
-# nWave version pinning during migration period
-# Pin to v1.9.0 until agent-ensemble is fully compatible with v2.0.0
-NWAVE_PINNED_VERSION="1.9.0"
-NWAVE_BREAKING_VERSION="2.0.0"
-
 echo "Installing agent-ensemble v$VERSION"
 echo ""
 
-# Pure function: Check if version is compatible (less than breaking version)
-# Returns 0 if compatible, 1 if incompatible
-check_version_compatible() {
-    local installed_version="$1"
-    local breaking_version="$2"
-
-    # Extract semver components (handle "nwave-ai X.Y.Z" format)
-    local version_num
-    version_num=$(echo "$installed_version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-
-    if [ -z "$version_num" ]; then
-        # Cannot parse version, assume compatible
-        return 0
-    fi
-
-    # Compare versions using sort -V
-    local lower
-    lower=$(printf '%s\n%s' "$version_num" "$breaking_version" | sort -V | head -1)
-
-    if [ "$lower" = "$version_num" ] && [ "$version_num" != "$breaking_version" ]; then
-        return 0  # installed < breaking, compatible
-    else
-        return 1  # installed >= breaking, incompatible
-    fi
-}
-
-# Pure function: Print version compatibility warning
-print_version_warning() {
-    local installed_version="$1"
-    echo ""
-    echo "  WARNING: nWave $installed_version detected."
-    echo "  agent-ensemble is currently compatible with nWave v$NWAVE_PINNED_VERSION."
-    echo "  nWave v$NWAVE_BREAKING_VERSION introduces breaking changes."
-    echo ""
-    echo "  To downgrade to compatible version:"
-    echo "    uvx uninstall nwave-ai && uvx install nwave-ai==$NWAVE_PINNED_VERSION"
-    echo "    # or with pipx:"
-    echo "    pipx uninstall nwave-ai && pipx install nwave-ai==$NWAVE_PINNED_VERSION"
-    echo ""
-    echo "  Migration to nWave v2.0.0 is in progress."
-    echo ""
-}
-
-# Pure function: Install nWave with version pinning
+# Pure function: Install nWave (latest version)
 # Tries uvx first, falls back to pipx
 install_nwave() {
-    local target_version="$1"
-
     if command -v uvx &> /dev/null; then
-        echo "  Installing nWave v$target_version via uvx (preferred)..."
-        uvx install "nwave-ai==$target_version"
+        echo "  Installing nWave via uvx (preferred)..."
+        uvx install nwave-ai
         return 0
     elif command -v pipx &> /dev/null; then
-        echo "  Installing nWave v$target_version via pipx..."
-        pipx install "nwave-ai==$target_version"
+        echo "  Installing nWave via pipx..."
+        pipx install nwave-ai
         return 0
     else
         return 1
@@ -93,8 +43,8 @@ print_install_instructions() {
     echo "    pip install pipx --user && pipx ensurepath  # Linux/Windows"
     echo "    # Then restart terminal and re-run ./install.sh"
     echo ""
-    echo "  Option 3 - Install nWave directly (version $NWAVE_PINNED_VERSION):"
-    echo "    pip install nwave-ai==$NWAVE_PINNED_VERSION --user"
+    echo "  Option 3 - Install nWave directly:"
+    echo "    pip install nwave-ai --user"
     echo "    nwave-ai install"
     echo "    # Then re-run ./install.sh"
     echo ""
@@ -105,17 +55,10 @@ print_install_instructions() {
 echo "=== Checking nWave dependency ==="
 
 NWAVE_INSTALLED=false
-NWAVE_VERSION_STR=""
 
 if command -v nwave-ai &> /dev/null; then
     NWAVE_VERSION_STR=$(nwave-ai --version 2>/dev/null || echo "unknown")
     echo "  nWave found: $NWAVE_VERSION_STR"
-
-    # Check version compatibility
-    if ! check_version_compatible "$NWAVE_VERSION_STR" "$NWAVE_BREAKING_VERSION"; then
-        print_version_warning "$NWAVE_VERSION_STR"
-    fi
-
     NWAVE_INSTALLED=true
 elif [ -d "$CLAUDE_DIR/agents" ] && ls "$CLAUDE_DIR/agents"/nw-*.md &> /dev/null 2>&1; then
     echo "  nWave agents found in ~/.claude/agents/"
@@ -126,12 +69,12 @@ if [ "$NWAVE_INSTALLED" = false ]; then
     echo "  nWave not found. Agent Ensemble requires nWave."
     echo ""
 
-    if install_nwave "$NWAVE_PINNED_VERSION"; then
+    if install_nwave; then
         echo ""
         echo "  Running nwave-ai install..."
         nwave-ai install
         echo ""
-        echo "  nWave v$NWAVE_PINNED_VERSION installed successfully."
+        echo "  nWave installed successfully."
     else
         print_install_instructions
         exit 1

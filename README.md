@@ -167,7 +167,10 @@ You can add projects directly in the dashboard UI, or create `.nw-board-projects
 }
 ```
 
-Projects with `docs/feature/*/roadmap.yaml` files will show feature progress on the dashboard.
+Projects with feature roadmaps will show progress on the dashboard. The dashboard supports:
+- `docs/feature/*/deliver/roadmap.json` (v2.0.0 preferred)
+- `docs/feature/*/roadmap.json`
+- `docs/feature/*/roadmap.yaml` (legacy)
 
 ## Updating
 
@@ -185,8 +188,9 @@ rm -rf ~/.claude/commands/ensemble
 rm -rf ~/.claude/lib/python/agent_ensemble
 rm -f ~/.claude/ensemble-manifest.txt
 
-# Optionally remove nWave
-pipx uninstall nwave-ai
+# Optionally remove nWave (uvx or pipx)
+uvx uninstall nwave-ai
+# or: pipx uninstall nwave-ai
 ```
 
 ## Related

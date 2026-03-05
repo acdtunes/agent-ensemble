@@ -345,3 +345,32 @@ class TestMainCLI:
     def test_no_args_shows_usage(self, capsys):
         result = main([])
         assert result == 2
+
+    def test_output_format_json_writes_to_deliver_directory(self, tmp_path):
+        """AC: migrate_roadmap.py supports --output-format json flag."""
+        roadmap = tmp_path / "roadmap.yaml"
+        roadmap.write_text(STYLE_A_YAML)
+
+        result = main([str(roadmap), "--output-format", "json"])
+        assert result == 0
+
+        # Should create deliver/roadmap.json
+        json_path = tmp_path / "deliver" / "roadmap.json"
+        assert json_path.exists()
+
+        import json
+
+        migrated = json.loads(json_path.read_text())
+        assert migrated["roadmap"]["project_id"] == "card-redesign"
+        assert migrated["phases"][0]["id"] == "01"
+
+    def test_yaml_loading_emits_deprecation_warning(self, tmp_path, capsys):
+        """AC: CLI tools emit deprecation warning when loading roadmap.yaml."""
+        roadmap = tmp_path / "roadmap.yaml"
+        roadmap.write_text(STYLE_B_YAML)
+
+        result = main([str(roadmap)])
+        assert result == 0
+
+        stderr = capsys.readouterr().err
+        assert "deprecated" in stderr.lower() or "DEPRECATION" in stderr
