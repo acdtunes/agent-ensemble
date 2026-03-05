@@ -3,6 +3,7 @@ import {
   type Result,
   type ParseError,
   type Roadmap,
+  type RoadmapFormat,
   type ReviewEntry,
   type ReviewOutcome,
   type RoadmapStep,
@@ -14,7 +15,7 @@ import {
   err,
 } from '../shared/types.js';
 
-// --- YAML deserialization (impure boundary) ---
+// --- Deserialization (impure boundary) ---
 
 const loadYaml = (content: string): Result<unknown, ParseError> => {
   try {
@@ -24,6 +25,18 @@ const loadYaml = (content: string): Result<unknown, ParseError> => {
     return err({ type: 'invalid_yaml' as const, message });
   }
 };
+
+const loadJson = (content: string): Result<unknown, ParseError> => {
+  try {
+    return ok(JSON.parse(content));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return err({ type: 'invalid_json' as const, message });
+  }
+};
+
+const loadContent = (content: string, format: RoadmapFormat): Result<unknown, ParseError> =>
+  format === 'json' ? loadJson(content) : loadYaml(content);
 
 // --- Validation helpers (pure functions) ---
 
@@ -170,10 +183,13 @@ const validateRoadmap = (raw: unknown): Result<Roadmap, ParseError> => {
   });
 };
 
-export const parseRoadmap = (content: string): Result<Roadmap, ParseError> => {
-  const yamlResult = loadYaml(content);
-  if (!yamlResult.ok) return yamlResult;
-  return validateRoadmap(yamlResult.value);
+export const parseRoadmap = (
+  content: string,
+  format: RoadmapFormat = 'yaml',
+): Result<Roadmap, ParseError> => {
+  const loadResult = loadContent(content, format);
+  if (!loadResult.ok) return loadResult;
+  return validateRoadmap(loadResult.value);
 };
 
 // Alias for acceptance tests

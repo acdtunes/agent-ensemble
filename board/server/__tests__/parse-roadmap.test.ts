@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseRoadmap } from '../parser.js';
-import type { Roadmap } from '../../shared/types.js';
+import type { Roadmap, RoadmapFormat } from '../../shared/types.js';
 
 // --- Fixtures ---
 
@@ -283,5 +283,148 @@ phases:
 
     expect(result.value.phases[0].id).toBe('phase-alpha');
     expect(result.value.phases[0].steps[0].id).toBe('alpha-01');
+  });
+});
+
+// --- JSON format parsing ---
+
+const validRoadmapJson = JSON.stringify({
+  roadmap: {
+    project_id: 'directory-browser',
+    created_at: '2026-03-02T18:44:29Z',
+    total_steps: 2,
+    phases: 1,
+  },
+  phases: [
+    {
+      id: '01',
+      name: 'Server-side browse infrastructure',
+      steps: [
+        {
+          id: '01-01',
+          name: 'Add shared browse types',
+          files_to_modify: ['board/shared/types.ts'],
+          deps: [],
+          criteria: ['BrowseEntry has readonly fields'],
+          status: 'approved',
+          teammate_id: 'crafter-01-01',
+          started_at: '2026-03-02T18:50:00Z',
+          completed_at: '2026-03-02T18:51:35Z',
+          review_attempts: 1,
+        },
+        {
+          id: '01-02',
+          name: 'Create validation core',
+          files_to_modify: ['board/server/browse.ts'],
+          deps: ['01-01'],
+          criteria: ['validateBrowsePath returns Result'],
+          status: 'pending',
+        },
+      ],
+    },
+  ],
+});
+
+describe('parseRoadmap with JSON format', () => {
+  it('should parse valid JSON roadmap with explicit format parameter', () => {
+    const result = parseRoadmap(validRoadmapJson, 'json');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const roadmap: Roadmap = result.value;
+    expect(roadmap.roadmap.project_id).toBe('directory-browser');
+    expect(roadmap.phases).toHaveLength(1);
+    expect(roadmap.phases[0].steps).toHaveLength(2);
+    expect(roadmap.phases[0].steps[0].id).toBe('01-01');
+    expect(roadmap.phases[0].steps[0].status).toBe('approved');
+  });
+
+  it('should return ParseError with type invalid_json for malformed JSON', () => {
+    const result = parseRoadmap('{ invalid json content', 'json');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('invalid_json');
+  });
+
+  it('should default to YAML parsing when format parameter is omitted', () => {
+    const yamlContent = `
+roadmap:
+  project_id: test
+phases:
+- id: '01'
+  name: Phase one
+  steps:
+  - id: 01-01
+    name: Step one
+`;
+    const result = parseRoadmap(yamlContent);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.roadmap.project_id).toBe('test');
+  });
+
+  it('should produce identical results for equivalent YAML and JSON content', () => {
+    const yamlContent = `
+roadmap:
+  project_id: identical-test
+  total_steps: 1
+phases:
+- id: '01'
+  name: Test phase
+  steps:
+  - id: 01-01
+    name: Test step
+    status: pending
+    deps: []
+    criteria:
+      - First criterion
+`;
+    const jsonContent = JSON.stringify({
+      roadmap: {
+        project_id: 'identical-test',
+        total_steps: 1,
+      },
+      phases: [
+        {
+          id: '01',
+          name: 'Test phase',
+          steps: [
+            {
+              id: '01-01',
+              name: 'Test step',
+              status: 'pending',
+              deps: [],
+              criteria: ['First criterion'],
+            },
+          ],
+        },
+      ],
+    });
+
+    const yamlResult = parseRoadmap(yamlContent, 'yaml');
+    const jsonResult = parseRoadmap(jsonContent, 'json');
+
+    expect(yamlResult.ok).toBe(true);
+    expect(jsonResult.ok).toBe(true);
+    if (!yamlResult.ok || !jsonResult.ok) return;
+
+    expect(jsonResult.value).toEqual(yamlResult.value);
+  });
+
+  it('should apply same validation rules to JSON input', () => {
+    const invalidJson = JSON.stringify({
+      roadmap: { project_id: 'test' },
+      // Missing phases array
+    });
+
+    const result = parseRoadmap(invalidJson, 'json');
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.type).toBe('invalid_schema');
+    expect(result.error.message).toContain('phases');
   });
 });

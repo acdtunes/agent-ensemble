@@ -112,8 +112,11 @@ export interface RoadmapTransition {
 
 // --- Parser error types ---
 
+export type RoadmapFormat = 'yaml' | 'json';
+
 export type ParseError =
   | { readonly type: 'invalid_yaml'; readonly message: string }
+  | { readonly type: 'invalid_json'; readonly message: string }
   | { readonly type: 'invalid_schema'; readonly message: string };
 
 // --- Branded slug IDs ---
