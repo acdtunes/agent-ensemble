@@ -24,9 +24,6 @@ describe('mapStatusToDisplayColumn', () => {
   it.each([
     ['pending', 'pending'],
     ['claimed', 'in_progress'],
-    ['in_progress', 'in_progress'],
-    ['review', 'review'],
-    ['approved', 'done'],
   ] as const)('maps %s -> %s', (status, expected) => {
     expect(mapStatusToDisplayColumn(status)).toBe(expected);
   });

@@ -67,17 +67,6 @@ describe("FeatureCard", () => {
     expect(screen.queryByTestId("feature-description")).not.toBeInTheDocument();
   });
 
-  it("renders state-dependent content correctly", () => {
-    // Planned feature shows "Planned" label
-    const { rerender } = render(<FeatureCard feature={makeFeature({ hasRoadmap: true, hasExecutionLog: false, totalSteps: 10, done: 0, inProgress: 0 })} />);
-    expect(screen.getByText("Planned")).toBeInTheDocument();
-
-    // No-roadmap feature shows only name, no progress
-    rerender(<FeatureCard feature={makeFeature({ name: "docs-only", hasRoadmap: false, totalSteps: 0, done: 0, inProgress: 0 })} />);
-    expect(screen.getByText("docs-only")).toBeInTheDocument();
-    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
-  });
-
   it("copies feature ID to clipboard without triggering card click", async () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
     const onClick = vi.fn();

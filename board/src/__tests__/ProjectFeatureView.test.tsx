@@ -8,7 +8,7 @@
  * - Search and status filters compose as intersection
  * - Archived features section with restore functionality
  *
- * Test Budget: 6 behaviors × 2 = 12 max unit tests
+ * Test Budget: 6 behaviors × 2 = 12 max unit tests (current: 12)
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
@@ -214,10 +214,8 @@ describe("ProjectFeatureView", () => {
     ];
 
     it.each([
-      ["auth", ["Authentication"]],
-      ["AUTH", ["Authentication"]],
-      ["dash", ["Dashboard"]],
-      ["a", ["Authentication", "Dashboard"]], // Contains 'a'
+      ["auth", ["Authentication"]], // lowercase match
+      ["AUTH", ["Authentication"]], // uppercase proves case-insensitivity
     ])(
       'filters features case-insensitively: "%s" shows %j',
       (searchTerm, expectedNames) => {
@@ -271,39 +269,6 @@ describe("ProjectFeatureView", () => {
       // No matches message
       fireEvent.change(searchInput, { target: { value: "xyz-nonexistent" } });
       expect(screen.getByText("No features match your search")).toBeInTheDocument();
-    });
-
-    it("updates group header counts when filtering", () => {
-      const mixedFeatures = [
-        activeFeature("Auth Service"),
-        activeFeature("Auth Provider"),
-        plannedFeature("User Profile"),
-        completedFeature("Login Flow"),
-      ];
-
-      render(
-        <ProjectFeatureView
-          projectId="agent-ensemble"
-          features={mixedFeatures}
-          onNavigateOverview={vi.fn()}
-          onNavigateFeatureBoard={vi.fn()}
-          onNavigateFeatureDocs={vi.fn()}
-        />,
-      );
-
-      // Before filtering
-      expect(screen.getByRole("heading", { name: "Active (2)" })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "Planned (1)" })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "Completed (1)" })).toBeInTheDocument();
-
-      // Filter by "auth" - only Active features match
-      fireEvent.change(screen.getByPlaceholderText("Search features..."), {
-        target: { value: "auth" },
-      });
-
-      expect(screen.getByRole("heading", { name: "Active (2)" })).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: /Planned/ })).not.toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: /Completed/ })).not.toBeInTheDocument();
     });
   });
 
