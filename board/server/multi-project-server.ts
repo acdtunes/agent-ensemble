@@ -4,7 +4,7 @@ import { join, basename } from 'node:path';
 import type { ProjectId, ProjectConfig, ProjectSummary, FeatureSummary, FeatureId, Roadmap, RoadmapTransition, AddProjectError, RemoveProjectError, Result } from '../shared/types.js';
 import { createProjectId, deriveProjectSummary } from '../shared/types.js';
 import { parseRoadmap } from './parser.js';
-import { createFileWatcher, type FileWatcher } from './watcher.js';
+import { createFileWatcher, createRoadmapWatcher, type FileWatcher, type RoadmapWatcher } from './watcher.js';
 import { createProjectRegistry, type ProjectRegistry } from './registry.js';
 import { computeTransitions } from './differ.js';
 import {
@@ -16,7 +16,7 @@ import {
   type DocHttpDeps,
   type BrowseHttpDeps,
 } from './index.js';
-import { resolveFeatureRoadmap } from './feature-path-resolver.js';
+import { resolveFeatureDir } from './feature-path-resolver.js';
 import {
   createProjectDiscovery,
   scanProjectDirsFs,
@@ -26,7 +26,7 @@ import {
 import { scanDocsDir } from './doc-tree.js';
 import { readDocContent } from './doc-content.js';
 import { listDirectories, defaultPath } from './browse.js';
-import { discoverFeaturesFs } from './feature-discovery.js';
+import { discoverFeaturesFs, loadFeatureRoadmapFs } from './feature-discovery.js';
 import { resolveArchiveDir } from './archive-path-resolver.js';
 import { moveToArchiveFs, scanArchiveDirFs } from './archive-io.js';
 import { createFeatureId } from '../shared/types.js';
@@ -122,7 +122,7 @@ interface FeatureWatcherManagerDeps {
 const EMPTY_ROADMAP: Roadmap = { roadmap: {}, phases: [] };
 
 const createFeatureWatcherManager = (deps: FeatureWatcherManagerDeps): FeatureWatcherManager => {
-  const watchers = new Map<string, FileWatcher>();
+  const watchers = new Map<string, RoadmapWatcher>();
   const roadmaps = new Map<string, Roadmap>();
 
   const toKey = (projectId: ProjectId, featureId: FeatureId): string =>
@@ -138,18 +138,20 @@ const createFeatureWatcherManager = (deps: FeatureWatcherManagerDeps): FeatureWa
     const projectPath = deps.getProjectPath(projectId);
     if (!projectPath) return;
 
-    const roadmapPath = resolveFeatureRoadmap(projectPath, featureId);
+    const featureDir = resolveFeatureDir(projectPath, featureId);
 
-    const fileResult = readFileSyncResult(roadmapPath);
-    if (fileResult.ok) {
-      const parsed = parseRoadmap(fileResult.value);
-      if (parsed.ok) {
-        roadmaps.set(key, parsed.value);
+    // Load initial roadmap using dynamic path resolution (v2.0.0 priority)
+    loadFeatureRoadmapFs(projectPath, featureId).then((result) => {
+      if (result !== null) {
+        roadmaps.set(key, result.roadmap);
       }
-    }
+    }).catch(() => {
+      // Ignore errors during initial load
+    });
 
-    const watcher = createFileWatcher(roadmapPath, (content) => {
-      const parsed = parseRoadmap(content);
+    // Watch for changes in all roadmap file locations
+    const watcher = createRoadmapWatcher(featureDir, (event) => {
+      const parsed = parseRoadmap(event.content, event.format);
       if (!parsed.ok) return;
 
       const previousRoadmap = roadmaps.get(key) ?? EMPTY_ROADMAP;
