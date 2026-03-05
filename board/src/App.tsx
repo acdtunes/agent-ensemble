@@ -100,11 +100,15 @@ const computeCurrentPhase = (roadmap: Roadmap): number => {
   return index === -1 ? roadmap.phases.length : index + 1;
 };
 
+const hasContent = (value: string | undefined): value is string =>
+  value !== undefined && value.trim().length > 0;
+
 const BoardContent = ({ roadmap }: BoardContentProps) => {
   const summary = useMemo(() => computeRoadmapSummary(roadmap), [roadmap]);
   const currentPhase = useMemo(() => computeCurrentPhase(roadmap), [roadmap]);
   const [selectedStep, setSelectedStep] = useState<RoadmapStep | null>(null);
   const stepLookup = useMemo(() => buildPlanStepLookup(roadmap), [roadmap]);
+  const description = roadmap.roadmap.description;
 
   const handleCardClick = useCallback(
     (stepId: string) => {
@@ -125,6 +129,14 @@ const BoardContent = ({ roadmap }: BoardContentProps) => {
         currentPhase={currentPhase}
         createdAt={roadmap.roadmap.created_at ?? ""}
       />
+      {hasContent(description) && (
+        <p
+          data-testid="feature-description-header"
+          className="mt-4 text-sm text-gray-400"
+        >
+          {description}
+        </p>
+      )}
       <div className="mt-6">
         <KanbanBoard roadmap={roadmap} onCardClick={handleCardClick} />
       </div>
