@@ -22,7 +22,7 @@ import { AddProjectDialog } from "./components/AddProjectDialog";
 import { ProjectFeatureView } from "./components/ProjectFeatureView";
 import { DocViewer } from "./components/DocViewer";
 import { FeatureDocsView } from "./components/FeatureDocsView";
-import type { Roadmap, ProjectId } from "../shared/types";
+import type { Roadmap, ProjectId, RoadmapStep } from "../shared/types";
 
 // --- Pure functions ---
 
@@ -103,19 +103,20 @@ const computeCurrentPhase = (roadmap: Roadmap): number => {
 const BoardContent = ({ roadmap }: BoardContentProps) => {
   const summary = useMemo(() => computeRoadmapSummary(roadmap), [roadmap]);
   const currentPhase = useMemo(() => computeCurrentPhase(roadmap), [roadmap]);
-  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const [selectedStep, setSelectedStep] = useState<RoadmapStep | null>(null);
   const stepLookup = useMemo(() => buildPlanStepLookup(roadmap), [roadmap]);
 
-  const handleCardClick = useCallback((stepId: string) => {
-    setSelectedStepId(stepId);
-  }, []);
+  const handleCardClick = useCallback(
+    (stepId: string) => {
+      const step = stepLookup.get(stepId);
+      if (step) setSelectedStep(step);
+    },
+    [stepLookup],
+  );
 
   const handleCloseModal = useCallback(() => {
-    setSelectedStepId(null);
+    setSelectedStep(null);
   }, []);
-
-  const selectedStep =
-    selectedStepId !== null ? (stepLookup.get(selectedStepId) ?? null) : null;
 
   return (
     <>
