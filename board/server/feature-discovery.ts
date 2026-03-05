@@ -7,11 +7,12 @@
  *
  * IO adapters:
  *   scanFeatureDirsFs: projectPath → FeatureId[] (reads docs/feature/ subdirectories)
- *   loadFeatureRoadmapFs: projectPath × FeatureId → Roadmap | null (reads roadmap.yaml only)
+ *   findRoadmapPath: featureDir → RoadmapPathResult | null (v2.0.0 priority: deliver/roadmap.json > roadmap.json > roadmap.yaml)
+ *   loadFeatureRoadmapFs: projectPath × FeatureId → FeatureRoadmap | null (multi-location with format)
  *   discoverFeaturesFs: projectPath → FeatureSummary[] (full discovery pipeline)
  */
 
-import type { FeatureId, FeatureSummary, Roadmap } from '../shared/types.js';
+import type { FeatureId, FeatureSummary, Roadmap, RoadmapFormat } from '../shared/types.js';
 import { createFeatureId } from '../shared/types.js';
 import { computeRoadmapSummary } from '../shared/types.js';
 
@@ -74,10 +75,24 @@ export const isFeatureDir = (name: string): boolean =>
   createFeatureId(name).ok;
 
 // =====================================================================
+// Types for multi-location roadmap finding
+// =====================================================================
+
+export interface RoadmapPathResult {
+  readonly path: string;
+  readonly format: RoadmapFormat;
+}
+
+export interface FeatureRoadmap {
+  readonly roadmap: Roadmap;
+  readonly format: RoadmapFormat;
+}
+
+// =====================================================================
 // IO Adapters — side-effect shell for filesystem operations
 // =====================================================================
 
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseRoadmap } from './parser.js';
 
@@ -114,12 +129,38 @@ const resolveFeatureDirFs = async (
   return null;
 };
 
-const readYamlFile = async (path: string): Promise<string | null> => {
+const readTextFile = async (path: string): Promise<string | null> => {
   try {
     return await readFile(path, 'utf-8');
   } catch {
     return null;
   }
+};
+
+const fileExists = async (path: string): Promise<boolean> => {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// v2.0.0 priority order: deliver/roadmap.json > roadmap.json > roadmap.yaml
+const ROADMAP_LOCATIONS: readonly { readonly relativePath: string; readonly format: RoadmapFormat }[] = [
+  { relativePath: 'deliver/roadmap.json', format: 'json' },
+  { relativePath: 'roadmap.json', format: 'json' },
+  { relativePath: 'roadmap.yaml', format: 'yaml' },
+];
+
+export const findRoadmapPath = async (featureDir: string): Promise<RoadmapPathResult | null> => {
+  for (const location of ROADMAP_LOCATIONS) {
+    const fullPath = join(featureDir, location.relativePath);
+    if (await fileExists(fullPath)) {
+      return { path: fullPath, format: location.format };
+    }
+  }
+  return null;
 };
 
 const scanSingleDir = async (
@@ -162,17 +203,18 @@ export const scanFeatureDirsFs = async (
 export const loadFeatureRoadmapFs = async (
   projectPath: string,
   featureId: FeatureId,
-): Promise<Roadmap | null> => {
+): Promise<FeatureRoadmap | null> => {
   const featureDir = await resolveFeatureDirFs(projectPath, featureId);
   if (featureDir === null) return null;
 
-  const roadmapPath = join(featureDir, 'roadmap.yaml');
-  const roadmapYaml = await readYamlFile(roadmapPath);
+  const pathResult = await findRoadmapPath(featureDir);
+  if (pathResult === null) return null;
 
-  if (roadmapYaml === null) return null;
+  const content = await readTextFile(pathResult.path);
+  if (content === null) return null;
 
-  const result = parseRoadmap(roadmapYaml);
-  return result.ok ? result.value : null;
+  const result = parseRoadmap(content, pathResult.format);
+  return result.ok ? { roadmap: result.value, format: pathResult.format } : null;
 };
 
 export const discoverFeaturesFs = async (
@@ -182,8 +224,8 @@ export const discoverFeaturesFs = async (
 
   return Promise.all(
     featureIds.map(async (featureId) => {
-      const roadmap = await loadFeatureRoadmapFs(projectPath, featureId);
-      return deriveFeatureSummary(featureId, roadmap);
+      const result = await loadFeatureRoadmapFs(projectPath, featureId);
+      return deriveFeatureSummary(featureId, result?.roadmap ?? null);
     }),
   );
 };

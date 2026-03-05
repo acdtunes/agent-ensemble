@@ -19,6 +19,7 @@ import {
   scanFeatureDirsFs,
   loadFeatureRoadmapFs,
   discoverFeaturesFs,
+  findRoadmapPath,
 } from '../feature-discovery.js';
 
 // --- Test helpers ---
@@ -285,36 +286,132 @@ describe('discoverFeaturesFs: multi-directory discovery', () => {
 });
 
 // =================================================================
-// loadFeatureRoadmapFs: reads roadmap.yaml per feature
+// loadFeatureRoadmapFs: reads roadmap and returns FeatureRoadmap
 // =================================================================
-describe('loadFeatureRoadmapFs: reads roadmap.yaml and parses as Roadmap', () => {
+describe('loadFeatureRoadmapFs: reads roadmap and returns FeatureRoadmap with format', () => {
   const featureId = makeFeatureId('auth');
 
-  it('loads and parses roadmap when present', async () => {
+  it('loads and parses YAML roadmap with format', async () => {
     await writeFeatureRoadmap(projectPath, 'auth', { withActivity: true });
 
-    const roadmap = await loadFeatureRoadmapFs(projectPath, featureId);
+    const result = await loadFeatureRoadmapFs(projectPath, featureId);
 
-    expect(roadmap).not.toBeNull();
-    expect(roadmap!.phases).toHaveLength(1);
-    expect(roadmap!.phases[0].steps).toHaveLength(2);
-    expect(roadmap!.phases[0].steps[0].status).toBe('approved');
+    expect(result).not.toBeNull();
+    expect(result!.format).toBe('yaml');
+    expect(result!.roadmap.phases).toHaveLength(1);
+    expect(result!.roadmap.phases[0].steps).toHaveLength(2);
+    expect(result!.roadmap.phases[0].steps[0].status).toBe('approved');
   });
 
-  it('returns null when roadmap.yaml is missing', async () => {
+  it('returns null when no roadmap file exists', async () => {
     await makeFeatureDir(projectPath, 'auth');
 
-    const roadmap = await loadFeatureRoadmapFs(projectPath, featureId);
+    const result = await loadFeatureRoadmapFs(projectPath, featureId);
 
-    expect(roadmap).toBeNull();
+    expect(result).toBeNull();
   });
 
-  it('returns null when roadmap.yaml has invalid YAML', async () => {
+  it('returns null when roadmap has invalid syntax', async () => {
     const featureDir = await makeFeatureDir(projectPath, 'auth');
     await writeFile(join(featureDir, 'roadmap.yaml'), '{{invalid yaml', 'utf-8');
 
-    const roadmap = await loadFeatureRoadmapFs(projectPath, featureId);
+    const result = await loadFeatureRoadmapFs(projectPath, featureId);
 
-    expect(roadmap).toBeNull();
+    expect(result).toBeNull();
+  });
+});
+
+// =================================================================
+// findRoadmapPath: checks multiple locations with v2.0.0 priority
+// =================================================================
+describe('findRoadmapPath: checks multiple locations with v2.0.0 priority', () => {
+  it('returns deliver/roadmap.json as first priority', async () => {
+    const featureDir = await makeFeatureDir(projectPath, 'auth');
+    const deliverDir = join(featureDir, 'deliver');
+    await mkdir(deliverDir, { recursive: true });
+    await writeFile(join(deliverDir, 'roadmap.json'), '{}', 'utf-8');
+    await writeFile(join(featureDir, 'roadmap.json'), '{}', 'utf-8');
+    await writeFile(join(featureDir, 'roadmap.yaml'), 'phases: []', 'utf-8');
+
+    const result = await findRoadmapPath(featureDir);
+
+    expect(result).not.toBeNull();
+    expect(result!.path).toBe(join(deliverDir, 'roadmap.json'));
+    expect(result!.format).toBe('json');
+  });
+
+  it('returns roadmap.json as second priority when deliver/roadmap.json missing', async () => {
+    const featureDir = await makeFeatureDir(projectPath, 'auth');
+    await writeFile(join(featureDir, 'roadmap.json'), '{}', 'utf-8');
+    await writeFile(join(featureDir, 'roadmap.yaml'), 'phases: []', 'utf-8');
+
+    const result = await findRoadmapPath(featureDir);
+
+    expect(result).not.toBeNull();
+    expect(result!.path).toBe(join(featureDir, 'roadmap.json'));
+    expect(result!.format).toBe('json');
+  });
+
+  it('returns roadmap.yaml as third priority when JSON files missing', async () => {
+    const featureDir = await makeFeatureDir(projectPath, 'auth');
+    await writeFile(join(featureDir, 'roadmap.yaml'), 'phases: []', 'utf-8');
+
+    const result = await findRoadmapPath(featureDir);
+
+    expect(result).not.toBeNull();
+    expect(result!.path).toBe(join(featureDir, 'roadmap.yaml'));
+    expect(result!.format).toBe('yaml');
+  });
+
+  it('returns null when no roadmap file exists', async () => {
+    const featureDir = await makeFeatureDir(projectPath, 'auth');
+
+    const result = await findRoadmapPath(featureDir);
+
+    expect(result).toBeNull();
+  });
+});
+
+// =================================================================
+// loadFeatureRoadmapFs: uses multi-location finder
+// =================================================================
+describe('loadFeatureRoadmapFs: uses multi-location finder', () => {
+  const featureId = makeFeatureId('auth');
+
+  it('loads JSON roadmap from deliver/roadmap.json', async () => {
+    const featureDir = await makeFeatureDir(projectPath, 'auth');
+    const deliverDir = join(featureDir, 'deliver');
+    await mkdir(deliverDir, { recursive: true });
+    const jsonRoadmap = JSON.stringify({
+      roadmap: { project_id: 'json-test' },
+      phases: [{
+        id: '01',
+        name: 'Phase 1',
+        steps: [{
+          id: '01-01',
+          name: 'Step A',
+          files_to_modify: [],
+          deps: [],
+          criteria: [],
+          status: 'pending',
+        }],
+      }],
+    });
+    await writeFile(join(deliverDir, 'roadmap.json'), jsonRoadmap, 'utf-8');
+
+    const result = await loadFeatureRoadmapFs(projectPath, featureId);
+
+    expect(result).not.toBeNull();
+    expect(result!.format).toBe('json');
+    expect(result!.roadmap.roadmap.project_id).toBe('json-test');
+  });
+
+  it('loads YAML roadmap when JSON files missing', async () => {
+    await writeFeatureRoadmap(projectPath, 'auth');
+
+    const result = await loadFeatureRoadmapFs(projectPath, featureId);
+
+    expect(result).not.toBeNull();
+    expect(result!.format).toBe('yaml');
   });
 });
