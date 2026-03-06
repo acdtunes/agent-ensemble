@@ -94,7 +94,7 @@ export const FeatureCard = ({
         }}
         className="cursor-pointer rounded-lg border border-gray-800 bg-gray-900/80 p-3 shadow-sm transition-colors hover:border-gray-600 hover:bg-gray-900"
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div className="min-w-0 flex-1">
             <h3
               data-testid="feature-primary-label"
