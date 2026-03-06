@@ -49,23 +49,20 @@ export const ProgressHeader = ({ summary, currentPhase, createdAt, description }
             <StatCard label="In Progress" value={summary.in_progress} color="text-blue-400" />
             <StatCard label="Pending" value={summary.pending} color="text-gray-400" />
           </div>
-          {hasContent(description) && (
-            <>
-              <div className="h-12 w-px bg-gray-700" />
-              <p
-                data-testid="progress-header-description"
-                className="min-w-0 max-w-xs truncate text-sm text-gray-400"
-              >
-                {description}
-              </p>
-            </>
-          )}
         </div>
         <div className="flex flex-col items-end text-sm text-gray-400">
           <div>Phase {currentPhase} of {summary.total_phases}</div>
           <div>Started: {formatDate(createdAt)}</div>
         </div>
       </div>
+      {hasContent(description) && (
+        <p
+          data-testid="progress-header-description"
+          className="mt-3 text-sm text-gray-400"
+        >
+          {description}
+        </p>
+      )}
       <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-gray-700">
         <div
           className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all duration-500"
