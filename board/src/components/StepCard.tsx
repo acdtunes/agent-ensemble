@@ -62,7 +62,7 @@ export const StepCard = ({ card, onCardClick, isHighlighted = false }: StepCardP
   return (
     <div
       data-testid="step-card"
-      className={`overflow-hidden rounded-b min-h-[160px] max-w-[320px] flex flex-col bg-gray-900/80 backdrop-blur-sm p-3 shadow-sm ${topBarColor} ${animationClasses}${isClickable ? ' cursor-pointer' : ''} ${highlightClasses}`}
+      className={`overflow-hidden rounded-b min-h-[160px] mx-auto max-w-[360px] flex flex-col bg-gray-900/80 backdrop-blur-sm p-3 shadow-sm ${topBarColor} ${animationClasses}${isClickable ? ' cursor-pointer' : ''} ${highlightClasses}`}
       onClick={isClickable ? () => onCardClick(card.stepId) : undefined}
     >
       <div>
