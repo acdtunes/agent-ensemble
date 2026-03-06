@@ -100,6 +100,14 @@ export const FeatureCard = ({
                 {feature.shortDescription}
               </p>
             )}
+            {hasValidDescription(feature.description) && (
+              <p
+                data-testid="feature-full-description"
+                className="line-clamp-2 text-xs text-gray-500"
+              >
+                {feature.description}
+              </p>
+            )}
             <div className="flex items-center gap-2">
               <h3
                 data-testid="feature-id"

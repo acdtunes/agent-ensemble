@@ -88,6 +88,34 @@ describe("FeatureCard", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Copied card-redesign"));
   });
 
+  it.each([
+    { desc: "renders full description when present", description: "Complete authentication system with OAuth2 support", expected: true },
+    { desc: "does not render full description when undefined", description: undefined, expected: false },
+    { desc: "does not render full description when empty", description: "", expected: false },
+    { desc: "does not render full description when whitespace-only", description: "   ", expected: false },
+  ])("$desc", ({ description, expected }) => {
+    render(<FeatureCard feature={makeFeature({ description })} />);
+    const fullDesc = screen.queryByTestId("feature-full-description");
+    if (expected) {
+      expect(fullDesc).toBeInTheDocument();
+      expect(fullDesc).toHaveTextContent(description!);
+    } else {
+      expect(fullDesc).not.toBeInTheDocument();
+    }
+  });
+
+  it("renders full description below short description", () => {
+    render(<FeatureCard feature={makeFeature({
+      shortDescription: "Auth handling",
+      description: "Complete auth system with OAuth2",
+    })} />);
+    const shortDesc = screen.getByTestId("feature-description");
+    const fullDesc = screen.getByTestId("feature-full-description");
+
+    // Full description should appear after short description in DOM
+    expect(shortDesc.compareDocumentPosition(fullDesc) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("archive flow: shows button when projectId provided, confirms and succeeds", async () => {
     const onArchiveSuccess = vi.fn();
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
