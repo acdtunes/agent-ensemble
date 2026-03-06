@@ -65,8 +65,11 @@ export const StepCard = ({ card, onCardClick, isHighlighted = false }: StepCardP
       className={`overflow-hidden rounded-b min-h-[160px] flex flex-col bg-gray-900/80 backdrop-blur-sm p-2 text-sm shadow-sm ${topBarColor} ${animationClasses}${isClickable ? ' cursor-pointer' : ''} ${highlightClasses}`}
       onClick={isClickable ? () => onCardClick(card.stepId) : undefined}
     >
-      <div className="flex items-start">
+      <div>
         <span className="min-w-0 font-medium text-gray-100">{card.stepName}</span>
+        {card.description && (
+          <p className="mt-0.5 line-clamp-2 text-xs text-gray-400">{card.description}</p>
+        )}
       </div>
       <div className="mt-1 flex flex-wrap gap-1">
         <MetadataChip>{card.fileCount} {card.fileCount === 1 ? 'file' : 'files'}</MetadataChip>

@@ -29,6 +29,7 @@ export const mapStatusToDisplayColumn = (status: StepStatus): DisplayColumn =>
 export interface StepCardData {
   readonly stepId: string;
   readonly stepName: string;
+  readonly description?: string;
   readonly displayColumn: DisplayColumn;
   readonly fileCount: number;
   readonly files: readonly string[];
@@ -48,6 +49,7 @@ export const expandStepToStepCard = (step: RoadmapStep, isBlocked: boolean): Ste
   return {
     stepId: step.id,
     stepName: step.name,
+    description: step.description,
     displayColumn: mapStatusToDisplayColumn(step.status),
     fileCount: files.length,
     files,
