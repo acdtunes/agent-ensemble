@@ -4,7 +4,11 @@ interface ProgressHeaderProps {
   readonly summary: RoadmapSummary;
   readonly currentPhase: number;
   readonly createdAt: string;
+  readonly description?: string;
 }
+
+const hasContent = (value: string | undefined): value is string =>
+  value !== undefined && value.trim().length > 0;
 
 const StatCard = ({ label, value, color }: { readonly label: string; readonly value: number; readonly color: string }) => (
   <div className="flex flex-col items-center rounded-lg bg-gray-800/50 px-4 py-2">
@@ -26,7 +30,7 @@ const formatDate = (dateString: string): string => {
   }
 };
 
-export const ProgressHeader = ({ summary, currentPhase, createdAt }: ProgressHeaderProps) => {
+export const ProgressHeader = ({ summary, currentPhase, createdAt, description }: ProgressHeaderProps) => {
   const completionPercent = summary.total_steps > 0
     ? Math.round((summary.done / summary.total_steps) * 100)
     : 0;
@@ -51,6 +55,14 @@ export const ProgressHeader = ({ summary, currentPhase, createdAt }: ProgressHea
           <div>Started: {formatDate(createdAt)}</div>
         </div>
       </div>
+      {hasContent(description) && (
+        <p
+          data-testid="progress-header-description"
+          className="mt-3 text-sm text-gray-400"
+        >
+          {description}
+        </p>
+      )}
       <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-gray-700">
         <div
           className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all duration-500"
