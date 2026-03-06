@@ -196,8 +196,8 @@ describe("ProjectFeatureView", () => {
       const headings = within(grid as HTMLElement).getAllByRole("heading", { level: 2 });
       const headingTexts = headings.map((h) => h.textContent);
 
-      // Active should come before No Roadmap
-      expect(headingTexts).toEqual(["Active (1)", "No Roadmap (1)"]);
+      // No Roadmap should come before Active
+      expect(headingTexts).toEqual(["No Roadmap (1)", "Active (1)"]);
     });
   });
 

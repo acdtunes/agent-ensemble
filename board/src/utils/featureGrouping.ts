@@ -13,7 +13,7 @@ export interface FeatureGroup {
 
 // --- Constants ---
 
-export const GROUP_ORDER: readonly GroupKey[] = ['active', 'planned', 'completed', 'no-roadmap'];
+export const GROUP_ORDER: readonly GroupKey[] = ['no-roadmap', 'active', 'planned', 'completed'];
 
 const GROUP_DISPLAY_NAMES: Record<GroupKey, string> = {
   active: 'Active',

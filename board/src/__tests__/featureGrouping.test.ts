@@ -3,7 +3,7 @@
  *
  * Driving port: groupFeaturesByStatus pure function
  * Acceptance criteria:
- * - Features grouped in order: Active > Planned > Completed > No Roadmap
+ * - Features grouped in order: No Roadmap > Active > Planned > Completed
  * - Features sorted alphabetically (case-insensitive) within each group
  * - Function returns grouped structure with group name and feature count
  * - Sorting is deterministic across calls
@@ -55,7 +55,7 @@ const noRoadmapFeature = (name: string) =>
 
 describe('GROUP_ORDER', () => {
   it('contains exactly 4 groups in display order', () => {
-    expect(GROUP_ORDER).toEqual(['active', 'planned', 'completed', 'no-roadmap']);
+    expect(GROUP_ORDER).toEqual(['no-roadmap', 'active', 'planned', 'completed']);
   });
 });
 
@@ -65,7 +65,7 @@ describe('GROUP_ORDER', () => {
 
 describe('groupFeaturesByStatus', () => {
   // --- Behavior 1: Correct group ordering ---
-  it('returns groups in order: Active > Planned > Completed > No Roadmap', () => {
+  it('returns groups in order: No Roadmap > Active > Planned > Completed', () => {
     const features = [
       noRoadmapFeature('Z-Docs'),
       completedFeature('Y-Done'),
@@ -76,7 +76,7 @@ describe('groupFeaturesByStatus', () => {
     const result = groupFeaturesByStatus(features);
     const groupKeys = result.map((g) => g.key);
 
-    expect(groupKeys).toEqual(['active', 'planned', 'completed', 'no-roadmap']);
+    expect(groupKeys).toEqual(['no-roadmap', 'active', 'planned', 'completed']);
   });
 
   // --- Behavior 2: Alphabetical sorting within groups (case-insensitive) ---
