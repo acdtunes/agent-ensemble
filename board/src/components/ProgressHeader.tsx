@@ -58,6 +58,7 @@ export const ProgressHeader = ({ summary, currentPhase, createdAt, description }
               >
                 {description}
               </p>
+              <div className="h-12 w-px shrink-0 bg-gray-700" />
             </>
           )}
         </div>
