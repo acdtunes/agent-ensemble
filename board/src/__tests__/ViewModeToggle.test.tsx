@@ -51,4 +51,15 @@ describe('ViewModeToggle', () => {
 
     expect(screen.getByRole('group', { name: 'View mode' })).toBeInTheDocument();
   });
+
+  // --- Behavior 4: Pointer cursor on buttons ---
+  it('has cursor-pointer on both toggle buttons', () => {
+    render(<ViewModeToggle mode="card" onToggle={vi.fn()} />);
+
+    const cardButton = screen.getByRole('button', { name: 'Card' });
+    const listButton = screen.getByRole('button', { name: 'List' });
+
+    expect(cardButton).toHaveClass('cursor-pointer');
+    expect(listButton).toHaveClass('cursor-pointer');
+  });
 });

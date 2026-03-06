@@ -19,7 +19,7 @@ export const ViewModeToggle = ({ mode, onToggle }: ViewModeToggleProps) => (
       type="button"
       onClick={() => onToggle('card')}
       aria-pressed={mode === 'card'}
-      className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
+      className={`flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
         mode === 'card'
           ? 'bg-gray-700 text-white'
           : 'text-gray-400 hover:text-gray-200'
@@ -32,7 +32,7 @@ export const ViewModeToggle = ({ mode, onToggle }: ViewModeToggleProps) => (
       type="button"
       onClick={() => onToggle('list')}
       aria-pressed={mode === 'list'}
-      className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
+      className={`flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
         mode === 'list'
           ? 'bg-gray-700 text-white'
           : 'text-gray-400 hover:text-gray-200'
