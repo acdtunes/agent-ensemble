@@ -30,6 +30,20 @@ const displayStateToGroupKey = (state: FeatureDisplayState | null): GroupKey =>
 const compareNamesIgnoreCase = (a: FeatureSummary, b: FeatureSummary): number =>
   a.name.toLowerCase().localeCompare(b.name.toLowerCase());
 
+const compareByOrderThenName = (a: FeatureSummary, b: FeatureSummary): number => {
+  // Both have order: sort by order ascending
+  if (a.order !== undefined && b.order !== undefined) {
+    const orderDiff = a.order - b.order;
+    return orderDiff !== 0 ? orderDiff : compareNamesIgnoreCase(a, b);
+  }
+  // Only a has order: a comes first
+  if (a.order !== undefined) return -1;
+  // Only b has order: b comes first
+  if (b.order !== undefined) return 1;
+  // Neither has order: fallback to name sort
+  return compareNamesIgnoreCase(a, b);
+};
+
 export const groupFeaturesByStatus = (
   features: readonly FeatureSummary[],
 ): readonly FeatureGroup[] => {
@@ -46,6 +60,6 @@ export const groupFeaturesByStatus = (
   return GROUP_ORDER.map((key) => ({
     key,
     displayName: GROUP_DISPLAY_NAMES[key],
-    features: grouped.get(key)!.slice().sort(compareNamesIgnoreCase),
+    features: grouped.get(key)!.slice().sort(compareByOrderThenName),
   }));
 };

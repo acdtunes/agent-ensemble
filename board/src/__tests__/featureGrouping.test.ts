@@ -34,8 +34,8 @@ const makeFeature = (
 });
 
 // Active: inProgress > 0 OR done > 0 (but not all done)
-const activeFeature = (name: string) =>
-  makeFeature(name, { hasRoadmap: true, totalSteps: 5, done: 2, inProgress: 1 });
+const activeFeature = (name: string, order?: number) =>
+  makeFeature(name, { hasRoadmap: true, totalSteps: 5, done: 2, inProgress: 1, order });
 
 // Planned: hasRoadmap && totalSteps > 0 && done === 0 && inProgress === 0
 const plannedFeature = (name: string) =>
@@ -151,5 +151,58 @@ describe('groupFeaturesByStatus', () => {
     for (const group of result) {
       expect(group.features).toHaveLength(0);
     }
+  });
+});
+
+// =============================================================
+// Order-based sorting (Step 01-03)
+// =============================================================
+
+describe('groupFeaturesByStatus: order-based sorting', () => {
+  // --- Behavior 1: Features with order field sort by order ascending ---
+  it('sorts features by order field ascending within each group', () => {
+    const features = [
+      activeFeature('Zebra', 3),
+      activeFeature('Alpha', 1),
+      activeFeature('Beta', 2),
+    ];
+
+    const result = groupFeaturesByStatus(features);
+    const activeGroup = result.find((g) => g.key === 'active');
+    const names = activeGroup?.features.map((f) => f.name);
+
+    expect(names).toEqual(['Alpha', 'Beta', 'Zebra']);
+  });
+
+  // --- Behavior 2: Features without order (undefined) sort last ---
+  it('sorts features with undefined order after features with order', () => {
+    const features = [
+      activeFeature('No-Order-B'),
+      activeFeature('Ordered-A', 1),
+      activeFeature('No-Order-A'),
+      activeFeature('Ordered-B', 2),
+    ];
+
+    const result = groupFeaturesByStatus(features);
+    const activeGroup = result.find((g) => g.key === 'active');
+    const names = activeGroup?.features.map((f) => f.name);
+
+    // Ordered first (by order), then undefined (by name)
+    expect(names).toEqual(['Ordered-A', 'Ordered-B', 'No-Order-A', 'No-Order-B']);
+  });
+
+  // --- Behavior 3: When orders are equal, fallback to name sort ---
+  it('falls back to name sort when order values are equal', () => {
+    const features = [
+      activeFeature('Zebra', 1),
+      activeFeature('Alpha', 1),
+      activeFeature('Beta', 1),
+    ];
+
+    const result = groupFeaturesByStatus(features);
+    const activeGroup = result.find((g) => g.key === 'active');
+    const names = activeGroup?.features.map((f) => f.name);
+
+    expect(names).toEqual(['Alpha', 'Beta', 'Zebra']);
   });
 });

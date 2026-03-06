@@ -66,6 +66,7 @@ export interface RoadmapMeta {
   readonly approved_at?: string;
   readonly short_description?: string;
   readonly description?: string;
+  readonly order?: number;
 }
 
 export interface Roadmap {
@@ -150,6 +151,7 @@ export interface FeatureSummary {
   readonly updatedAt: string;
   readonly shortDescription?: string;
   readonly description?: string;
+  readonly order?: number;
 }
 
 export interface ManifestEntry {

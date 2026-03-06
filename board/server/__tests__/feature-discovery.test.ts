@@ -103,6 +103,28 @@ const phaseOneCompleteRoadmap: Roadmap = {
   ],
 };
 
+const roadmapWithOrder = (order: number): Roadmap => ({
+  roadmap: { project_id: 'ordered-feature', total_steps: 1, phases: 1, order },
+  phases: [{
+    id: '01', name: 'Phase 1',
+    steps: [{
+      id: '01-01', name: 'Step A', files_to_modify: [], dependencies: [], criteria: [],
+      status: 'pending', teammate_id: null, started_at: null, completed_at: null, review_attempts: 0,
+    }],
+  }],
+});
+
+const roadmapWithoutOrder: Roadmap = {
+  roadmap: { project_id: 'no-order-feature', total_steps: 1, phases: 1 },
+  phases: [{
+    id: '01', name: 'Phase 1',
+    steps: [{
+      id: '01-01', name: 'Step A', files_to_modify: [], dependencies: [], criteria: [],
+      status: 'pending', teammate_id: null, started_at: null, completed_at: null, review_attempts: 0,
+    }],
+  }],
+};
+
 // --- Acceptance: deriveFeatureSummary ---
 
 describe('deriveFeatureSummary: computes FeatureSummary from Roadmap', () => {
@@ -187,6 +209,30 @@ describe('deriveFeatureSummary: computes FeatureSummary from Roadmap', () => {
         return summary.hasRoadmap === (roadmap !== null);
       }),
     );
+  });
+});
+
+// --- Acceptance: order field extraction ---
+
+describe('deriveFeatureSummary: extracts order from roadmap metadata', () => {
+  const featureId = makeFeatureId('ordered-feature');
+
+  it('extracts order from roadmap.roadmap.order when present', () => {
+    const summary = deriveFeatureSummary(featureId, roadmapWithOrder(5));
+
+    expect(summary.order).toBe(5);
+  });
+
+  it('returns undefined order when roadmap.roadmap.order is absent', () => {
+    const summary = deriveFeatureSummary(featureId, roadmapWithoutOrder);
+
+    expect(summary.order).toBeUndefined();
+  });
+
+  it('returns undefined order when roadmap is null', () => {
+    const summary = deriveFeatureSummary(featureId, null);
+
+    expect(summary.order).toBeUndefined();
   });
 });
 

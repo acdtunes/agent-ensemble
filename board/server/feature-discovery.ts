@@ -68,6 +68,7 @@ export const deriveFeatureSummary = (
     updatedAt: latestTimestamp(roadmap),
     shortDescription: roadmap.roadmap.short_description,
     description: roadmap.roadmap.description,
+    order: roadmap.roadmap.order,
   };
 };
 
