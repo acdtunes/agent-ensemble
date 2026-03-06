@@ -34,9 +34,9 @@ const FEATURE_BOARD_VIEW_PATH = ['..', '..', '..', '..', 'components', 'FeatureB
 // US-01: FeatureCard displays shortDescription
 // =================================================================
 
-// First acceptance test enabled
-describe('US-01 Scenario: FeatureCard shows short description below feature name', () => {
-  it('Given feature with short description, When viewed, Then description appears below name', async () => {
+// First acceptance test enabled - Updated for step 03-01: shortDescription is now primary label
+describe('US-01 Scenario: FeatureCard shows short description as primary label', () => {
+  it('Given feature with short description, When viewed, Then shortDescription appears as primary bold label', async () => {
     // Given feature with short description
     const feature = createFeatureWithDescriptions('auth-system', 'Handles user authentication');
 
@@ -44,20 +44,20 @@ describe('US-01 Scenario: FeatureCard shows short description below feature name
     const { FeatureCard } = await import(/* @vite-ignore */ FEATURE_CARD_PATH);
     render(<FeatureCard feature={feature} />);
 
-    // Then description appears below the feature name with muted styling
+    // Then shortDescription appears as the primary bold label in heading
     const card = screen.getByRole('button');
-    // Feature name appears in heading
-    const featureName = within(card).getByRole('heading', { level: 3 });
-    expect(featureName).toHaveTextContent('auth-system');
+    const primaryLabel = within(card).getByRole('heading', { level: 3 });
+    expect(primaryLabel).toHaveTextContent('Handles user authentication');
+    expect(primaryLabel.className).toMatch(/font-semibold.*text-gray-100|text-gray-100.*font-semibold/);
 
-    const description = within(card).getByText('Handles user authentication');
-    expect(description).toBeInTheDocument();
-    // Description should have muted/secondary text styling
-    expect(description.className).toMatch(/text-gray-400|text-gray-500/);
+    // And feature-id appears below in muted style
+    const featureId = within(card).getByTestId('feature-id');
+    expect(featureId).toHaveTextContent('auth-system');
+    expect(featureId.className).toMatch(/text-gray-500/);
   });
 });
 
-// Truncation test enabled
+// Truncation test enabled - Updated for step 03-01: shortDescription is now primary label
 describe('US-01 Scenario: FeatureCard truncates long short description with ellipsis', () => {
   it('Given feature with long description, When viewed, Then truncated with ellipsis', async () => {
     // Given feature with long description
@@ -67,10 +67,10 @@ describe('US-01 Scenario: FeatureCard truncates long short description with elli
     const { FeatureCard } = await import(/* @vite-ignore */ FEATURE_CARD_PATH);
     render(<FeatureCard feature={feature} />);
 
-    // Then the description container has truncation styling
-    const description = screen.getByTestId('feature-description');
-    expect(description.textContent).toContain('This is a very long');
-    expect(description.className).toMatch(/truncate|line-clamp|overflow-hidden/);
+    // Then the primary label container has truncation styling
+    const primaryLabel = screen.getByTestId('feature-primary-label');
+    expect(primaryLabel.textContent).toContain('This is a very long');
+    expect(primaryLabel.className).toMatch(/truncate|line-clamp|overflow-hidden/);
   });
 });
 

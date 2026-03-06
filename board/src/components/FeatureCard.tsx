@@ -25,6 +25,10 @@ export const formatProgressLabel = (done: number, total: number): string =>
 export const hasValidDescription = (description: string | undefined): boolean =>
   description !== undefined && description.trim().length > 0;
 
+/** Pure function: get primary label - shortDescription if valid, otherwise fallback to name */
+export const getPrimaryLabel = (shortDescription: string | undefined, name: string): string =>
+  hasValidDescription(shortDescription) ? shortDescription! : name;
+
 // --- Component ---
 
 interface FeatureCardProps {
@@ -92,30 +96,20 @@ export const FeatureCard = ({
       >
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            {hasValidDescription(feature.shortDescription) && (
-              <p
-                data-testid="feature-description"
-                className="truncate text-xs text-gray-400"
-              >
-                {feature.shortDescription}
-              </p>
-            )}
-            {hasValidDescription(feature.description) && (
-              <p
-                data-testid="feature-full-description"
-                className="line-clamp-2 text-xs text-gray-500"
-              >
-                {feature.description}
-              </p>
-            )}
+            <h3
+              data-testid="feature-primary-label"
+              className="truncate text-sm font-semibold text-gray-100"
+            >
+              {getPrimaryLabel(feature.shortDescription, feature.name)}
+            </h3>
             <div className="flex items-center gap-2">
-              <h3
+              <span
                 data-testid="feature-id"
                 onClick={handleFeatureIdClick}
-                className="truncate text-sm font-semibold text-gray-100 cursor-pointer hover:underline"
+                className="truncate text-xs text-gray-500 cursor-pointer hover:underline"
               >
-                {feature.name}
-              </h3>
+                {feature.featureId}
+              </span>
               {toast.message && (
                 <span role="status" className="text-xs text-gray-400">
                   {toast.message}

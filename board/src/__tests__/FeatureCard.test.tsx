@@ -59,21 +59,13 @@ describe("FeatureCard", () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it("conditionally renders short description", () => {
-    const { rerender } = render(<FeatureCard feature={makeFeature({ shortDescription: "Handles auth" })} />);
-    expect(screen.getByTestId("feature-description")).toHaveTextContent("Handles auth");
-
-    rerender(<FeatureCard feature={makeFeature({ shortDescription: "   " })} />);
-    expect(screen.queryByTestId("feature-description")).not.toBeInTheDocument();
-  });
-
-  it("renders description above feature-id", () => {
+  it("renders primary label above feature-id", () => {
     render(<FeatureCard feature={makeFeature({ shortDescription: "Auth handling" })} />);
-    const description = screen.getByTestId("feature-description");
+    const primaryLabel = screen.getByTestId("feature-primary-label");
     const featureId = screen.getByTestId("feature-id");
 
-    // Verify DOM order: description should appear before feature-id
-    expect(description.compareDocumentPosition(featureId) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Verify DOM order: primary label should appear before feature-id
+    expect(primaryLabel.compareDocumentPosition(featureId) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("copies feature ID to clipboard without triggering card click", async () => {
@@ -88,32 +80,46 @@ describe("FeatureCard", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Copied card-redesign"));
   });
 
-  it.each([
-    { desc: "renders full description when present", description: "Complete authentication system with OAuth2 support", expected: true },
-    { desc: "does not render full description when undefined", description: undefined, expected: false },
-    { desc: "does not render full description when empty", description: "", expected: false },
-    { desc: "does not render full description when whitespace-only", description: "   ", expected: false },
-  ])("$desc", ({ description, expected }) => {
-    render(<FeatureCard feature={makeFeature({ description })} />);
-    const fullDesc = screen.queryByTestId("feature-full-description");
-    if (expected) {
-      expect(fullDesc).toBeInTheDocument();
-      expect(fullDesc).toHaveTextContent(description!);
-    } else {
-      expect(fullDesc).not.toBeInTheDocument();
-    }
+
+  it("renders shortDescription as primary bold label with correct styling", () => {
+    render(<FeatureCard feature={makeFeature({ shortDescription: "Auth handling" })} />);
+    const primaryLabel = screen.getByTestId("feature-primary-label");
+
+    expect(primaryLabel).toHaveTextContent("Auth handling");
+    expect(primaryLabel).toHaveClass("text-sm", "font-semibold", "text-gray-100");
   });
 
-  it("renders full description below short description", () => {
+  it("renders feature-id as muted secondary text", () => {
+    render(<FeatureCard feature={makeFeature({ shortDescription: "Auth handling" })} />);
+    const featureId = screen.getByTestId("feature-id");
+
+    expect(featureId).toHaveTextContent("card-redesign");
+    expect(featureId).toHaveClass("text-xs", "text-gray-500");
+  });
+
+  it("does not render feature-full-description element", () => {
     render(<FeatureCard feature={makeFeature({
       shortDescription: "Auth handling",
       description: "Complete auth system with OAuth2",
     })} />);
-    const shortDesc = screen.getByTestId("feature-description");
-    const fullDesc = screen.getByTestId("feature-full-description");
 
-    // Full description should appear after short description in DOM
-    expect(shortDesc.compareDocumentPosition(fullDesc) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByTestId("feature-full-description")).not.toBeInTheDocument();
+  });
+
+  it("falls back to feature.name as primary label when shortDescription is empty", () => {
+    render(<FeatureCard feature={makeFeature({ shortDescription: "" })} />);
+    const primaryLabel = screen.getByTestId("feature-primary-label");
+
+    expect(primaryLabel).toHaveTextContent("card-redesign");
+    expect(primaryLabel).toHaveClass("text-sm", "font-semibold", "text-gray-100");
+  });
+
+  it("falls back to feature.name as primary label when shortDescription is undefined", () => {
+    render(<FeatureCard feature={makeFeature({ shortDescription: undefined })} />);
+    const primaryLabel = screen.getByTestId("feature-primary-label");
+
+    expect(primaryLabel).toHaveTextContent("card-redesign");
+    expect(primaryLabel).toHaveClass("text-sm", "font-semibold", "text-gray-100");
   });
 
   it("archive flow: shows button when projectId provided, confirms and succeeds", async () => {
