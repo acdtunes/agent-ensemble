@@ -67,6 +67,15 @@ describe("FeatureCard", () => {
     expect(screen.queryByTestId("feature-description")).not.toBeInTheDocument();
   });
 
+  it("renders description above feature-id", () => {
+    render(<FeatureCard feature={makeFeature({ shortDescription: "Auth handling" })} />);
+    const description = screen.getByTestId("feature-description");
+    const featureId = screen.getByTestId("feature-id");
+
+    // Verify DOM order: description should appear before feature-id
+    expect(description.compareDocumentPosition(featureId) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("copies feature ID to clipboard without triggering card click", async () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
     const onClick = vi.fn();

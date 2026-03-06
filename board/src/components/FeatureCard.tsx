@@ -92,6 +92,14 @@ export const FeatureCard = ({
       >
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
+            {hasValidDescription(feature.shortDescription) && (
+              <p
+                data-testid="feature-description"
+                className="truncate text-xs text-gray-400"
+              >
+                {feature.shortDescription}
+              </p>
+            )}
             <div className="flex items-center gap-2">
               <h3
                 data-testid="feature-id"
@@ -106,14 +114,6 @@ export const FeatureCard = ({
                 </span>
               )}
             </div>
-            {hasValidDescription(feature.shortDescription) && (
-              <p
-                data-testid="feature-description"
-                className="truncate text-xs text-gray-400"
-              >
-                {feature.shortDescription}
-              </p>
-            )}
           </div>
           <div className="ml-2 flex flex-shrink-0 items-center gap-2">
             {displayState !== null && (
