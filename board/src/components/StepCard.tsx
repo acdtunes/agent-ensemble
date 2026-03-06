@@ -71,12 +71,6 @@ export const StepCard = ({ card, onCardClick, isHighlighted = false }: StepCardP
           <p className="mt-0.5 line-clamp-2 text-sm text-gray-400">{card.description}</p>
         )}
       </div>
-      <div className="mt-1 flex flex-wrap gap-1">
-        <MetadataChip>{card.fileCount} {card.fileCount === 1 ? 'file' : 'files'}</MetadataChip>
-        {card.dependencyCount > 0 && (
-          <MetadataChip>🔗 {card.dependencyCount} {card.dependencyCount === 1 ? 'dep' : 'deps'}</MetadataChip>
-        )}
-      </div>
       {card.displayColumn !== 'done' && (
         <div className="mt-1 flex flex-wrap gap-1">
           {card.conflictsWith?.length > 0 && (
@@ -93,8 +87,14 @@ export const StepCard = ({ card, onCardClick, isHighlighted = false }: StepCardP
       <div className="flex-grow" />
       <div
         data-testid="card-footer"
-        className="mt-2 flex items-center justify-end"
+        className="mt-2 flex items-center justify-between"
       >
+        <div className="flex flex-wrap gap-1">
+          <MetadataChip>{card.fileCount} {card.fileCount === 1 ? 'file' : 'files'}</MetadataChip>
+          {card.dependencyCount > 0 && (
+            <MetadataChip>🔗 {card.dependencyCount} {card.dependencyCount === 1 ? 'dep' : 'deps'}</MetadataChip>
+          )}
+        </div>
         <span className="flex items-center gap-1">
           {toast.message && (
             <span role="status" className="text-xs text-gray-500">
