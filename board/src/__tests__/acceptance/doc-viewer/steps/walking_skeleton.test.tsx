@@ -62,7 +62,10 @@ describe('Walking Skeleton: Andres navigates to docs, selects a document, and re
     const badges = screen.getAllByText(/\d+/);
     expect(badges.length).toBeGreaterThan(0);
 
-    // When he clicks on "ADR-001-state-management.md" in the tree
+    // When he expands the "adrs" folder (collapsed by default for project-level docs)
+    fireEvent.click(screen.getByText('adrs'));
+
+    // And clicks on "ADR-001-state-management.md" in the tree
     fireEvent.click(screen.getByText('ADR-001-state-management'));
 
     // Then the content panel renders the document with formatted headings

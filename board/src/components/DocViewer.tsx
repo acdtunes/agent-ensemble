@@ -52,7 +52,7 @@ export const DocViewer = ({ projectId, tree, fetchContent, docsRoot = 'docs', er
       {hasTree && (
         <div className="mt-4 flex gap-4">
           <aside className="w-64 shrink-0 border-r border-gray-800 pr-4">
-            <DocTreeComponent tree={tree} onSelectDoc={handleSelectDoc} defaultExpanded />
+            <DocTreeComponent tree={tree} onSelectDoc={handleSelectDoc} defaultExpanded={false} />
           </aside>
           <div className="min-w-0 flex-1">
             {selectedDocPath === null && (
