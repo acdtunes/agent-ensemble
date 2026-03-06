@@ -62,13 +62,13 @@ export const StepCard = ({ card, onCardClick, isHighlighted = false }: StepCardP
   return (
     <div
       data-testid="step-card"
-      className={`overflow-hidden rounded-b min-h-[160px] flex flex-col bg-gray-900/80 backdrop-blur-sm p-2 text-sm shadow-sm ${topBarColor} ${animationClasses}${isClickable ? ' cursor-pointer' : ''} ${highlightClasses}`}
+      className={`overflow-hidden rounded-b min-h-[160px] flex flex-col bg-gray-900/80 backdrop-blur-sm p-3 shadow-sm ${topBarColor} ${animationClasses}${isClickable ? ' cursor-pointer' : ''} ${highlightClasses}`}
       onClick={isClickable ? () => onCardClick(card.stepId) : undefined}
     >
       <div>
-        <span className="min-w-0 font-medium text-gray-100">{card.stepName}</span>
+        <span className="min-w-0 text-base font-medium text-gray-100">{card.stepName}</span>
         {card.description && (
-          <p className="mt-0.5 line-clamp-2 text-xs text-gray-400">{card.description}</p>
+          <p className="mt-0.5 line-clamp-2 text-sm text-gray-400">{card.description}</p>
         )}
       </div>
       <div className="mt-1 flex flex-wrap gap-1">
