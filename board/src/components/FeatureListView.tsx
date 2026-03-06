@@ -87,17 +87,13 @@ const FeatureRow = ({ feature, onClick }: FeatureRowProps) => (
     }}
     className="flex cursor-pointer items-center gap-4 rounded-lg border border-gray-800 bg-gray-900/80 px-4 py-2 transition-colors hover:border-gray-600 hover:bg-gray-900"
   >
-    <div className="flex-1 truncate">
-      {hasShortDescription(feature) ? (
-        <>
-          <span className="font-medium text-gray-100">
-            {feature.shortDescription}
-          </span>
-          <span className="ml-2 text-xs text-gray-500">{feature.name}</span>
-        </>
-      ) : (
-        <span className="font-medium text-gray-100">{feature.name}</span>
-      )}
+    <div className="min-w-0 flex-1">
+      <div className="truncate font-medium text-gray-100">
+        {hasShortDescription(feature) ? feature.shortDescription : feature.name}
+      </div>
+      <div className="truncate text-xs text-gray-500">
+        {feature.featureId}
+      </div>
     </div>
     <span className="w-24 text-sm text-gray-400">
       {getStatusLabel(feature)}

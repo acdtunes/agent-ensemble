@@ -80,12 +80,13 @@ describe("FeatureListView", () => {
       screen.getByRole("heading", { name: "Planned (1)" }),
     ).toBeInTheDocument();
 
-    // Feature rows with name, status, progress
-    expect(screen.getByText("auth-service")).toBeInTheDocument();
-    expect(screen.getByText("5 of 10")).toBeInTheDocument();
+    // Feature rows with name, feature-id, status, progress
+    const rows = screen.getAllByRole("button");
+    expect(within(rows[0]).getAllByText("auth-service")).toHaveLength(2);
+    expect(within(rows[0]).getByText("5 of 10")).toBeInTheDocument();
 
-    expect(screen.getByText("user-profile")).toBeInTheDocument();
-    expect(screen.getByText("0 of 6")).toBeInTheDocument();
+    expect(within(rows[2]).getAllByText("user-profile")).toHaveLength(2);
+    expect(within(rows[2]).getByText("0 of 6")).toBeInTheDocument();
   });
 
   // --- Behavior 2: Navigation callbacks on row click ---
@@ -123,15 +124,12 @@ describe("FeatureListView", () => {
     );
 
     // Click feature with roadmap
-    fireEvent.click(
-      screen.getByText("with-roadmap").closest('[role="button"]')!,
-    );
+    const rows = screen.getAllByRole("button");
+    fireEvent.click(rows[0]);
     expect(onNavigateFeatureBoard).toHaveBeenCalledWith("with-roadmap");
 
     // Click feature without roadmap
-    fireEvent.click(
-      screen.getByText("without-roadmap").closest('[role="button"]')!,
-    );
+    fireEvent.click(rows[1]);
     expect(onNavigateFeatureDocs).toHaveBeenCalledWith("without-roadmap");
   });
 
@@ -179,9 +177,12 @@ describe("FeatureListView", () => {
       expect(primaryLabel).toBeInTheDocument();
       expect(primaryLabel).toHaveClass("font-medium", "text-gray-100");
 
-      // Secondary label: feature.name with text-xs text-gray-500
-      const secondaryLabel = screen.getByText("auth-service");
-      expect(secondaryLabel).toBeInTheDocument();
+      // Secondary label: featureId with text-xs text-gray-500
+      const featureIdLabels = screen.getAllByText("auth-service");
+      const secondaryLabel = featureIdLabels.find((el) =>
+        el.classList.contains("text-xs"),
+      );
+      expect(secondaryLabel).toBeDefined();
       expect(secondaryLabel).toHaveClass("text-xs", "text-gray-500");
     });
 
@@ -208,14 +209,20 @@ describe("FeatureListView", () => {
         />,
       );
 
-      // Only feature.name shown as primary label
-      const primaryLabel = screen.getByText("dashboard");
-      expect(primaryLabel).toBeInTheDocument();
+      // Primary label: feature.name with font-medium text-gray-100
+      const allDashboardElements = screen.getAllByText("dashboard");
+      const primaryLabel = allDashboardElements.find((el) =>
+        el.classList.contains("font-medium"),
+      );
+      expect(primaryLabel).toBeDefined();
       expect(primaryLabel).toHaveClass("font-medium", "text-gray-100");
 
-      // No secondary label should exist (only one element with 'dashboard' text)
-      const allDashboardElements = screen.getAllByText("dashboard");
-      expect(allDashboardElements).toHaveLength(1);
+      // Feature ID shown below
+      const featureIdLabel = allDashboardElements.find((el) =>
+        el.classList.contains("text-xs"),
+      );
+      expect(featureIdLabel).toBeDefined();
+      expect(featureIdLabel).toHaveClass("text-xs", "text-gray-500");
     });
   });
 });

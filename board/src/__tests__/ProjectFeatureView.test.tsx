@@ -413,12 +413,12 @@ describe("ProjectFeatureView", () => {
 
       const listView = screen.getByTestId("feature-list-view");
 
-      // Each feature row shows name, status, progress
-      expect(within(listView).getByText("Auth Service")).toBeInTheDocument();
+      // Each feature row shows name, feature-id below, status, progress
+      expect(within(listView).getAllByText("Auth Service")).toHaveLength(2);
       expect(within(listView).getByText("Active")).toBeInTheDocument();
       expect(within(listView).getByText("2 of 5")).toBeInTheDocument();
 
-      expect(within(listView).getByText("Dashboard")).toBeInTheDocument();
+      expect(within(listView).getAllByText("Dashboard")).toHaveLength(2);
       expect(within(listView).getByText("Planned")).toBeInTheDocument();
       expect(within(listView).getByText("0 of 5")).toBeInTheDocument();
     });
