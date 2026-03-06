@@ -37,32 +37,35 @@ export const ProgressHeader = ({ summary, currentPhase, createdAt, description }
 
   return (
     <div className="rounded-lg border border-gray-800 bg-gray-900/60 p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <div className="flex flex-col">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-6">
+          <div className="flex shrink-0 flex-col">
             <span className="text-sm text-gray-400">Progress</span>
             <span className="text-3xl font-bold text-gray-100">{completionPercent}%</span>
           </div>
-          <div className="h-12 w-px bg-gray-700" />
-          <div className="flex gap-3">
+          <div className="h-12 w-px shrink-0 bg-gray-700" />
+          <div className="flex shrink-0 gap-3">
             <StatCard label="Done" value={summary.done} color="text-emerald-400" />
             <StatCard label="In Progress" value={summary.in_progress} color="text-blue-400" />
             <StatCard label="Pending" value={summary.pending} color="text-gray-400" />
           </div>
+          {hasContent(description) && (
+            <>
+              <div className="h-12 w-px shrink-0 bg-gray-700" />
+              <p
+                data-testid="progress-header-description"
+                className="min-w-0 text-sm text-gray-400"
+              >
+                {description}
+              </p>
+            </>
+          )}
         </div>
-        <div className="flex flex-col items-end text-sm text-gray-400">
+        <div className="flex shrink-0 flex-col items-end text-sm text-gray-400">
           <div>Phase {currentPhase} of {summary.total_phases}</div>
           <div>Started: {formatDate(createdAt)}</div>
         </div>
       </div>
-      {hasContent(description) && (
-        <p
-          data-testid="progress-header-description"
-          className="mt-3 text-sm text-gray-400"
-        >
-          {description}
-        </p>
-      )}
       <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-gray-700">
         <div
           className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all duration-500"
