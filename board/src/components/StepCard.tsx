@@ -68,7 +68,7 @@ export const StepCard = ({ card, onCardClick, isHighlighted = false }: StepCardP
       <div>
         <span className="min-w-0 text-base font-medium text-gray-100">{card.stepName}</span>
         {card.description && (
-          <p className="mt-0.5 line-clamp-2 text-sm text-gray-400">{card.description}</p>
+          <p className="mt-0.5 text-sm text-gray-400">{card.description}</p>
         )}
       </div>
       {card.displayColumn !== 'done' && (
