@@ -7,8 +7,9 @@
  * - Features grouped by status with proper header display/hiding
  * - Search and status filters compose as intersection
  * - Archived features section with restore functionality
+ * - View mode toggle switches between card and list layouts
  *
- * Test Budget: 6 behaviors × 2 = 12 max unit tests (current: 12)
+ * Test Budget: 7 behaviors × 2 = 14 max unit tests (current: 14)
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
@@ -348,10 +349,86 @@ describe("ProjectFeatureView", () => {
   });
 
   // =============================================================
-  // Behavior 6: Archived features section
+  // Behavior 6: View mode toggle (card/list)
   // =============================================================
 
-  describe("archived features section", () => {
+  describe("view mode toggle", () => {
+    const viewModeFeatures = [
+      activeFeature("Auth Service"),
+      plannedFeature("Dashboard"),
+    ];
+
+    it("defaults to card mode showing FeatureGrid, toggles to list mode showing FeatureListView", () => {
+      render(
+        <ProjectFeatureView
+          projectId="agent-ensemble"
+          features={viewModeFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      // Card mode is default - feature grid present
+      expect(screen.getByTestId("feature-grid")).toBeInTheDocument();
+      expect(screen.queryByTestId("feature-list-view")).not.toBeInTheDocument();
+
+      // Card button is pressed by default
+      expect(screen.getByRole("button", { name: /card/i })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+
+      // Click list mode toggle
+      fireEvent.click(screen.getByRole("button", { name: /list/i }));
+
+      // List mode - feature list view present
+      expect(screen.getByTestId("feature-list-view")).toBeInTheDocument();
+      expect(screen.queryByTestId("feature-grid")).not.toBeInTheDocument();
+
+      // List button is now pressed
+      expect(screen.getByRole("button", { name: /list/i })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.getByRole("button", { name: /card/i })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
+
+    it("list view displays feature name, status, and progress for each feature", () => {
+      render(
+        <ProjectFeatureView
+          projectId="agent-ensemble"
+          features={viewModeFeatures}
+          onNavigateOverview={vi.fn()}
+          onNavigateFeatureBoard={vi.fn()}
+          onNavigateFeatureDocs={vi.fn()}
+        />,
+      );
+
+      // Switch to list mode
+      fireEvent.click(screen.getByRole("button", { name: /list/i }));
+
+      const listView = screen.getByTestId("feature-list-view");
+
+      // Each feature row shows name, status, progress
+      expect(within(listView).getByText("Auth Service")).toBeInTheDocument();
+      expect(within(listView).getByText("Active")).toBeInTheDocument();
+      expect(within(listView).getByText("2 of 5")).toBeInTheDocument();
+
+      expect(within(listView).getByText("Dashboard")).toBeInTheDocument();
+      expect(within(listView).getByText("Planned")).toBeInTheDocument();
+      expect(within(listView).getByText("0 of 5")).toBeInTheDocument();
+    });
+  });
+
+  // =============================================================
+  // Behavior 7: Archived features section
+  // =============================================================
+
+  describe("archived features section (behavior 7)", () => {
     const testFeatures = [activeFeature("Current Feature")];
     const archivedFeatures = [
       { featureId: "old-auth" as FeatureId, name: "Old Auth", archivedAt: "2026-03-01T10:00:00Z" },

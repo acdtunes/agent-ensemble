@@ -1,0 +1,131 @@
+/**
+ * Tests for FeatureListView — compact list layout for features grouped by status.
+ *
+ * Driving port: FeatureListView component
+ * Test Budget: 2 behaviors × 2 = 4 max unit tests
+ */
+
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { FeatureListView } from '../components/FeatureListView';
+import type { FeatureGroup } from '../utils/featureGrouping';
+import type { FeatureSummary, FeatureId } from '../../shared/types';
+
+afterEach(cleanup);
+
+const makeFeature = (
+  id: string,
+  overrides: Partial<FeatureSummary> = {},
+): FeatureSummary => ({
+  featureId: id as FeatureId,
+  name: id,
+  hasRoadmap: true,
+  hasExecutionLog: true,
+  totalSteps: 5,
+  done: 2,
+  inProgress: 1,
+  currentLayer: 2,
+  updatedAt: '2026-03-01T12:00:00Z',
+  ...overrides,
+});
+
+const testGroups: readonly FeatureGroup[] = [
+  {
+    key: 'active',
+    displayName: 'Active',
+    features: [
+      makeFeature('auth-service', { totalSteps: 10, done: 5, inProgress: 2 }),
+      makeFeature('dashboard', { totalSteps: 8, done: 3, inProgress: 1 }),
+    ],
+  },
+  {
+    key: 'planned',
+    displayName: 'Planned',
+    features: [
+      makeFeature('user-profile', { totalSteps: 6, done: 0, inProgress: 0 }),
+    ],
+  },
+];
+
+describe('FeatureListView', () => {
+  // --- Behavior 1: Renders groups with headers and feature rows ---
+  it('renders group headers with counts and feature rows', () => {
+    render(
+      <FeatureListView
+        groups={testGroups}
+        projectId="test-project"
+        onNavigateFeatureBoard={vi.fn()}
+        onNavigateFeatureDocs={vi.fn()}
+      />,
+    );
+
+    // Group headers with counts
+    expect(screen.getByRole('heading', { name: 'Active (2)' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Planned (1)' })).toBeInTheDocument();
+
+    // Feature rows with name, status, progress
+    expect(screen.getByText('auth-service')).toBeInTheDocument();
+    expect(screen.getByText('5 of 10')).toBeInTheDocument();
+
+    expect(screen.getByText('user-profile')).toBeInTheDocument();
+    expect(screen.getByText('0 of 6')).toBeInTheDocument();
+  });
+
+  // --- Behavior 2: Navigation callbacks on row click ---
+  it('calls correct navigation callback when feature row clicked', () => {
+    const noRoadmapGroups: readonly FeatureGroup[] = [
+      {
+        key: 'active',
+        displayName: 'Active',
+        features: [makeFeature('with-roadmap', { hasRoadmap: true })],
+      },
+      {
+        key: 'no-roadmap',
+        displayName: 'No Roadmap',
+        features: [
+          makeFeature('without-roadmap', {
+            hasRoadmap: false,
+            totalSteps: 0,
+            done: 0,
+            inProgress: 0,
+          }),
+        ],
+      },
+    ];
+
+    const onNavigateFeatureBoard = vi.fn();
+    const onNavigateFeatureDocs = vi.fn();
+
+    render(
+      <FeatureListView
+        groups={noRoadmapGroups}
+        projectId="test-project"
+        onNavigateFeatureBoard={onNavigateFeatureBoard}
+        onNavigateFeatureDocs={onNavigateFeatureDocs}
+      />,
+    );
+
+    // Click feature with roadmap
+    fireEvent.click(screen.getByText('with-roadmap').closest('[role="button"]')!);
+    expect(onNavigateFeatureBoard).toHaveBeenCalledWith('with-roadmap');
+
+    // Click feature without roadmap
+    fireEvent.click(screen.getByText('without-roadmap').closest('[role="button"]')!);
+    expect(onNavigateFeatureDocs).toHaveBeenCalledWith('without-roadmap');
+  });
+
+  // --- Behavior 3: Test ID for parent container ---
+  it('renders with feature-list-view test ID', () => {
+    render(
+      <FeatureListView
+        groups={testGroups}
+        projectId="test-project"
+        onNavigateFeatureBoard={vi.fn()}
+        onNavigateFeatureDocs={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('feature-list-view')).toBeInTheDocument();
+  });
+});

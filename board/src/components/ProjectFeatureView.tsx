@@ -5,6 +5,8 @@ import { FeatureCard } from "./FeatureCard";
 import { StatusGroupHeader } from "./StatusGroupHeader";
 import { StatusFilterControls } from "./StatusFilterControls";
 import { ArchivedFeaturesSection } from "./ArchivedFeaturesSection";
+import { ViewModeToggle, type ViewMode } from "./ViewModeToggle";
+import { FeatureListView } from "./FeatureListView";
 import {
   groupFeaturesByStatus,
   type FeatureGroup,
@@ -69,6 +71,7 @@ export const ProjectFeatureView = ({
 }: ProjectFeatureViewProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("card");
 
   const breadcrumbSegments: BreadcrumbSegment[] = [
     { label: "Overview", onClick: onNavigateOverview },
@@ -96,13 +99,16 @@ export const ProjectFeatureView = ({
       ) : (
         <>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <input
-              type="text"
-              placeholder="Search features..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 sm:w-64"
-            />
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                placeholder="Search features..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-gray-100 placeholder-gray-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 sm:w-64"
+              />
+              <ViewModeToggle mode={viewMode} onToggle={setViewMode} />
+            </div>
             <StatusFilterControls
               options={statusFilterOptions}
               selected={statusFilter}
@@ -110,14 +116,14 @@ export const ProjectFeatureView = ({
             />
           </div>
 
-          <div
-            data-testid="feature-grid"
-            className="grid grid-cols-1 gap-3 lg:grid-cols-4 xl:grid-cols-6"
-          >
-            {isFiltering && !hasResults ? (
-              <NoSearchResults />
-            ) : (
-              groups.map((group) => (
+          {isFiltering && !hasResults ? (
+            <NoSearchResults />
+          ) : viewMode === 'card' ? (
+            <div
+              data-testid="feature-grid"
+              className="grid grid-cols-1 gap-3 lg:grid-cols-4 xl:grid-cols-6"
+            >
+              {groups.map((group) => (
                 <GroupSection
                   key={group.key}
                   group={group}
@@ -126,9 +132,17 @@ export const ProjectFeatureView = ({
                   onNavigateFeatureDocs={onNavigateFeatureDocs}
                   onArchiveSuccess={onArchiveSuccess}
                 />
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <FeatureListView
+              groups={groups}
+              projectId={projectId}
+              onNavigateFeatureBoard={onNavigateFeatureBoard}
+              onNavigateFeatureDocs={onNavigateFeatureDocs}
+              onArchiveSuccess={onArchiveSuccess}
+            />
+          )}
 
           <div className="mt-6">
             <ArchivedFeaturesSection
