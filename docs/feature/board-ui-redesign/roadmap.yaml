@@ -1,0 +1,270 @@
+roadmap:
+  project_id: board-ui-redesign
+  created_at: '2026-03-06T12:24:46Z'
+  total_steps: 9
+  phases: 3
+  short_description: "Board UI polish: collapsed docs, card swap, list view, header
+    description, feature ordering, name labels, cursor polish"
+  description: "Eight focused UI improvements to the board application: collapse doc
+    trees by default, swap FeatureCard layout, add card/list view toggle, move description
+    into ProgressHeader, add feature order metadata for sorting, feature name as primary
+    card label, dual-label list view rows, and pointer cursor on toggle buttons."
+phases:
+- id: '01'
+  name: 'Independent UI Changes'
+  steps:
+  - id: 01-01
+    name: 'DocViewer collapsed by default'
+    description: "Change DocViewer to render DocTree with defaultExpanded={false}
+      so project-level doc trees start collapsed. Feature-level docs (MultiRootDocViewer)
+      remain expanded. Single prop value change in DocViewer.tsx."
+    criteria: |
+      - DocViewer renders DocTree with defaultExpanded={false}
+      - MultiRootDocViewer still renders DocTree with defaultExpanded={true}
+      - Unit test verifies DocTree receives defaultExpanded=false from DocViewer
+    time_estimate: 15m
+    dependencies: []
+    files_to_modify:
+    - board/src/components/DocViewer.tsx
+    status: approved
+    teammate_id: crafter-01-01
+    started_at: '2026-03-06T12:58:00.813931+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-06T13:08:57.295235+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-06T13:08:57.295235+00:00'
+      outcome: approved
+      feedback: 'Approved: clean prop change, MultiRootDocViewer unchanged, walking
+        skeleton updated correctly'
+  - id: 01-02
+    name: 'FeatureCard description above feature-id'
+    description: "Swap the order of description and feature-id in FeatureCard.tsx
+      so description renders first, then the clickable feature-id below it. JSX restructure
+      only, no data model change. Preserve click-to-copy on feature-id."
+    criteria: |
+      - Description text renders above feature-id in the card
+      - Feature-id remains clickable with copy-to-clipboard
+      - Unit test verifies DOM order (description before feature-id)
+    time_estimate: 15m
+    dependencies: []
+    files_to_modify:
+    - board/src/components/FeatureCard.tsx
+    status: approved
+    teammate_id: crafter-01-02
+    started_at: '2026-03-06T12:58:05.355608+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-06T13:06:24.719092+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-06T13:06:24.719092+00:00'
+      outcome: approved
+      feedback: 'Approved: clean FP, hasValidDescription pure fn, DOM order tests
+        correct'
+  - id: 01-03
+    name: 'Feature order metadata and sorting'
+    description: "Add optional order field to FeatureSummary type, extract it from
+      roadmap metadata in feature-discovery.ts, and update featureGrouping sort to
+      order by this field (nulls last) then by name."
+    criteria: |
+      - FeatureSummary type includes readonly order?: number
+      - deriveFeatureSummary extracts order from roadmap.roadmap.order
+      - featureGrouping sorts by order (undefined last), then by name
+      - Unit tests cover: ordered features sort correctly, undefined order sorts last, fallback to name sort
+    time_estimate: 25m
+    dependencies: []
+    files_to_modify:
+    - board/shared/types.ts
+    - board/server/feature-discovery.ts
+    - board/src/utils/featureGrouping.ts
+    status: approved
+    teammate_id: crafter-01-03
+    started_at: '2026-03-06T12:58:09.133538+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-06T13:05:41.216636+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-06T13:05:41.216636+00:00'
+      outcome: approved
+      feedback: 'Approved: type safety, pure comparator, no testing theater'
+- id: '02'
+  name: 'Composite UI Changes'
+  steps:
+  - id: 02-01
+    name: 'Description in ProgressHeader'
+    description: "Add optional description prop to ProgressHeader component and render
+      it between stat cards and phase info. Update BoardContent in App.tsx to pass
+      description to ProgressHeader and remove the standalone description paragraph."
+    criteria: |
+      - ProgressHeader accepts optional description prop
+      - Description renders between stat cards and phase info in the header
+      - BoardContent passes roadmap.roadmap.description to ProgressHeader
+      - Standalone description paragraph removed from BoardContent
+      - Unit test verifies ProgressHeader renders description when provided
+      - Unit test verifies ProgressHeader omits description section when not provided
+    time_estimate: 20m
+    dependencies: []
+    files_to_modify:
+    - board/src/components/ProgressHeader.tsx
+    - board/src/App.tsx
+    status: approved
+    teammate_id: crafter-02-01
+    started_at: '2026-03-06T12:58:12.393657+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-06T13:06:24.621002+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-06T13:06:24.621002+00:00'
+      outcome: approved
+      feedback: 'Approved: clean implementation, pure hasContent predicate, all AC
+        met'
+  - id: 02-02
+    name: 'Add full description to FeatureCard'
+    description: "Display the full roadmap description (feature.description) on the
+      FeatureCard below the shortDescription. Show as a truncated multi-line text
+      block. Only render when description is present and non-empty."
+    criteria: |
+      - FeatureCard renders feature.description when present
+      - Description is not rendered when undefined or empty
+      - Unit test verifies description appears in card DOM when provided
+      - Unit test verifies description is absent when not provided
+    time_estimate: 15m
+    dependencies:
+    - 01-02
+    files_to_modify:
+    - board/src/components/FeatureCard.tsx
+    status: approved
+    teammate_id: crafter-02-02
+    started_at: '2026-03-06T13:06:39.419000+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-06T13:09:33.141430+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-06T13:09:33.141430+00:00'
+      outcome: approved
+      feedback: 'Approved: hasValidDescription reuse, clean layout, tests within budget'
+  - id: 02-03
+    name: 'Card/List view toggle for ProjectFeatureView'
+    description: "Add view mode state to ProjectFeatureView with a ViewModeToggle
+      component and a new FeatureListView component. ViewModeToggle switches between
+      card and list modes. FeatureListView renders features as compact rows grouped
+      by status."
+    criteria: |
+      - ViewModeToggle component renders card/list toggle buttons
+      - ProjectFeatureView manages viewMode state ('card' | 'list')
+      - Card mode renders existing FeatureGrid layout
+      - List mode renders new FeatureListView with compact rows
+      - FeatureListView shows feature name, status, progress in each row
+      - Unit tests cover: toggle switches view mode, card mode renders grid, list mode renders list view
+    time_estimate: 40m
+    dependencies:
+    - 01-03
+    files_to_modify:
+    - board/src/components/ProjectFeatureView.tsx
+    - board/src/components/ViewModeToggle.tsx
+    - board/src/components/FeatureListView.tsx
+    status: approved
+    teammate_id: crafter-02-03
+    started_at: '2026-03-06T13:05:55.577582+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-06T13:11:31.787347+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-06T13:11:31.787347+00:00'
+      outcome: approved
+      feedback: 'Approved: interface contracts match design spec, accessibility, FP
+        paradigm, no testing theater'
+- id: '03'
+  name: 'Label Refinements'
+  steps:
+  - id: 03-01
+    name: 'Feature name as primary FeatureCard label'
+    description: "Promote shortDescription to bold primary label, demote feature-id
+      to small muted text (text-xs text-gray-500), remove description rendering entirely.
+      Fallback: show feature.name as primary when shortDescription absent."
+    criteria: |
+      - shortDescription renders as primary bold label (text-sm font-semibold text-gray-100)
+      - feature-id renders below in muted style (text-xs text-gray-500)
+      - feature.description element removed from card (no data-testid="feature-full-description")
+      - Fallback: feature.name shown as bold primary when shortDescription is empty/undefined
+      - Click-to-copy on feature-id preserved
+    time_estimate: 20m
+    dependencies:
+    - 01-02
+    - 02-02
+    files_to_modify:
+    - board/src/components/FeatureCard.tsx
+    status: approved
+    teammate_id: crafter-03-01
+    started_at: '2026-03-06T13:59:18.172747+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-06T14:08:38.223375+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-06T14:08:38.223375+00:00'
+      outcome: approved
+      feedback: 'Approved: pure functions, correct styling, all AC met, tests within
+        budget'
+  - id: 03-02
+    name: 'FeatureListView short name + feature-id'
+    description: "Display shortDescription as primary bold label with feature.name
+      as secondary muted text. Fallback: show only feature.name when shortDescription
+      absent."
+    criteria: |
+      - shortDescription renders as primary label (font-medium text-gray-100)
+      - feature.name renders as secondary muted label (text-xs text-gray-500)
+      - Fallback: only feature.name shown when shortDescription is empty/undefined
+      - Unit test verifies dual-label rendering and fallback behavior
+    time_estimate: 15m
+    dependencies:
+    - 02-03
+    files_to_modify:
+    - board/src/components/FeatureListView.tsx
+    status: approved
+    teammate_id: crafter-03-02
+    started_at: '2026-03-06T13:59:21.603485+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-06T14:08:38.335308+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-06T14:08:38.335308+00:00'
+      outcome: approved
+      feedback: 'Approved: clean FP dual-label, pure hasShortDescription predicate,
+        no testing theater'
+  - id: 03-03
+    name: 'ViewModeToggle pointer cursor'
+    description: "Add cursor-pointer class to Card and List toggle buttons for consistent
+      hover UX."
+    criteria: |
+      - Card button has cursor-pointer class
+      - List button has cursor-pointer class
+      - Unit test verifies cursor-pointer class present on both buttons
+    time_estimate: 5m
+    dependencies:
+    - 02-03
+    files_to_modify:
+    - board/src/components/ViewModeToggle.tsx
+    status: approved
+    teammate_id: crafter-03-03
+    started_at: '2026-03-06T13:59:26.503745+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-06T14:08:38.447365+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-06T14:08:38.447365+00:00'
+      outcome: approved
+      feedback: 'Approved: cursor-pointer on both buttons, clean test'
+implementation_scope:
+  source_directories:
+  - board/src/
+  - board/server/
+  - board/shared/
+  test_directories:
+  - board/src/__tests__/
+  excluded_patterns:
+  - node_modules/**
+  - dist/**
+validation:
+  status: pending
+  reviewer: lead
+  approved_at:

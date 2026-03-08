@@ -1,0 +1,98 @@
+# JTBD Analysis: Project Docs Tab
+# Epic: project-docs-tab
+# Date: 2026-03-06
+# Type: Brownfield Enhancement (single job, lightweight discovery)
+
+job_statement: >
+  Help me access project-level documentation without leaving the project context
+  or memorizing direct URLs.
+
+job_story:
+  situation: >
+    When I am on the project page reviewing the feature list and I need to check
+    project-wide documentation (architecture decisions, design specs, UX journeys),
+  motivation: >
+    I want to switch to a documentation view directly from the project page,
+  outcome: >
+    so I can find and read project docs without losing my place or navigating
+    away from the project context.
+
+job_dimensions:
+  functional: >
+    Navigate from the project feature-list view to a project-level documentation
+    browser, and back again, without losing context.
+  emotional: >
+    Feel oriented and in control -- the docs are always one click away, never
+    hidden behind a mystery URL. Confidence that I can find what I need quickly.
+  social: >
+    Be seen as someone who consults documentation before making decisions. Enable
+    team members to share project doc links easily.
+
+forces:
+  push:
+    description: >
+      The project page has no tab bar, so the only way to reach project docs is
+      by manually editing the URL hash to #/projects/{id}/docs. This is
+      undiscoverable and breaks the navigation mental model established by the
+      feature page (which has Board | Docs tabs).
+    strength: HIGH
+
+  pull:
+    description: >
+      The feature page already proves the pattern works -- Board | Docs tabs with
+      consistent navigation. Extending this to the project level provides
+      symmetry, discoverability, and a single-click path to project docs.
+    strength: HIGH
+
+  anxiety:
+    description: >
+      Low anxiety -- the pattern is already proven at the feature level. The only
+      risk is inconsistency if the project Docs tab looks or behaves differently
+      from the feature Docs tab.
+    strength: LOW
+
+  habit:
+    description: >
+      Users currently go to the project page, see no docs tab, and either give up
+      or manually type the URL. Some may not know project docs exist at all.
+    strength: MEDIUM
+
+  assessment:
+    switch_likelihood: HIGH
+    key_blocker: None significant -- pattern is proven, components exist
+    key_enabler: Symmetry with feature-level tabs eliminates learning curve
+    design_implication: >
+      Must reuse ProjectTabs component (already exists), ensure the Docs view
+      feels consistent with the feature Docs view, and make the transition
+      between features tab and docs tab seamless.
+
+job_map:
+  define:
+    description: User decides to look at project documentation
+    requirement: Tab must be visible and clearly labeled on the project page
+  locate:
+    description: User finds the Docs tab in the project header
+    requirement: Tab placement must match feature-level pattern (Board | Docs)
+  prepare:
+    description: No preparation needed -- single click navigation
+    requirement: null
+  confirm:
+    description: User sees the Docs tab is available and clickable
+    requirement: Active tab state clearly indicates current view
+  execute:
+    description: User clicks Docs tab, project documentation tree loads
+    requirement: Doc tree loads and displays with clear structure
+  monitor:
+    description: User scans the doc tree to find the document they need
+    requirement: Tree sidebar with document hierarchy, select-to-preview
+  modify:
+    description: User navigates between documents within the Docs view
+    requirement: Document selection updates content pane without full page reload
+  conclude:
+    description: User returns to feature list or navigates elsewhere
+    requirement: Board tab returns to feature list; breadcrumbs work correctly
+
+outcome_statements:
+  - "Minimize the time it takes to navigate from the feature list to project documentation"
+  - "Minimize the likelihood of not finding the project documentation view"
+  - "Maximize the consistency between project-level and feature-level navigation patterns"

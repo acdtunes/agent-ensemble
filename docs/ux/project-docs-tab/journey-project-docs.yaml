@@ -1,0 +1,190 @@
+journey:
+  name: "Access Project Documentation"
+  goal: "Navigate from the project feature list to a project-level documentation browser and back"
+  persona: "Carla Rivera, tech lead reviewing project-wide docs before planning"
+
+  emotional_arc:
+    start: "Oriented, task-focused -- knows what she needs to find"
+    middle: "Exploring, engaged -- browsing the doc tree and reading content"
+    end: "Informed, satisfied -- found the doc, ready to return to features"
+
+steps:
+  - id: 1
+    name: "See tab navigation on project page"
+    action: "Navigate to #/projects/{projectId}"
+
+    ui_mockup: |
+      +--------------------------------------------------------------------+
+      | Overview / nw-teams                                                |
+      | Agent Ensemble    [Board]  [Docs]                   Connected [*]  |
+      +--------------------------------------------------------------------+
+      | Feature cards grouped by status...                                 |
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: projectId
+        source: "URL hash: #/projects/{projectId}"
+        displayed_as: "${projectId}"
+        consumers:
+          - "ProjectTabs breadcrumb"
+          - "Board tab href"
+          - "Docs tab href"
+          - "Feature list API call"
+
+    emotional_state:
+      entry: "Task-focused -- arrived at project page with a goal"
+      exit: "Oriented -- sees tabs, knows Docs is one click away"
+
+    integration_checkpoint: |
+      ProjectTabs component renders with Board tab active.
+      Both tab hrefs use correct projectId from route.
+
+    gherkin: |
+      Scenario: Project page displays Board and Docs tabs
+        Given Carla Rivera navigates to the "nw-teams" project page
+        When the project page loads
+        Then she sees "Board" and "Docs" tabs in the header
+        And the "Board" tab is active (highlighted with blue underline)
+        And the feature card list is displayed below
+
+  - id: 2
+    name: "Switch to Docs tab"
+    action: "Click the Docs tab"
+
+    ui_mockup: |
+      +--------------------------------------------------------------------+
+      | Overview / nw-teams                                                |
+      | Agent Ensemble    [Board]  [Docs]                   Connected [*]  |
+      +--------------------------------------------------------------------+
+      | +-- Sidebar ------+  +-- Content Pane ----------------------------+|
+      | | > docs/         |  | Select a document to view its contents    ||
+      | |   > feature/    |  |                                           ||
+      | |   > ux/         |  |                                           ||
+      | |   > requirements|  |                                           ||
+      | +-----------------+  +-------------------------------------------+|
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: projectId
+        source: "URL hash: #/projects/{projectId}/docs"
+        displayed_as: "${projectId}"
+        consumers:
+          - "ProjectTabs breadcrumb"
+          - "useDocTree hook API call"
+          - "fetchContent API call"
+
+    emotional_state:
+      entry: "Curious -- clicked Docs to find documentation"
+      exit: "Exploring -- sees the doc tree, ready to browse"
+
+    integration_checkpoint: |
+      URL changes to #/projects/{projectId}/docs.
+      Router resolves to 'docs' view.
+      DocsView component mounts with ProjectTabs showing Docs tab active.
+      useDocTree fetches /api/projects/{projectId}/docs/tree.
+
+    gherkin: |
+      Scenario: Clicking Docs tab shows the documentation browser
+        Given Carla Rivera is on the "nw-teams" project page with the Board tab active
+        When she clicks the "Docs" tab
+        Then the URL changes to "#/projects/nw-teams/docs"
+        And the "Docs" tab becomes active (blue underline)
+        And the document tree sidebar appears on the left
+        And the content pane shows "Select a document to view its contents"
+
+  - id: 3
+    name: "Browse and read a document"
+    action: "Click a document in the sidebar tree"
+
+    ui_mockup: |
+      +--------------------------------------------------------------------+
+      | Overview / nw-teams                                                |
+      | Agent Ensemble    [Board]  [Docs]                   Connected [*]  |
+      +--------------------------------------------------------------------+
+      | +-- Sidebar ------+  +-- Content Pane ----------------------------+|
+      | | > docs/         |  | docs/ux/auth-flow/journey.yaml       [CP] ||
+      | |   > feature/    |  |                                           ||
+      | |   > ux/         |  | journey:                                  ||
+      | |    > auth-flow/ |  |   name: "User Authentication"             ||
+      | |     [journey.y] |  |   goal: "Secure login flow"               ||
+      | |   > requirements|  |   ...                                     ||
+      | +-----------------+  +-------------------------------------------+|
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: selectedDocPath
+        source: "User click on sidebar tree item"
+        displayed_as: "${docsRoot}/${selectedDocPath}"
+        consumers:
+          - "DocContent component"
+          - "CopyPathButton component"
+          - "fetchContent API call"
+
+    emotional_state:
+      entry: "Focused -- selected a specific document"
+      exit: "Informed -- read the content, got what was needed"
+
+    integration_checkpoint: |
+      fetchContent calls /api/projects/{projectId}/docs/content?path={selectedDocPath}.
+      DocContent renders the document with proper formatting.
+      CopyPathButton shows correct file path.
+
+    gherkin: |
+      Scenario: Selecting a document displays its content
+        Given Carla Rivera is on the "nw-teams" project Docs view
+        And the document tree shows "ux/auth-flow/journey.yaml"
+        When she clicks "journey.yaml" in the sidebar
+        Then the content pane displays the document content
+        And the file path "docs/ux/auth-flow/journey.yaml" appears above the content
+        And a copy-path button is available
+
+  - id: 4
+    name: "Return to feature list"
+    action: "Click the Board tab"
+
+    ui_mockup: |
+      +--------------------------------------------------------------------+
+      | Overview / nw-teams                                                |
+      | Agent Ensemble    [Board]  [Docs]                   Connected [*]  |
+      +--------------------------------------------------------------------+
+      | [Search features...]              [All] [Active] [Planned] ...     |
+      | Feature cards...                                                   |
+      +--------------------------------------------------------------------+
+
+    shared_artifacts:
+      - name: projectId
+        source: "URL hash: #/projects/{projectId}"
+        displayed_as: "${projectId}"
+        consumers:
+          - "ProjectTabs breadcrumb"
+          - "Feature list fetch"
+
+    emotional_state:
+      entry: "Satisfied -- done reading docs"
+      exit: "Re-oriented -- back to feature list, ready for next task"
+
+    integration_checkpoint: |
+      URL changes to #/projects/{projectId}/board (not #/projects/{projectId}).
+      Router resolves to 'board' view.
+      BoardView component mounts with feature list content.
+      Note: Currently ProjectView (#/projects/{projectId}) shows the feature list.
+      Board tab links to #/projects/{projectId}/board which is the BoardView (roadmap).
+      This needs alignment -- see Technical Notes in user story.
+
+    gherkin: |
+      Scenario: Clicking Board tab returns to the project board view
+        Given Carla Rivera is viewing project docs for "nw-teams"
+        When she clicks the "Board" tab
+        Then the URL changes to "#/projects/nw-teams/board"
+        And the "Board" tab becomes active
+        And the project view content is displayed
+
+integration_validation:
+  shared_artifact_consistency:
+    - artifact: projectId
+      must_match_across: [1, 2, 3, 4]
+      failure_message: "Project ID must be consistent across all tab navigations and API calls"
+
+    - artifact: tab_active_state
+      must_match_across: [1, 2, 3, 4]
+      failure_message: "Active tab indicator must correctly reflect current view (Board vs Docs)"

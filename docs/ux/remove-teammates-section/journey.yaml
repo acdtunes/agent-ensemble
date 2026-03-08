@@ -1,0 +1,55 @@
+journey:
+  name: remove-teammates-section
+  goal: User sees clean full-width board without agent-related noise
+  persona: Project owner monitoring multi-agent delivery
+
+  emotional_arc:
+    start: overwhelmed
+    middle: scanning
+    end: focused
+
+  steps:
+    - id: open-board
+      action: Open board view for a feature
+      system_response: Display full-width Kanban board
+      emotional_state: neutral
+      artifacts_produced:
+        - board_view
+
+    - id: scan-phases
+      action: Scan phases and columns
+      system_response: Show all phases with status columns
+      emotional_state: focused
+      notes: No sidebar competing for attention
+
+    - id: identify-active-work
+      action: Look at In Progress and Review columns
+      system_response: Cards show step name and status color
+      emotional_state: informed
+      notes: No agent indicators cluttering cards
+
+    - id: drill-into-step
+      action: Click a card to see details
+      system_response: Modal shows step details without agent info
+      emotional_state: confident
+      artifacts_consumed:
+        - step_id
+      artifacts_produced:
+        - step_details_view
+
+    - id: assess-progress
+      action: Form mental model of delivery status
+      system_response: Progress header shows completion stats
+      emotional_state: satisfied
+      notes: Focus on outcomes, not who's doing the work
+
+  shared_artifacts:
+    board_view:
+      source: system
+      description: Full-width Kanban board with all phases
+    step_id:
+      source: user_action
+      description: Selected step from card click
+    step_details_view:
+      source: system
+      description: Modal showing step description, files, dependencies, review history

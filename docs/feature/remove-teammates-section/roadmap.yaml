@@ -1,0 +1,98 @@
+roadmap:
+  project_id: remove-teammates-section
+  created_at: '2026-03-04T23:27:05Z'
+  total_steps: 3
+  phases: 1
+  short_description: Remove teammates sidebar and agent indicators
+  description: Remove the Teammates sidebar section and agent assignment 
+    indicators from cards and modal to create a cleaner, more focused board 
+    monitoring experience.
+phases:
+- id: '01'
+  name: UI Cleanup
+  steps:
+  - id: 01-01
+    name: Remove Teammates Sidebar
+    description: Remove the TeamPanel component from the board layout and change
+      the grid from 3/4 width to full width. Delete the Teammates section 
+      wrapper in BoardContent. The Kanban board should span 100% available 
+      width.
+    criteria: |
+      - Board view has no sidebar section
+      - No "Teammates" heading visible
+      - Kanban board spans full available width
+      - All phases and columns remain visible
+    status: approved
+    teammate_id: crafter-01-01
+    files_to_modify:
+    - board/src/App.tsx
+    dependencies: []
+    review_attempts: 1
+    started_at: '2026-03-04T23:31:03.780062+00:00'
+    completed_at: '2026-03-04T23:48:23.118702+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-04T23:48:23.118702+00:00'
+      outcome: approved
+      feedback: Sidebar removal verified - full width layout implemented 
+        correctly
+  - id: 01-02
+    name: Remove Agent Indicator from Cards
+    description: Remove the teammate indicator (emoji and agent ID) from 
+      StepCard component. Cards should display step name and status color only, 
+      without @agent-id or emoji badges for any status.
+    criteria: |
+      - Cards do not display agent ID (e.g., @crafter-01)
+      - Cards do not display teammate emoji
+      - Cards still show step name and status color
+      - Status-based color coding preserved
+    status: approved
+    teammate_id: crafter-01-02
+    files_to_modify:
+    - board/src/components/StepCard.tsx
+    dependencies: []
+    review_attempts: 1
+    started_at: '2026-03-04T23:31:07.159760+00:00'
+    completed_at: '2026-03-04T23:46:58.235223+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-04T23:46:58.235223+00:00'
+      outcome: approved
+      feedback: Clean implementation with proper import cleanup, test budget 
+        compliance
+  - id: 01-03
+    name: Remove Agent from Modal Header
+    description: Remove the teammate display from StepDetailModal header. The 
+      modal should show step name, ID, and status without agent identifier or 
+      emoji. All other modal sections (Description, Files, Dependencies, Review 
+      History) remain unchanged.
+    criteria: |
+      - Modal header does not display agent ID
+      - Modal header does not display teammate emoji
+      - Modal still shows step name, ID, and status
+      - All other modal sections unchanged
+    status: approved
+    teammate_id: crafter-01-03
+    files_to_modify:
+    - board/src/components/StepDetailModal.tsx
+    dependencies: []
+    review_attempts: 1
+    started_at: '2026-03-04T23:31:10.433363+00:00'
+    completed_at: '2026-03-04T23:45:06.900759+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-04T23:45:06.900759+00:00'
+      outcome: approved
+      feedback: Modal header cleanup approved - teammate display removed cleanly
+implementation_scope:
+  source_directories:
+  - board/src/
+  test_directories:
+  - board/src/__tests__/
+  excluded_patterns:
+  - node_modules/**
+  - dist/**
+validation:
+  status: pending
+  reviewer: nw-software-crafter-reviewer
+  approved_at:
