@@ -13,13 +13,14 @@ Orchestrates complete DELIVER wave: feature description → production-ready cod
 
 Sub-agents cannot use Skill tool or `/en:*` commands. You MUST:
 - Read the relevant command file and embed instructions in the Agent prompt
-- Remind the crafter to load its skills as needed for the task (skill files are at `skills/{agent-name}/`)
+- Remind the crafter to load its skills as needed for the task (skill files are at `~/.claude/skills/en/{agent-name}/`)
 
 ## CRITICAL BOUNDARY RULES
 
 1. **NEVER implement steps directly.** ALL implementation MUST be delegated to the selected crafter (@en-software-crafter or @en-functional-software-crafter per step 1.5) via Agent tool with DES markers. You are ORCHESTRATOR — coordinate, not implement.
 2. **NEVER write phase entries to execution-log.json.** Only the crafter subagent that performed TDD work may append entries.
 3. **Extract step context from roadmap.json ONLY for Agent prompt.** Grep roadmap for step_id ~50 lines context, extract (description|acceptance_criteria|files_to_modify), pass in DES template.
+4. **ALL agents MUST be spawned as teammates via Agent Teams.** NEVER use plain Agent tool calls. Create the delivery team with TeamCreate in step 1 (before any agent spawning) and use it for the entire delivery lifecycle — architect, crafters, reviewers, and support agents. Use SendMessage for multi-round interaction with teammates.
 
 **DES monitoring is non-negotiable.** Circumventing DES — faking step IDs, omitting markers, or writing log entries manually — is a **violation that invalidates the delivery**. DES detects unmonitored steps and flags them; finalize **blocks** until every flagged step is re-executed through a properly instrumented Task. There is no workaround: unverified steps cannot pass integrity verification, and the delivery cannot be finalized. Without DES monitoring, nWave cannot **verify** TDD phase compliance. For non-deliver tasks (docs, research, one-off edits): `<!-- DES-ENFORCEMENT : exempt -->`.
 
@@ -56,6 +57,10 @@ INPUT: "{feature-description}"
         python -m des.cli.init_log --project-dir docs/feature/{feature-id}/deliver --feature-id {feature-id}
         Do NOT create execution-log.json directly with Write — use the CLI only.
      b. Create deliver session marker: .en/des/deliver-session.json
+     c. **Create delivery team**: Use TeamCreate to create team `deliver-{feature-id}`.
+        This team is used for ALL agent interactions throughout the entire delivery —
+        architect (Phase 1), crafters (Phase 2), reviewers, and support agents.
+        NEVER spawn agents outside this team.
   |
   1.5. Detect development paradigm
      a. Read project CLAUDE.md (project root, NOT ~/.claude/CLAUDE.md)
@@ -76,15 +81,117 @@ INPUT: "{feature-description}"
      a. Skip if docs/feature/{feature-id}/deliver/roadmap.json exists with validation.status == "approved"
         IMPORTANT: Only check the deliver/ subdirectory. If roadmap.json is found in design/ instead,
         MOVE it to deliver/ and log warning: "Roadmap relocated from design/ to deliver/ — was created in wrong wave."
-     b. Spawn @en-solution-architect to create roadmap.json.
-        YOU (the Lead) MUST read commands/roadmap.md FIRST, then include its full
-        orchestration steps (scaffold via CLI, fill content, validate) in the
-        architect's spawn prompt. The architect does NOT know how to scaffold
-        unless you tell it. Pass the feature-id, goal, and the roadmap.md
-        instructions verbatim in the prompt.
-        Step IDs: NN-NN format (01-01, 01-02, 02-01). 01-A or 1-1 = invalid.
+
+     b. Spawn an **en-solution-architect** teammate (subagent_type: "en-solution-architect").
+        The teammate stays alive for multi-round interaction.
+        The architect does NOT have Bash — the orchestrator relays all CLI commands.
+        The orchestrator MUST NOT decide the decomposition — that is the architect's job.
+
+        **CRITICAL: Do NOT pre-chew the step decomposition.** The orchestrator provides ONLY:
+        - The goal description
+        - File paths to architecture design, acceptance tests, and existing source structure
+        - The scaffold CLI template (so the architect knows what parameters to return)
+        The architect reads the docs, analyzes the domain, and decides phases/steps itself.
+
+        ### Round 1: Architect analyzes and decides decomposition
+
+        Spawn prompt:
+        ```
+        You are the solution architect for feature "{feature-id}".
+
+        Goal: {goal-description}
+
+        ANALYZE these files to understand what needs to be built:
+        - docs/feature/{feature-id}/design/architecture-design.md
+        - docs/feature/{feature-id}/distill/test-scenarios.md
+        - docs/feature/{feature-id}/distill/walking-skeleton.md
+        - tests/acceptance/{feature-id}/ (all test files)
+        - Existing source structure under src/
+
+        YOUR TASK (Round 1): Decide the roadmap decomposition.
+        - How many phases?
+        - How many steps per phase?
+        - Brief rationale for your decomposition
+
+        CRITICAL — MAXIMIZE PARALLELISM:
+        Phases are for HUMAN readability only — they do NOT constrain execution order.
+        Any step can run as soon as its dependencies are met, regardless of phase boundaries.
+        A step should only depend on another if it literally cannot start without the other's output.
+        File conflicts between parallel steps are handled automatically via git worktrees and merges —
+        do NOT make steps sequential just because they touch the same file.
+        A fully linear chain (every step depends on the previous) defeats the purpose of parallel execution.
+        Aim for a WIDE dependency graph: many steps with few dependencies, not a single chain.
+
+        Output ONLY these two things:
+        1. Your reasoning (brief — why this structure)
+        2. The scaffold parameters in this exact format:
+           PHASES: {N}
+           STEPS: "{01:X,02:Y,...}"
+           GOAL: "{one-line goal for the roadmap}"
+
+        Do NOT create any files. Do NOT fill any content. Just analyze and decide.
+        The orchestrator will run the scaffold CLI with your parameters and come back to you.
+        ```
+
+        ### Orchestrator runs scaffold + enrich (Bash relay)
+
+        After receiving the architect's parameters, the orchestrator runs:
+        ```bash
+        PYTHONPATH=$HOME/.claude/lib/python python3 -m des.cli.roadmap init \
+          --project-id {feature-id} \
+          --goal "{architect's goal text}" \
+          --output docs/feature/{feature-id}/deliver/roadmap.json \
+          --phases {architect's N} --steps "{architect's step counts}"
+
+        PYTHONPATH=$HOME/.claude/lib/python python3 -m en.cli.enrich_roadmap \
+          docs/feature/{feature-id}/deliver/roadmap.json
+        ```
+
+        ### Round 2: Architect fills TODO placeholders
+
+        Message the architect teammate:
+        ```
+        Scaffold created and enriched at docs/feature/{feature-id}/deliver/roadmap.json.
+        Read the file and use Edit to fill every TODO placeholder with real content.
+        Do NOT change the JSON structure (phases, steps, keys).
+
+        Fill these fields per step:
+        - "name": short action-oriented label (e.g. "HTTP daemon lifecycle")
+        - "description": what the step does and WHY. For HUMAN consumption, not machine.
+          HARD LIMIT: 2-3 sentences max. No file paths, no implementation details.
+          Write like a Jira ticket title + summary. Start with a verb.
+          Focus on WHAT to build and WHY, not HOW. Do NOT list files or modules — that's what files_to_modify is for.
+        - "criteria": testable acceptance criteria. Passed to the crafter to write tests against.
+          Use Given/When/Then or bullet list of observable behaviors.
+        - "dependencies": list of step IDs this step TRULY depends on (e.g. ["01-01"]).
+          MINIMIZE dependencies. Only add a dependency if the step literally cannot start without the other's output.
+          File overlap is NOT a reason for a dependency — worktrees handle that automatically.
+        - "files_to_modify": list of files the step will touch
+
+        Also fill roadmap-level fields:
+        - "short_description": the feature NAME
+        - "description": full description of what the roadmap delivers
+        - implementation_scope source/test directories
+
+        Step IDs use NN-NN format (01-01, 01-02, 02-01).
+
+        When done, message me "READY FOR VALIDATION".
+        ```
+
+        ### Orchestrator runs validation (Bash relay)
+
+        After the architect signals ready:
+        ```bash
+        PYTHONPATH=$HOME/.claude/lib/python python3 -m des.cli.roadmap validate \
+          docs/feature/{feature-id}/deliver/roadmap.json
+        ```
+        Exit 0 → proceed. Exit 1 → message architect with errors to fix, re-validate.
+
+        ### IMMEDIATELY after validation passes: send shutdown_request to architect teammate.
+        The architect is expensive and not needed after this point. Do NOT keep it alive for quality gate or review.
+
      c. Automated quality gate (see below)
-     d. @en-software-crafter-reviewer reviews (read commands/review.md)
+     d. @en-software-crafter-reviewer reviews (read ~/.claude/commands/en/review.md)
      e. Retry once on rejection → stop for manual intervention
   |
   3. Phase 2 — Parallel Execution (Agent Teams + next-steps CLI)
@@ -98,9 +205,7 @@ INPUT: "{feature-description}"
         This resets any in_progress steps back to pending and cleans up orphaned worktrees.
         Approved steps are preserved — only incomplete work is reverted.
 
-     b. **Create agent team**:
-        Use TeamCreate to create a delivery team (e.g., `deliver-{feature-id}`).
-        This team persists for the entire Phase 2 execution.
+     b. **Team already exists** (created in step 1.c). All crafters/reviewers spawn into `deliver-{feature-id}`.
 
      c. **Parallel execution loop** — `next-steps` CLI is the SOLE authority for step ordering (ADR-019).
         Do NOT extract steps from roadmap manually or sort by dependency. Always defer to next-steps.
@@ -260,14 +365,14 @@ INPUT: "{feature-description}"
   6. Phase 5 — Mutation Testing [SKIP if rigor.mutation_enabled = false]
      If rigor.mutation_enabled = false → SKIP regardless of CLAUDE.md strategy
      Otherwise, apply CLAUDE.md strategy:
-     per-feature → gate ≥80% kill rate (read commands/mutation-test.md)
+     per-feature → gate ≥80% kill rate (read ~/.claude/commands/en/mutation-test.md)
      nightly-delta → SKIP|log "handled by CI nightly pipeline"
      pre-release → SKIP|log "handled at release boundary"
      disabled → SKIP|log "disabled per project configuration"
   |
   7. Phase 6 — Deliver Integrity Verification
      TDD integrity MUST pass before finalization. This is a hard gate — no bypass.
-     a. PYTHONPATH=src/ python -m des.cli.verify_deliver_integrity docs/feature/{feature-id}/deliver/
+     a. PYTHONPATH=$HOME/.claude/lib/python python -m des.cli.verify_deliver_integrity docs/feature/{feature-id}/deliver/
      b. Exit 0 → proceed to finalize|Exit 1 → STOP, read output, remediate
      c. Checks performed:
         - Every roadmap step has a matching execution-log.json entry
@@ -280,7 +385,7 @@ INPUT: "{feature-description}"
      e. Re-run verification after remediation: loop until exit 0 or escalate after 2 retries
   |
   8. Phase 7 — Finalize
-     a. **Archive**: @en-platform-architect archives to docs/evolution/ (read commands/finalize.md)
+     a. **Archive**: @en-platform-architect archives to docs/evolution/ (read ~/.claude/commands/en/finalize.md)
         - Creates {feature-id}-evolution.md with delivery summary, step outcomes, metrics
      b. **Cleanup**: rm -f .en/des/deliver-session.json .en/des/des-task-active
         - Remove temporary DES session files
@@ -313,11 +418,11 @@ Per phase:
 
 ## Crafter Spawn Prompt
 
-DES markers required for step execution. Without markers → unmonitored. Full DES Prompt Template (9 sections) in `commands/execute.md`.
+DES markers required for step execution. Without markers → unmonitored. Full DES Prompt Template (9 sections) in `~/.claude/commands/en/execute.md`.
 
 When spawning a crafter teammate, use the COMPLETE DES template from execute.md verbatim as the spawn prompt. Fill all `{placeholders}` from roadmap step context. The DES hook validates the prompt BEFORE the teammate starts — abbreviated prompts that delegate template reading to the teammate will be BLOCKED.
 
-Copy the template from the code block in `commands/execute.md` (between ``` markers), fill placeholders, and pass as the teammate's prompt. The template contains 9 mandatory sections: DES_METADATA, AGENT_IDENTITY, SKILL_LOADING, TASK_CONTEXT, TDD_PHASES, QUALITY_GATES, OUTCOME_RECORDING, RECORDING_INTEGRITY, BOUNDARY_RULES, TIMEOUT_INSTRUCTION.
+Copy the template from the code block in `~/.claude/commands/en/execute.md` (between ``` markers), fill placeholders, and pass as the teammate's prompt. The template contains 9 mandatory sections: DES_METADATA, AGENT_IDENTITY, SKILL_LOADING, TASK_CONTEXT, TDD_PHASES, QUALITY_GATES, OUTCOME_RECORDING, RECORDING_INTEGRITY, BOUNDARY_RULES, TIMEOUT_INSTRUCTION.
 
 Spawn a {selected-crafter} teammate named crafter-{step_id} with this prompt:
 
@@ -336,7 +441,7 @@ Agent: {selected-crafter}
 
 # SKILL_LOADING
 Before starting TDD phases, read your skill files for methodology guidance.
-Skills path: skills/{agent-name}/
+Skills path: ~/.claude/skills/en/{agent-name}/
 Always load at PREPARE: tdd-methodology.md, quality-framework.md
 Load on-demand per phase as specified in your Skill Loading Strategy table.
 
