@@ -314,8 +314,8 @@ sync_commands() {
     local filename
     filename="$(basename "$src_file")"
 
-    # Never overwrite deliver.md if it exists (project override)
-    if [[ "$filename" == "deliver.md" && -f "$target_dir/$filename" ]]; then
+    # Never overwrite project overrides
+    if [[ ("$filename" == "deliver.md" || "$filename" == "roadmap.md") && -f "$target_dir/$filename" ]]; then
       TOTAL_SKIPPED=$((TOTAL_SKIPPED + 1))
       echo "  [skip] commands/$filename (project override)"
       continue

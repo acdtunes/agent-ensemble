@@ -11,7 +11,7 @@ argument-hint: '[agent] [goal-description] - Example: @solution-architect "Migra
 
 ## Overview
 
-Dispatches expert agent to fill a pre-scaffolded YAML roadmap skeleton. CLI tools handle structure; agent handles content.
+Dispatches expert agent to create a roadmap. Agent decides structure (phases/steps) and scaffolds via CLI; orchestrator validates output.
 
 Output: `docs/feature/{feature-id}/deliver/roadmap.json`
 
@@ -32,35 +32,31 @@ You MUST execute these steps in order. Do NOT skip any.
 2. Goal description (quoted string)
 3. Derive feature-id from goal (kebab-case, e.g., "Migrate to OAuth2" -> "migrate-to-oauth2")
 
-**Step 2 — Scaffold skeleton via CLI (mandatory, BEFORE invoking agent):**
+**Step 2 — Invoke agent to create roadmap:**
 
-```bash
-PYTHONPATH=src/ python3 -m des.cli.roadmap init \
-  --project-id {feature-id} \
-  --goal "{goal-description}" \
-  --output docs/feature/{feature-id}/deliver/roadmap.json
-```
-For complex projects add: `--phases 3 --steps "01:3,02:2,03:1"`
-
-If exit code non-zero, stop and report error. Do NOT write file manually.
-
-**Step 3 — Invoke agent to fill skeleton:**
-
-Skeleton exists with TODO placeholders. Invoke via Task tool:
+Invoke via Task tool:
 ```
 @{agent-name}
 
-Fill in the roadmap skeleton at docs/feature/{feature-id}/deliver/roadmap.json.
-Replace every TODO with real content. Do NOT change the YAML structure
-(phases, steps, keys). Fill in: names, descriptions, acceptance criteria,
-time estimates, dependencies, and implementation_scope paths.
+Create the roadmap at docs/feature/{feature-id}/deliver/roadmap.json.
+
+1. Decide the phase/step structure from the architecture and acceptance tests
+2. Scaffold via CLI:
+   PYTHONPATH=src/ python3 -m des.cli.roadmap init \
+     --project-id {feature-id} \
+     --goal "{goal-description}" \
+     --output docs/feature/{feature-id}/deliver/roadmap.json \
+     --phases {N} --steps "{e.g. 01:3,02:2}"
+3. Fill every TODO with real content. Do NOT change the YAML structure
+   (phases, steps, keys). Fill in: names, descriptions, acceptance criteria,
+   time estimates, dependencies, and implementation_scope paths.
 
 Goal: {goal-description}
 ```
 
 Context to pass (if available): measurement baseline|mikado-graph.md|existing docs.
 
-**Step 4 — Validate via CLI (hard gate, mandatory):**
+**Step 3 — Validate via CLI (hard gate, mandatory):**
 
 ```bash
 PYTHONPATH=src/ python3 -m des.cli.roadmap validate docs/feature/{feature-id}/deliver/roadmap.json
@@ -73,17 +69,16 @@ PYTHONPATH=src/ python3 -m des.cli.roadmap validate docs/feature/{feature-id}/de
 
 Keep agent prompt minimal. Agent knows roadmap structure and planning methodology.
 
-Pass: skeleton file path + goal description + measurement context (if available).
+Pass: goal description + measurement context (if available).
 Do not pass: YAML templates|phase guidance|step decomposition rules.
 
 For performance roadmaps, include measurement context inline so agent can validate targets against baselines.
 
 ## Success Criteria
 
-### Dispatcher (you) — all 4 must be checked
+### Dispatcher (you) — all 3 must be checked
 - [ ] Parameters parsed (agent name, goal, feature-id)
-- [ ] `des.cli.roadmap init` executed via Bash (exit 0)
-- [ ] Agent invoked via Task tool to fill TODO placeholders
+- [ ] Agent invoked via Task tool to create roadmap (scaffold + fill)
 - [ ] `des.cli.roadmap validate` executed via Bash (exit 0)
 
 ### Agent output (reference)
@@ -106,24 +101,24 @@ For performance roadmaps, include measurement context inline so agent can valida
 ```
 /en:roadmap @en-solution-architect "Migrate authentication to OAuth2"
 ```
-Derives feature-id="migrate-auth-to-oauth2", scaffolds skeleton, invokes agent to fill TODOs, validates. Produces docs/feature/migrate-auth-to-oauth2/deliver/roadmap.json.
+Derives feature-id="migrate-auth-to-oauth2", invokes agent to create roadmap, validates. Produces docs/feature/migrate-auth-to-oauth2/deliver/roadmap.json.
 
 ### Example 2: Performance roadmap with measurement context
 ```
 /en:roadmap @en-solution-architect "Optimize test suite execution"
 ```
-Passes measurement data inline. Agent fills skeleton, validates targets against baseline, prioritizes largest bottleneck first.
+Passes measurement data inline. Agent creates roadmap, validates targets against baseline, prioritizes largest bottleneck first.
 
 ### Example 3: Mikado refactoring
 ```
 /en:roadmap @en-software-crafter "Extract payment module from monolith"
 ```
-Agent fills skeleton with methodology: mikado, references mikado-graph.md, maps leaf nodes to steps.
+Agent creates roadmap with methodology: mikado, references mikado-graph.md, maps leaf nodes to steps.
 
 ## Workflow Context
 
 ```bash
-/en:roadmap @agent "goal"           # 1. Plan (init -> agent fills -> validate)
+/en:roadmap @agent "goal"              # 1. Plan (agent scaffolds + fills -> validate)
 /en:execute @agent "feature-id" "01-01" # 2. Execute steps
 /en:finalize @agent "feature-id"        # 3. Finalize
 ```

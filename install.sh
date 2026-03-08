@@ -1,286 +1,102 @@
 #!/usr/bin/env bash
-# Install agent-ensemble into ~/.claude/
-# Copies files so the installation is independent of the source repo.
-# Also installs nWave dependency if not present.
+# Install en: framework globally into ~/.claude/
+# Copies files and transforms paths for global usage.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
-VERSION="0.1.0"
-MANIFEST_FILE="$CLAUDE_DIR/ensemble-manifest.txt"
 
-# Parse command-line arguments
-NWAVE_VERSION=""
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --nwave-version)
-            NWAVE_VERSION="$2"
-            shift 2
-            ;;
-        --nwave-version=*)
-            NWAVE_VERSION="${1#*=}"
-            shift
-            ;;
-        --help|-h)
-            echo "Usage: ./install.sh [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  --nwave-version VERSION  Install a specific nWave version (e.g. 1.9.0)"
-            echo "  --help, -h               Show this help"
-            echo ""
-            echo "Examples:"
-            echo "  ./install.sh                        # Install with latest nWave"
-            echo "  ./install.sh --nwave-version 1.9.0  # Pin to specific version"
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1"
-            echo "Run ./install.sh --help for usage"
-            exit 1
-            ;;
-    esac
-done
-
-# Build the nWave package specifier (with or without version)
-nwave_package_spec() {
-    if [ -n "$NWAVE_VERSION" ]; then
-        echo "nwave-ai==$NWAVE_VERSION"
-    else
-        echo "nwave-ai"
-    fi
-}
-
-echo "Installing agent-ensemble v$VERSION"
-if [ -n "$NWAVE_VERSION" ]; then
-    echo "  nWave version: $NWAVE_VERSION (pinned)"
-fi
+echo "Installing en: framework"
 echo ""
 
-# Install nWave using uv tool install (preferred) or pipx
-install_nwave() {
-    local spec
-    spec=$(nwave_package_spec)
-
-    if command -v uv &> /dev/null; then
-        echo "  Installing $spec via uv tool install..."
-        uv tool install "$spec"
-        return 0
-    elif command -v pipx &> /dev/null; then
-        echo "  Installing $spec via pipx..."
-        pipx install "$spec"
-        return 0
-    else
-        return 1
-    fi
+# Transform project-relative paths to global ~/.claude/ paths
+globalize() {
+  sed \
+    -e 's|skills/|~/.claude/skills/en/|g' \
+    -e 's|PYTHONPATH=src/|PYTHONPATH=$HOME/.claude/lib/python|g' \
+    -e 's|commands/|~/.claude/commands/en/|g' \
+    -e 's|agents/en-|~/.claude/agents/en/en-|g'
 }
 
-# Upgrade/downgrade nWave to a specific version
-reinstall_nwave() {
-    local spec
-    spec=$(nwave_package_spec)
+# 1. Configure Claude Code settings for agent teams
+echo "=== Configuring Claude Code settings ==="
+SETTINGS_FILE="$CLAUDE_DIR/settings.json"
+KEY="CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"
 
-    if command -v uv &> /dev/null; then
-        echo "  Reinstalling $spec via uv tool install --force..."
-        uv tool install "$spec" --force
-        return 0
-    elif command -v pipx &> /dev/null; then
-        echo "  Reinstalling $spec via pipx install --force..."
-        pipx install "$spec" --force
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Print installation instructions when no package manager found
-print_install_instructions() {
-    echo "  ERROR: Neither uv nor pipx found. Cannot auto-install nWave."
-    echo ""
-    echo "  Manual installation options:"
-    echo ""
-    echo "  Option 1 - Install uv first (recommended):"
-    echo "    curl -LsSf https://astral.sh/uv/install.sh | sh"
-    echo "    # Then restart terminal and re-run ./install.sh"
-    echo ""
-    echo "  Option 2 - Install pipx first:"
-    echo "    brew install pipx    # macOS"
-    echo "    pip install pipx --user && pipx ensurepath  # Linux/Windows"
-    echo "    # Then restart terminal and re-run ./install.sh"
-    echo ""
-    echo "  Option 3 - Install nWave directly:"
-    echo "    pip install $(nwave_package_spec) --user"
-    echo "    nwave-ai install"
-    echo "    # Then re-run ./install.sh"
-    echo ""
-}
-
-# Read previous nWave version from manifest
-read_manifest_nwave_version() {
-    if [ -f "$MANIFEST_FILE" ]; then
-        grep "^nwave_version=" "$MANIFEST_FILE" 2>/dev/null | cut -d= -f2 || echo ""
-    else
-        echo ""
-    fi
-}
-
-# Detect currently installed nWave version
-detect_nwave_version() {
-    if command -v nwave-ai &> /dev/null; then
-        nwave-ai --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown"
-    else
-        echo ""
-    fi
-}
-
-# Configure Claude Code settings for agent teams
-configure_settings() {
-    local settings_file="$CLAUDE_DIR/settings.json"
-    local key="CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"
-    local value="1"
-
-    echo "=== Configuring Claude Code settings ==="
-
-    if [ -f "$settings_file" ]; then
-        # Check if already configured
-        if python3 -c "
+if [ -f "$SETTINGS_FILE" ]; then
+    if python3 -c "
 import json, sys
-with open('$settings_file') as f:
+with open('$SETTINGS_FILE') as f:
     data = json.load(f)
-val = data.get('env', {}).get('$key', '')
-sys.exit(0 if val == '$value' else 1)
+sys.exit(0 if data.get('env', {}).get('$KEY') == '1' else 1)
 " 2>/dev/null; then
-            echo "  Agent teams already enabled in $settings_file"
-            echo ""
-            return 0
-        fi
-
-        # Merge into existing file
+        echo "  Agent teams already enabled"
+    else
         python3 -c "
 import json
-with open('$settings_file') as f:
+with open('$SETTINGS_FILE') as f:
     data = json.load(f)
-data.setdefault('env', {})['$key'] = '$value'
-with open('$settings_file', 'w') as f:
+data.setdefault('env', {})['$KEY'] = '1'
+with open('$SETTINGS_FILE', 'w') as f:
     json.dump(data, f, indent=2)
     f.write('\n')
 "
-        echo "  Enabled agent teams in existing $settings_file"
-    else
-        # Create new settings file
-        mkdir -p "$CLAUDE_DIR"
-        python3 -c "
-import json
-data = {'env': {'$key': '$value'}}
-with open('$settings_file', 'w') as f:
-    json.dump(data, f, indent=2)
-    f.write('\n')
-"
-        echo "  Created $settings_file with agent teams enabled"
+        echo "  Enabled agent teams in $SETTINGS_FILE"
     fi
-
-    echo ""
-}
-
-# 0. Check/Install nWave dependency
-echo "=== Checking nWave dependency ==="
-
-CURRENT_NWAVE_VERSION=$(detect_nwave_version)
-PREVIOUS_NWAVE_VERSION=$(read_manifest_nwave_version)
-
-if [ -n "$CURRENT_NWAVE_VERSION" ] && [ "$CURRENT_NWAVE_VERSION" != "unknown" ]; then
-    echo "  nWave found: v$CURRENT_NWAVE_VERSION"
-
-    if [ -n "$NWAVE_VERSION" ] && [ "$NWAVE_VERSION" != "$CURRENT_NWAVE_VERSION" ]; then
-        echo "  Requested version: v$NWAVE_VERSION (current: v$CURRENT_NWAVE_VERSION)"
-        if reinstall_nwave; then
-            echo ""
-            echo "  Running nwave-ai install..."
-            nwave-ai install
-            echo "  nWave v$NWAVE_VERSION installed."
-            CURRENT_NWAVE_VERSION="$NWAVE_VERSION"
-        else
-            print_install_instructions
-            exit 1
-        fi
-    fi
-elif [ -d "$CLAUDE_DIR/agents" ] && ls "$CLAUDE_DIR/agents"/nw-*.md &> /dev/null 2>&1; then
-    echo "  nWave agents found in ~/.claude/agents/"
-    CURRENT_NWAVE_VERSION="agents-only"
 else
-    echo "  nWave not found. Agent Ensemble requires nWave."
-    echo ""
-
-    if install_nwave; then
-        echo ""
-        echo "  Running nwave-ai install..."
-        nwave-ai install
-        echo ""
-        echo "  nWave installed successfully."
-        CURRENT_NWAVE_VERSION=$(detect_nwave_version)
-    else
-        print_install_instructions
-        exit 1
-    fi
+    mkdir -p "$CLAUDE_DIR"
+    python3 -c "
+import json
+data = {'env': {'$KEY': '1'}}
+with open('$SETTINGS_FILE', 'w') as f:
+    json.dump(data, f, indent=2)
+    f.write('\n')
+"
+    echo "  Created $SETTINGS_FILE with agent teams enabled"
 fi
-
 echo ""
 
-# 0.5 Configure Claude Code settings
-configure_settings
-
-# 1. Cleanup old installations (symlinks or directories)
-echo "=== Cleaning up old installations ==="
-
-# Remove old nw-teams symlinks (migration from old name)
-if [ -L "$CLAUDE_DIR/commands/nw-teams" ]; then
-    echo "  Removing old symlink: commands/nw-teams"
-    rm "$CLAUDE_DIR/commands/nw-teams"
-fi
-if [ -L "$CLAUDE_DIR/lib/python/nw_teams" ]; then
-    echo "  Removing old symlink: lib/python/nw_teams"
-    rm "$CLAUDE_DIR/lib/python/nw_teams"
-fi
-
-# Remove old ensemble symlinks (migration from symlink-based install)
-if [ -L "$CLAUDE_DIR/commands/ensemble" ]; then
-    echo "  Removing old symlink: commands/ensemble"
-    rm "$CLAUDE_DIR/commands/ensemble"
-fi
-if [ -L "$CLAUDE_DIR/lib/python/agent_ensemble" ]; then
-    echo "  Removing old symlink: lib/python/agent_ensemble"
-    rm "$CLAUDE_DIR/lib/python/agent_ensemble"
-fi
-
-# Remove old ensemble directories (will be replaced)
-if [ -d "$CLAUDE_DIR/commands/ensemble" ]; then
-    echo "  Removing old directory: commands/ensemble"
-    rm -rf "$CLAUDE_DIR/commands/ensemble"
-fi
-if [ -d "$CLAUDE_DIR/lib/python/agent_ensemble" ]; then
-    echo "  Removing old directory: lib/python/agent_ensemble"
-    rm -rf "$CLAUDE_DIR/lib/python/agent_ensemble"
-fi
-
+# 2. Copy commands (with path transforms)
+echo "=== Installing en: commands ==="
+mkdir -p "$CLAUDE_DIR/commands/en"
+for src_file in "$SCRIPT_DIR/commands/"*.md; do
+    [ -f "$src_file" ] || continue
+    filename="$(basename "$src_file")"
+    globalize < "$src_file" > "$CLAUDE_DIR/commands/en/$filename"
+done
+COMMAND_COUNT=$(ls -1 "$CLAUDE_DIR/commands/en/"*.md 2>/dev/null | wc -l | tr -d ' ')
+echo "  Installed $COMMAND_COUNT commands to ~/.claude/commands/en/"
 echo ""
 
-# 2. Copy commands
-echo "=== Installing ensemble commands ==="
-mkdir -p "$CLAUDE_DIR/commands/ensemble"
-cp -r "$SCRIPT_DIR/commands/"* "$CLAUDE_DIR/commands/ensemble/"
-COMMAND_COUNT=$(ls -1 "$CLAUDE_DIR/commands/ensemble/"*.md 2>/dev/null | wc -l | tr -d ' ')
-echo "  Copied $COMMAND_COUNT commands to ~/.claude/commands/ensemble/"
+# 3. Copy agents (with path transforms)
+echo "=== Installing en- agents ==="
+mkdir -p "$CLAUDE_DIR/agents/en"
+for src_file in "$SCRIPT_DIR/agents/"*.md; do
+    [ -f "$src_file" ] || continue
+    filename="$(basename "$src_file")"
+    globalize < "$src_file" > "$CLAUDE_DIR/agents/en/$filename"
+done
+AGENT_COUNT=$(ls -1 "$CLAUDE_DIR/agents/en/"*.md 2>/dev/null | wc -l | tr -d ' ')
+echo "  Installed $AGENT_COUNT agents to ~/.claude/agents/en/"
+echo ""
 
-# 3. Copy Python library
+# 4. Copy skills (no transforms needed — content is domain knowledge)
+echo "=== Installing skills ==="
+mkdir -p "$CLAUDE_DIR/skills/en"
+cp -r "$SCRIPT_DIR/skills/"* "$CLAUDE_DIR/skills/en/"
+echo "  Installed to ~/.claude/skills/en/"
+echo ""
+
+# 5. Copy Python library
 echo "=== Installing Python library ==="
 mkdir -p "$CLAUDE_DIR/lib/python/en"
 cp -r "$SCRIPT_DIR/src/en/"* "$CLAUDE_DIR/lib/python/en/"
-# Remove __pycache__ directories from copied files
 find "$CLAUDE_DIR/lib/python/en" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-CLI_COUNT=$(ls -1 "$CLAUDE_DIR/lib/python/en/cli/"*.py 2>/dev/null | grep -v __init__ | wc -l | tr -d ' ')
-echo "  Copied Python library with $CLI_COUNT CLI modules to ~/.claude/lib/python/en/"
+echo "  Installed to ~/.claude/lib/python/en/"
+echo ""
 
-# 4. Install board UI dependencies
+# 6. Install board UI dependencies
 echo "=== Installing board UI ==="
 if command -v npm &> /dev/null; then
     (cd "$SCRIPT_DIR/board" && npm install --no-fund --no-audit 2>&1) | sed 's/^/  /'
@@ -289,22 +105,6 @@ else
     echo "  WARNING: npm not found — skipping board UI install."
     echo "  To install manually: cd board && npm install"
 fi
-
-echo ""
-
-# 5. Write manifest for tracking
-echo "=== Writing manifest ==="
-cat > "$MANIFEST_FILE" << EOF
-# agent-ensemble installation manifest
-version=$VERSION
-installed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-source_dir=$SCRIPT_DIR
-commands_dir=$CLAUDE_DIR/commands/ensemble
-python_dir=$CLAUDE_DIR/lib/python/en
-nwave_version=$CURRENT_NWAVE_VERSION
-nwave_previous_version=$PREVIOUS_NWAVE_VERSION
-EOF
-echo "  Created manifest at $MANIFEST_FILE"
 
 echo ""
 echo "=== Installation complete ==="
@@ -316,12 +116,5 @@ for cmd_file in "$SCRIPT_DIR/commands/"*.md; do
     echo "  /en:$cmd_name"
 done
 echo ""
-echo "Agent teams: auto-configured in ~/.claude/settings.json"
-echo ""
-echo "Run the feature dashboard:"
-echo "  cd board && npm run dev"
-echo ""
 echo "To update: git pull && ./install.sh"
-echo "To pin nWave:     ./install.sh --nwave-version 1.9.0"
-echo "To uninstall:     rm -rf ~/.claude/commands/ensemble ~/.claude/lib/python/en ~/.claude/ensemble-manifest.txt"
-echo "To uninstall nWave: uv tool uninstall nwave-ai  (or: pipx uninstall nwave-ai)"
+echo "To uninstall: rm -rf ~/.claude/commands/en ~/.claude/agents/en ~/.claude/skills/en ~/.claude/lib/python/en"
