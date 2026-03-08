@@ -124,6 +124,7 @@ const BoardContent = ({ roadmap }: BoardContentProps) => {
         summary={summary}
         currentPhase={currentPhase}
         createdAt={roadmap.roadmap.created_at ?? ""}
+        name={roadmap.roadmap.short_description}
         description={roadmap.roadmap.description}
       />
       <div className="mt-6">

@@ -4,6 +4,7 @@ interface ProgressHeaderProps {
   readonly summary: RoadmapSummary;
   readonly currentPhase: number;
   readonly createdAt: string;
+  readonly name?: string;
   readonly description?: string;
 }
 
@@ -30,7 +31,7 @@ const formatDate = (dateString: string): string => {
   }
 };
 
-export const ProgressHeader = ({ summary, currentPhase, createdAt, description }: ProgressHeaderProps) => {
+export const ProgressHeader = ({ summary, currentPhase, createdAt, name, description }: ProgressHeaderProps) => {
   const completionPercent = summary.total_steps > 0
     ? Math.round((summary.done / summary.total_steps) * 100)
     : 0;
@@ -49,15 +50,17 @@ export const ProgressHeader = ({ summary, currentPhase, createdAt, description }
             <StatCard label="In Progress" value={summary.in_progress} color="text-blue-400" />
             <StatCard label="Pending" value={summary.pending} color="text-gray-400" />
           </div>
-          {hasContent(description) && (
+          {(hasContent(name) || hasContent(description)) && (
             <>
               <div className="h-12 w-px shrink-0 bg-gray-700" />
-              <p
-                data-testid="progress-header-description"
-                className="min-w-0 text-sm text-gray-400"
-              >
-                {description}
-              </p>
+              <div className="min-w-0">
+                {hasContent(name) && (
+                  <h2 data-testid="progress-header-name" className="text-lg font-bold text-gray-100">{name}</h2>
+                )}
+                {hasContent(description) && (
+                  <p data-testid="progress-header-description" className="text-sm text-gray-400">{description}</p>
+                )}
+              </div>
               <div className="h-12 w-px shrink-0 bg-gray-700" />
             </>
           )}
