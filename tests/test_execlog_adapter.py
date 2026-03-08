@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_ensemble.adapters.execlog_adapter import (
+from en.adapters.execlog_adapter import (
     detect_format,
     load_execlog,
     migrate_execlog_to_json,

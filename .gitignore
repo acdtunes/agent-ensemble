@@ -23,6 +23,7 @@ node_modules/
 
 # Local project config (user-specific)
 .nwave/
+nwave/
 .nw-board-projects.json
 .mcp.json
 

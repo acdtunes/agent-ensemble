@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from ruamel.yaml import YAML
 
-from agent_ensemble.cli.parallel_groups import (
+from en.cli.parallel_groups import (
     Step,
     cmd_analyze,
     extract_steps,

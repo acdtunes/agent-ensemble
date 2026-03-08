@@ -133,6 +133,55 @@ detect_nwave_version() {
     fi
 }
 
+# Configure Claude Code settings for agent teams
+configure_settings() {
+    local settings_file="$CLAUDE_DIR/settings.json"
+    local key="CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"
+    local value="1"
+
+    echo "=== Configuring Claude Code settings ==="
+
+    if [ -f "$settings_file" ]; then
+        # Check if already configured
+        if python3 -c "
+import json, sys
+with open('$settings_file') as f:
+    data = json.load(f)
+val = data.get('env', {}).get('$key', '')
+sys.exit(0 if val == '$value' else 1)
+" 2>/dev/null; then
+            echo "  Agent teams already enabled in $settings_file"
+            echo ""
+            return 0
+        fi
+
+        # Merge into existing file
+        python3 -c "
+import json
+with open('$settings_file') as f:
+    data = json.load(f)
+data.setdefault('env', {})['$key'] = '$value'
+with open('$settings_file', 'w') as f:
+    json.dump(data, f, indent=2)
+    f.write('\n')
+"
+        echo "  Enabled agent teams in existing $settings_file"
+    else
+        # Create new settings file
+        mkdir -p "$CLAUDE_DIR"
+        python3 -c "
+import json
+data = {'env': {'$key': '$value'}}
+with open('$settings_file', 'w') as f:
+    json.dump(data, f, indent=2)
+    f.write('\n')
+"
+        echo "  Created $settings_file with agent teams enabled"
+    fi
+
+    echo ""
+}
+
 # 0. Check/Install nWave dependency
 echo "=== Checking nWave dependency ==="
 
@@ -176,6 +225,9 @@ else
 fi
 
 echo ""
+
+# 0.5 Configure Claude Code settings
+configure_settings
 
 # 1. Cleanup old installations (symlinks or directories)
 echo "=== Cleaning up old installations ==="
@@ -221,14 +273,26 @@ echo "  Copied $COMMAND_COUNT commands to ~/.claude/commands/ensemble/"
 
 # 3. Copy Python library
 echo "=== Installing Python library ==="
-mkdir -p "$CLAUDE_DIR/lib/python/agent_ensemble"
-cp -r "$SCRIPT_DIR/src/agent_ensemble/"* "$CLAUDE_DIR/lib/python/agent_ensemble/"
+mkdir -p "$CLAUDE_DIR/lib/python/en"
+cp -r "$SCRIPT_DIR/src/en/"* "$CLAUDE_DIR/lib/python/en/"
 # Remove __pycache__ directories from copied files
-find "$CLAUDE_DIR/lib/python/agent_ensemble" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-CLI_COUNT=$(ls -1 "$CLAUDE_DIR/lib/python/agent_ensemble/cli/"*.py 2>/dev/null | grep -v __init__ | wc -l | tr -d ' ')
-echo "  Copied Python library with $CLI_COUNT CLI modules to ~/.claude/lib/python/agent_ensemble/"
+find "$CLAUDE_DIR/lib/python/en" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+CLI_COUNT=$(ls -1 "$CLAUDE_DIR/lib/python/en/cli/"*.py 2>/dev/null | grep -v __init__ | wc -l | tr -d ' ')
+echo "  Copied Python library with $CLI_COUNT CLI modules to ~/.claude/lib/python/en/"
 
-# 4. Write manifest for tracking
+# 4. Install board UI dependencies
+echo "=== Installing board UI ==="
+if command -v npm &> /dev/null; then
+    (cd "$SCRIPT_DIR/board" && npm install --no-fund --no-audit 2>&1) | sed 's/^/  /'
+    echo "  Board UI dependencies installed."
+else
+    echo "  WARNING: npm not found — skipping board UI install."
+    echo "  To install manually: cd board && npm install"
+fi
+
+echo ""
+
+# 5. Write manifest for tracking
 echo "=== Writing manifest ==="
 cat > "$MANIFEST_FILE" << EOF
 # agent-ensemble installation manifest
@@ -236,7 +300,7 @@ version=$VERSION
 installed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 source_dir=$SCRIPT_DIR
 commands_dir=$CLAUDE_DIR/commands/ensemble
-python_dir=$CLAUDE_DIR/lib/python/agent_ensemble
+python_dir=$CLAUDE_DIR/lib/python/en
 nwave_version=$CURRENT_NWAVE_VERSION
 nwave_previous_version=$PREVIOUS_NWAVE_VERSION
 EOF
@@ -245,26 +309,19 @@ echo "  Created manifest at $MANIFEST_FILE"
 echo ""
 echo "=== Installation complete ==="
 echo ""
-echo "Ensemble commands are now available in Claude Code:"
-echo "  /ensemble:deliver  — Parallel feature delivery"
-echo "  /ensemble:review   — Multi-perspective code review"
-echo "  /ensemble:debug    — Competing hypotheses debugging"
-echo "  /ensemble:design   — Cross-discipline architecture"
-echo "  /ensemble:discover — Parallel research"
-echo "  /ensemble:distill  — Parallel acceptance test design"
-echo "  /ensemble:document — Parallel documentation"
-echo "  /ensemble:execute  — Parallel feature execution"
-echo "  /ensemble:refactor — Parallel refactoring"
-echo "  /ensemble:audit    — Multi-perspective quality audit"
+echo "Available /en:* commands:"
+for cmd_file in "$SCRIPT_DIR/commands/"*.md; do
+    [ -f "$cmd_file" ] || continue
+    cmd_name=$(basename "$cmd_file" .md)
+    echo "  /en:$cmd_name"
+done
 echo ""
-echo "IMPORTANT: Enable agent teams in Claude Code:"
-echo "  Add to ~/.claude/settings.json:"
-echo '  { "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" } }'
+echo "Agent teams: auto-configured in ~/.claude/settings.json"
 echo ""
-echo "Optional: Run the feature dashboard:"
-echo "  cd board && npm install && npm run dev"
+echo "Run the feature dashboard:"
+echo "  cd board && npm run dev"
 echo ""
 echo "To update: git pull && ./install.sh"
 echo "To pin nWave:     ./install.sh --nwave-version 1.9.0"
-echo "To uninstall:     rm -rf ~/.claude/commands/ensemble ~/.claude/lib/python/agent_ensemble ~/.claude/ensemble-manifest.txt"
+echo "To uninstall:     rm -rf ~/.claude/commands/ensemble ~/.claude/lib/python/en ~/.claude/ensemble-manifest.txt"
 echo "To uninstall nWave: uv tool uninstall nwave-ai  (or: pipx uninstall nwave-ai)"

@@ -1,227 +1,116 @@
-# Parallel Documentation with Agent Teams
+---
+description: "Creates evidence-based documentation following DIVIO/Diataxis principles. Use when writing tutorials, how-to guides, reference docs, or explanations."
+argument-hint: "[topic/component] - Optional: --type=[tutorial|howto|reference|explanation] --research-depth=[overview|detailed|comprehensive|deep-dive]"
+---
 
-**Command**: `/ensemble:document`
-**Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
+# EN-DOCUMENT: DIVIO Documentation Creation
+
+**Wave**: CROSS_WAVE | **Agent**: Orchestrator (self)
+**Agents**: Nova (en-researcher)|Scholar (en-researcher-reviewer)|Quill (en-documentarist)|en-documentarist-reviewer
 
 ## Overview
 
-Execute parallel documentation using Claude Code Agent Teams. You (the Lead) will create a team of documentarist teammates, each covering a different area of the codebase. Documentarists follow DIVIO/Diataxis principles, cross-reference between areas, and reviewers validate classification and quality.
+Create evidence-based, DIVIO-compliant documentation by orchestrating research and writing phases with peer review at each gate. Cross-wave capability for any nWave phase.
 
-## Why Parallel Documentation?
+## Context Files Required
 
-A single documentarist working sequentially tends to:
-- Lose steam on later areas, producing uneven quality
-- Miss cross-references between related areas
-- Mix documentation types (DIVIO collapse patterns)
+- .en/trusted-source-domains.yaml — Embed inline in researcher prompt
+- agents/en-researcher.md — Extract research methodology
+- agents/en-documentarist.md — Extract DIVIO framework and templates
 
-With multiple documentarists in parallel, each area gets focused attention, cross-references emerge naturally, and reviewers enforce DIVIO discipline.
+## Command Syntax
 
-## Your Role: Team Lead
-
-You are the **Team Lead** — orchestrate the documentation team, ensure cross-area consistency, consolidate the final documentation set.
-
-**Your responsibilities**:
-- Identify areas that need documentation
-- Classify which DIVIO types each area needs
-- Create the team and spawn documentarists
-- Facilitate cross-referencing between areas
-- Coordinate the review phase
-- Ensure navigation coherence across the final documentation set
-- Clean up the team
-
-**You do NOT**:
-- Write documentation yourself (documentarists do this)
-- Review documentation yourself (reviewers do this)
-
-## Workflow
-
-### Phase 1: Understand Scope
-
-Gather from user:
-1. **What to document**: Specific modules, components, APIs, or the entire project
-2. **Target audience**: Developers, operators, end-users, or mixed
-3. **Existing docs**: What documentation already exists? What's outdated?
-
-### Phase 2: Classify Documentation Types
-
-For each area, determine which DIVIO types are needed:
-- **Tutorial**: Learning-oriented, step-by-step guides for beginners
-- **How-to**: Task-oriented, recipes for specific goals
-- **Reference**: Information-oriented, accurate technical descriptions
-- **Explanation**: Understanding-oriented, background and context
-
-Present classification to user:
-```
-Documentation plan:
-
-Area 1: Authentication module
-  - How-to: Setting up OAuth providers
-  - Reference: Auth API endpoints
-  - Explanation: Security model and token lifecycle
-
-Area 2: Database layer
-  - Tutorial: Adding a new entity
-  - Reference: Schema documentation
-  - How-to: Running migrations
-
-Area 3: Deployment
-  - How-to: Deploying to production
-  - Reference: Environment variables
-  - Explanation: Infrastructure architecture
+```bash
+/en:document [topic] [--type=tutorial|howto|reference|explanation] [--research-depth=overview|detailed|comprehensive|deep-dive]
 ```
 
-### Phase 3: Create Team
+If `--type` omitted, ask user. If `--research-depth` omitted, auto-select: tutorial->overview|howto->detailed|reference->comprehensive|explanation->deep-dive.
+
+## Orchestration Phases
+
+Sub-agents have no Skill tool access. Embed all domain knowledge inline in each Task prompt. Read from agent files and config at orchestration time.
 
 ```
-Create an agent team for parallel documentation.
+Phase 1: Research           @en-researcher
+Phase 1.5: Research Review  @en-researcher-reviewer
+Phase 2: Documentation      @en-documentarist
+Phase 2.5: Doc Review       @en-documentarist-reviewer
+Phase 3: Handoff
 ```
 
-### Phase 4: Spawn Documentarists
+### Phase 0: Pre-Flight
 
-**IMPORTANT — Agent Types and Model**:
-- Documentarists MUST use `subagent_type: nw-documentarist`
-- Reviewers MUST use `subagent_type: nw-documentarist-reviewer`
-- ALL teammates MUST use `model: opus` to override agent defaults that may not resolve
-- NEVER use `general-purpose` for documentarists or reviewers
+1. Validate topic non-empty, type/depth valid if provided
+2. If type not specified, present DIVIO selection: TUTORIAL ("Teach me")|HOW-TO ("Help me do X")|REFERENCE ("What is X?")|EXPLANATION ("Why is X?")
+3. Determine output: `docs/{tutorials|howto|reference|explanation}/{topic-kebab-case}.md`
+4. Read and cache: .en/trusted-source-domains.yaml|en-researcher.md|en-documentarist.md
 
-**Naming Convention**: `documentarist-{area}` (e.g., `documentarist-auth`, `documentarist-db`)
+### Phase 1: Research (@en-researcher)
 
-**MAXIMIZE PARALLELISM**: Spawn ALL documentarists simultaneously in a SINGLE message with multiple Task tool calls.
+Invoke via Task tool. Prompt includes: topic|doc type|research depth|complete .en/trusted-source-domains.yaml (inline)|type-specific research focus (from en-researcher.md)|quality gates: trusted sources only, 3+ sources/claim, citation coverage >95%, source reputation >=0.80. Output: `docs/research/{topic-kebab-case}-for-{type}-doc.md`
 
-**Documentarist Template**:
+### Phase 1.5: Research Review (@en-researcher-reviewer)
+
+Prompt includes: research artifact path|review focus (source verification|bias detection|evidence quality|cross-reference|doc readiness)|quality gates (same as Phase 1)|output: append YAML review metadata. Verdicts: APPROVED|NEEDS_REVISION|REJECTED
+
+### Phase 2: Documentation (@en-documentarist)
+
+Prompt includes: topic|type|research path|DIVIO framework principles (from en-documentarist.md)|type-specific validation rules + template|collapse detection anti-patterns|quality gates: type purity >=80%, Flesch 70-80, zero spelling errors, zero broken links, style >=95%. Output: doc file + .validation.yaml
+
+### Phase 2.5: Documentation Review (@en-documentarist-reviewer)
+
+Prompt includes: doc artifact path|review focus (classification accuracy|validation completeness|collapse detection|recommendation quality|scores|verdict)|quality gates (same as Phase 2)|output: append YAML review metadata. Verdicts: APPROVED|NEEDS_REVISION|RESTRUCTURE_REQUIRED
+
+### Phase 3: Handoff
+
+Verify all deliverables exist and both reviews APPROVED. Present: research path|doc path|validation path|quality gate results|review outcomes and iteration count.
+
+## Review Iteration Protocol
+
+Applies to both review gates (Phase 1.5 and 2.5):
+1. **APPROVED**: Proceed to next phase
+2. **NEEDS_REVISION**: Extract critiques, re-invoke producer with feedback, re-invoke reviewer. Max 2 cycles. Escalate to user after 2 failures.
+3. **REJECTED / RESTRUCTURE_REQUIRED**: Escalate immediately — restart|adjust scope|accept with issues|cancel.
+
+## Examples
+
+### Example 1: Tutorial with auto-depth
+```bash
+/en:document "Getting Started with nWave" --type=tutorial
 ```
-Spawn a documentarist teammate (subagent_type: nw-documentarist, name: documentarist-{area}, model: opus) with this prompt:
+Orchestrator auto-selects overview depth, invokes researcher, reviews, invokes documentarist, reviews, outputs to `docs/tutorials/getting-started-with-nwave.md`.
 
-"You are documentarist-{area} on the {team} team. Project root: {project_root}
-
-Document the {area} area of the codebase.
-
-Documentation types needed:
-{list of DIVIO types for this area}
-
-Target audience: {audience}
-
-Existing documentation: {existing docs paths, if any}
-
-Your deliverables:
-1. Documentation for each specified DIVIO type
-2. Clear separation between types (no collapse patterns)
-3. Cross-references to other areas where relevant
-4. Code examples that are tested and accurate
-
-DIVIO principles to follow:
-- Tutorials: practical steps, minimum explanation, working outcome
-- How-tos: assume knowledge, goal-oriented, series of steps
-- Reference: dry, accurate, complete, consistent structure
-- Explanation: context, background, why (not how), connections
-
-Communication protocol:
-- When you need to reference another area's content: message the relevant documentarist-{other}
-- When you discover content that belongs in another area: message that documentarist
-- When you find shared concepts across areas: message me
-- When you're done: message me with your complete documentation
-
-You are using nw-documentarist methodology."
+### Example 2: Explanation with explicit depth
+```bash
+/en:document "Why nWave Uses Hexagonal Architecture" --type=explanation --research-depth=deep-dive
 ```
+Full 4-phase pipeline with deep-dive research. Output to `docs/explanation/`.
 
-### Phase 5: Cross-Reference
-
-While documentarists are working:
-
-1. **Monitor cross-area messages**: Ensure documentarists communicate when content overlaps
-2. **Resolve ownership**: If two documentarists want to cover the same concept, decide which area owns it and which references it
-3. **Track shared concepts**: Maintain a mental list of concepts referenced across areas
-
-### Phase 6: Review
-
-Once documentarists complete, spawn reviewer agents:
-
-**Naming Convention**: `reviewer-{area}`
-
+### Example 3: Interactive type selection
+```bash
+/en:document "Mikado Method Integration"
 ```
-Spawn a reviewer teammate (subagent_type: nw-documentarist-reviewer, name: reviewer-{area}, model: opus) with this prompt:
-
-"You are reviewer-{area} on the {team} team.
-
-Review the documentation produced by documentarist-{area}.
-
-Documentation to review: {output location}
-
-Check for:
-1. DIVIO classification accuracy — is each document the right type?
-2. Collapse patterns — does a tutorial drift into reference? Does a how-to become explanation?
-3. Completeness — are all specified types covered?
-4. Code examples — do they look correct and testable?
-5. Cross-references — are links to other areas accurate?
-
-Report findings with severity (Critical/High/Medium/Low).
-Message me when done.
-
-You are using nw-documentarist-reviewer methodology."
-```
-
-### Phase 7: Consolidate
-
-After reviews complete:
-
-1. **Address review findings**: If reviewers found collapse patterns or misclassifications, note for the user
-2. **Verify cross-references**: Ensure all links between areas point to real content
-3. **Check navigation**: Ensure a reader can navigate logically across the documentation set
-4. **Produce consolidated documentation**:
-
-```markdown
-# Documentation: {project/feature}
-
-## Navigation Guide
-{how the documentation is organized, what to read first}
-
-## Tutorials
-{learning-oriented guides}
-
-## How-to Guides
-{task-oriented recipes}
-
-## Reference
-{technical descriptions}
-
-## Explanation
-{background and context}
-
----
-Documented by: {N} documentarist teammates
-Reviewed by: {N} documentarist reviewer teammates
-Method: Parallel per-area documentation with DIVIO validation
-```
-
-### Phase 8: Cleanup
-
-```
-Ask all documentarist and reviewer teammates to shut down.
-Clean up the team.
-```
-
-Present the consolidated documentation to the user.
-
-## Example Invocation
-
-```
-User: /ensemble:document "Document the API layer and the notification system"
-
-Lead (you):
-1. Classify: API needs Reference + How-to, Notifications needs Explanation + How-to + Reference
-2. Create team, spawn 2 documentarists
-3. documentarist-api finds notification webhooks → messages documentarist-notifications
-4. Both complete, spawn 2 reviewers
-5. reviewer-api flags: "How-to section drifts into Reference — collapse pattern"
-6. Consolidate with review notes
-7. Clean up team, present documentation set
-```
+Orchestrator prompts user to select DIVIO type before proceeding.
 
 ## Success Criteria
 
-- [ ] All areas documented in parallel
-- [ ] DIVIO types correctly classified (no collapse patterns)
-- [ ] Cross-references between areas are accurate
-- [ ] Reviewer validation completed for each area
-- [ ] Navigation across documentation set is coherent
-- [ ] Team cleaned up
+- [ ] Research created with trusted sources and cross-references
+- [ ] Research review: APPROVED (max 2 cycles)
+- [ ] Documentation follows DIVIO template with >=80% type purity
+- [ ] Doc review: APPROVED (max 2 cycles)
+- [ ] All deliverables exist: research|documentation|validation report
+- [ ] No collapse anti-patterns detected
+
+## Error Handling
+
+- Insufficient sources: continue with gaps|expand scope|cancel
+- Review iteration limit exceeded: escalate with persistent issues
+- Collapse detected: split into separate docs|revise scope|accept
+
+## Next Wave
+
+**Handoff To**: Invoking workflow
+**Deliverables**:
+- Research: `docs/research/{topic}-for-{type}-doc.md`
+- Documentation: `docs/{type-dir}/{topic-kebab-case}.md`
+- Validation: `docs/{type-dir}/{topic-kebab-case}.md.validation.yaml`

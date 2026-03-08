@@ -18,7 +18,7 @@ import textwrap
 
 import pytest
 
-from agent_ensemble.cli.team_state import main
+from en.cli.team_state import main
 
 
 # --- Fixtures ---
@@ -400,7 +400,7 @@ def test_start_step_no_conflicts_with_when_no_file_overlap(tmp_path):
 
 def test_compute_conflicting_step_ids_returns_ids_of_overlapping_active_steps():
     """Unit: Pure function returns list of step IDs that share files."""
-    from agent_ensemble.cli.team_state import _compute_conflicting_step_ids
+    from en.cli.team_state import _compute_conflicting_step_ids
 
     step = {"id": "02-01", "files_to_modify": ["src/auth.ts", "src/api.ts"]}
     active_steps = [
@@ -416,7 +416,7 @@ def test_compute_conflicting_step_ids_returns_ids_of_overlapping_active_steps():
 
 def test_compute_conflicting_step_ids_excludes_self():
     """Unit: Function excludes the step itself from conflicts."""
-    from agent_ensemble.cli.team_state import _compute_conflicting_step_ids
+    from en.cli.team_state import _compute_conflicting_step_ids
 
     step = {"id": "01-01", "files_to_modify": ["src/auth.ts"]}
     active_steps = [
@@ -431,7 +431,7 @@ def test_compute_conflicting_step_ids_excludes_self():
 
 def test_compute_conflicting_step_ids_returns_empty_for_no_overlap():
     """Unit: Function returns empty list when no file overlap exists."""
-    from agent_ensemble.cli.team_state import _compute_conflicting_step_ids
+    from en.cli.team_state import _compute_conflicting_step_ids
 
     step = {"id": "02-01", "files_to_modify": ["src/new.ts"]}
     active_steps = [
@@ -448,7 +448,7 @@ def test_compute_conflicting_step_ids_returns_empty_for_no_overlap():
 
 def test_clear_conflict_references_removes_step_id_from_other_steps():
     """Unit: Pure function removes step ID from all steps' conflicts_with arrays."""
-    from agent_ensemble.cli.team_state import _clear_conflict_references
+    from en.cli.team_state import _clear_conflict_references
 
     steps = [
         {"id": "01-01", "conflicts_with": ["01-02"]},
@@ -456,26 +456,26 @@ def test_clear_conflict_references_removes_step_id_from_other_steps():
         {"id": "01-03", "conflicts_with": ["01-01", "01-02"]},
     ]
 
-    _clear_conflict_references(steps, "01-02")
+    result = _clear_conflict_references(steps, "01-02")
 
-    assert "conflicts_with" not in steps[0]  # 01-01 had only 01-02
-    assert "conflicts_with" not in steps[1]  # 01-02 had its conflicts cleared
-    assert steps[2].get("conflicts_with") == ["01-01"]  # 01-03 still has 01-01
+    assert "conflicts_with" not in result[0]  # 01-01 had only 01-02
+    assert "conflicts_with" not in result[1]  # 01-02 had its conflicts cleared
+    assert result[2].get("conflicts_with") == ["01-01"]  # 01-03 still has 01-01
 
 
 def test_clear_conflict_references_handles_steps_without_conflicts_with():
     """Unit: Function handles steps that don't have conflicts_with field."""
-    from agent_ensemble.cli.team_state import _clear_conflict_references
+    from en.cli.team_state import _clear_conflict_references
 
     steps = [
         {"id": "01-01"},
         {"id": "01-02", "conflicts_with": ["01-01"]},
     ]
 
-    _clear_conflict_references(steps, "01-01")
+    result = _clear_conflict_references(steps, "01-01")
 
-    assert "conflicts_with" not in steps[0]
-    assert "conflicts_with" not in steps[1]  # Became empty, removed
+    assert "conflicts_with" not in result[0]
+    assert "conflicts_with" not in result[1]  # Became empty, removed
 
 
 # --- Acceptance: complete-step clears conflicts_with ---

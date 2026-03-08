@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_ensemble.adapters.roadmap_adapter import (
+from en.adapters.roadmap_adapter import (
     detect_format,
     load_roadmap,
     migrate_yaml_to_json,

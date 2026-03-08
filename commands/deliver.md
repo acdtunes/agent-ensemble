@@ -1,625 +1,447 @@
-# Parallel Feature Delivery with Agent Teams
+---
+description: "Orchestrates the full DELIVER wave end-to-end (roadmap > execute-all > finalize). Use when all prior waves are complete and the feature is ready for implementation."
+argument-hint: '[feature-description] - Example: "Implement user authentication with JWT"'
+---
 
-**Command**: `/ensemble:deliver`
-**Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
+# EN-DELIVER: Complete DELIVER Wave Orchestrator
+
+**Wave**: DELIVER (wave 6 of 6)|**Agent**: Main Instance (orchestrator)|**Command**: `/en:deliver "{feature-description}"`
 
 ## Overview
 
-Execute parallel feature delivery using Claude Code Agent Teams. You (the Lead) will create a team of crafter and reviewer teammates who work in parallel, messaging each other directly.
+Orchestrates complete DELIVER wave: feature description → production-ready code with mandatory quality gates. You (main Claude instance) coordinate by delegating to specialized agents via Agent Teams for parallel execution. Final wave (DISCOVER > DISCUSS > DESIGN > DEVOPS > DISTILL > DELIVER).
 
-## CLI Tools
+Sub-agents cannot use Skill tool or `/en:*` commands. You MUST:
+- Read the relevant command file and embed instructions in the Agent prompt
+- Remind the crafter to load its skills as needed for the task (skill files are at `skills/{agent-name}/`)
 
-This command uses deterministic CLI scripts for coordination:
+## CRITICAL BOUNDARY RULES
 
-```bash
-# Set PYTHONPATH for all CLI commands
-export PYTHONPATH=$HOME/.claude/lib/python
+1. **NEVER implement steps directly.** ALL implementation MUST be delegated to the selected crafter (@en-software-crafter or @en-functional-software-crafter per step 1.5) via Agent tool with DES markers. You are ORCHESTRATOR — coordinate, not implement.
+2. **NEVER write phase entries to execution-log.json.** Only the crafter subagent that performed TDD work may append entries.
+3. **Extract step context from roadmap.json ONLY for Agent prompt.** Grep roadmap for step_id ~50 lines context, extract (description|acceptance_criteria|files_to_modify), pass in DES template.
 
-# Analyze roadmap for parallel groups (supports roadmap.yaml or roadmap.json)
-python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/
+**DES monitoring is non-negotiable.** Circumventing DES — faking step IDs, omitting markers, or writing log entries manually — is a **violation that invalidates the delivery**. DES detects unmonitored steps and flags them; finalize **blocks** until every flagged step is re-executed through a properly instrumented Task. There is no workaround: unverified steps cannot pass integrity verification, and the delivery cannot be finalized. Without DES monitoring, nWave cannot **verify** TDD phase compliance. For non-deliver tasks (docs, research, one-off edits): `<!-- DES-ENFORCEMENT : exempt -->`.
 
-# Generate execution plan
-python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/ --output .ensemble/plan.yaml
+## Rigor Profile Integration
 
-# Initialize team state
-python -m agent_ensemble.cli.team_state init --plan .ensemble/plan.yaml --output .ensemble/state.yaml
+Before dispatching any agent, read the rigor profile from `.en/des-config.json` (key: `rigor`). If absent, use standard defaults.
 
-# Create worktrees for parallel steps
-python -m agent_ensemble.cli.worktree create {step_id}
+**How rigor affects deliver phases:**
 
-# Check if step needs worktree (file conflicts with active steps)
-python -m agent_ensemble.cli.team_state should-worktree .ensemble/state.yaml --step {step_id}
+| Setting | Effect |
+|---------|--------|
+| `agent_model` | Pass as `model` parameter to all Agent tool invocations for crafter agents. If `"inherit"`, omit `model` parameter (inherits from session). |
+| `reviewer_model` | Pass as `model` parameter to reviewer Agent invocations. If `"skip"`, skip Phase 4 entirely. |
+| `review_enabled` | If `false`, skip Phase 4 (Adversarial Review). |
+| `double_review` | If `true`, run Phase 4 twice with separate review scopes. |
+| `tdd_phases` | Pass to crafter in DES template. Replace `# TDD_PHASES` section with the configured phases. If only `[RED_UNIT, GREEN]`, omit PREPARE/RED_ACCEPTANCE/COMMIT. |
+| `refactor_pass` | If `false`, skip Phase 3 (Complete Refactoring). |
+| `mutation_enabled` | If `false`, skip Phase 5 regardless of mutation strategy in CLAUDE.md. |
 
-# Track step progress (--worktree flag required when conflicts exist)
-python -m agent_ensemble.cli.team_state update .ensemble/state.yaml --step {step_id} --status {status} --teammate {teammate_id} [--worktree]
+**Teammate naming convention:**
+- Crafters: `crafter-{step_id}` (e.g., `crafter-01-01`)
+- Reviewers: `reviewer-{step_id}` (e.g., `reviewer-01-01`)
 
-# Check layer completion
-python -m agent_ensemble.cli.team_state check .ensemble/state.yaml --layer {layer_num}
-
-# Show team state
-python -m agent_ensemble.cli.team_state show .ensemble/state.yaml
-
-# Merge all worktree branches
-python -m agent_ensemble.cli.worktree merge-all --plan .ensemble/plan.yaml
-
-# Cleanup worktrees
-python -m agent_ensemble.cli.worktree cleanup --all
-```
-
-## Pre-Flight Check
-
-Before proceeding, verify the feature flag is enabled:
-
-1. Check if agent teams are available by attempting to describe creating a team
-2. If not available, instruct the user to enable the feature flag:
-   ```json
-   // ~/.claude/settings.json
-   {
-     "env": {
-       "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-     }
-   }
-   ```
-
-## Your Role: Team Lead
-
-You are the **Team Lead** — a Claude AI session that orchestrates but does NOT execute steps directly.
-
-**Your responsibilities**:
-- Analyze the roadmap and identify parallel groups
-- Create the team and spawn teammates
-- Populate the shared task list
-- Wait for teammates to complete
-- Synthesize results and verify quality
-- Clean up the team
-
-**You do NOT**:
-- Execute TDD steps yourself (crafters do this)
-- Review code yourself (reviewer does this)
-- Write implementation code
-
-## Workflow
-
-### Phase 1: Analyze Roadmap
-
-Use the CLI to analyze the roadmap and generate an execution plan:
-
-```bash
-# Analyze and display parallel groups (auto-detects roadmap.yaml or roadmap.json)
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups analyze docs/feature/{project-id}/
-
-# Generate execution plan
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/ --output .ensemble/plan.yaml
-
-# Initialize team state tracking
-mkdir -p .ensemble
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state init --plan .ensemble/plan.yaml --output .ensemble/state.yaml
-```
-
-The CLI will output:
-```
-=== Parallel Execution Analysis ===
-Total steps: 4
-Layers: 2
-Max parallelism: 3 steps
-Estimated speedup: 2.0x
-
-Layer 1 (parallel):
-  - 01-01: Create user model
-  - 01-02: Create user repository
-  - 01-03: Create user service
-
-Layer 2 (sequential):
-  - 02-01: Create user controller
-```
-
-Wait for user confirmation before proceeding.
-
-### Phase 2: Create Team
-
-Ask Claude Code to create an agent team. Use natural language:
+## Orchestration Flow
 
 ```
-Create an agent team for parallel feature delivery.
+INPUT: "{feature-description}"
+  |
+  0. Read rigor profile from .en/des-config.json (default: standard)
+     Store: agent_model|reviewer_model|tdd_phases|review_enabled|double_review|mutation_enabled|refactor_pass
+  |
+  1. Parse input|derive feature-id (kebab-case)|create docs/feature/{feature-id}/deliver/
+     a. Create execution-log.json if missing via CLI:
+        python -m des.cli.init_log --project-dir docs/feature/{feature-id}/deliver --feature-id {feature-id}
+        Do NOT create execution-log.json directly with Write — use the CLI only.
+     b. Create deliver session marker: .en/des/deliver-session.json
+  |
+  1.5. Detect development paradigm
+     a. Read project CLAUDE.md (project root, NOT ~/.claude/CLAUDE.md)
+     b. Search "## Development Paradigm"
+     c. Found → extract paradigm: "functional"/@en-functional-software-crafter or "object-oriented"/@en-software-crafter (default)
+     d. Not found → ask user "OOP or Functional?"|offer to write to CLAUDE.md
+     e. Store selected crafter for all Phase 2 dispatches
+     f. Functional → property-based testing default|@property tags signal PBT|example-based = fallback
+  |
+  1.6. Detect mutation testing strategy
+     a. Same CLAUDE.md|search "## Mutation Testing Strategy"
+     b. Found → extract: per-feature|nightly-delta|pre-release|disabled
+     c. Not found → default "per-feature"
+     d. Log strategy for traceability
+     Note: Strategy locks at deliver start. CLAUDE.md edits during delivery take effect next run.
+  |
+  2. Phase 1 — Roadmap Creation + Review
+     a. Skip if docs/feature/{feature-id}/deliver/roadmap.json exists with validation.status == "approved"
+        IMPORTANT: Only check the deliver/ subdirectory. If roadmap.json is found in design/ instead,
+        MOVE it to deliver/ and log warning: "Roadmap relocated from design/ to deliver/ — was created in wrong wave."
+     b. @en-solution-architect creates roadmap.json (read commands/roadmap.md)
+        Step IDs: NN-NN format (01-01, 01-02, 02-01). 01-A or 1-1 = invalid.
+     c. Automated quality gate (see below)
+     d. @en-software-crafter-reviewer reviews (read commands/review.md)
+     e. Retry once on rejection → stop for manual intervention
+  |
+  3. Phase 2 — Parallel Execution (Agent Teams + next-steps CLI)
+
+     **MAXIMIZE PARALLELISM**: Spawn ALL ready steps simultaneously. If `next-steps` returns 4 READY steps,
+     spawn 4 crafters — not 1 "to be safe". The entire point of en:deliver is parallel execution.
+     Being conservative defeats the purpose.
+
+     a. **Interruption recovery**: On resume, run recovery CLI first:
+        `python -m en.cli.team_state recover ROADMAP_PATH`
+        This resets any in_progress steps back to pending and cleans up orphaned worktrees.
+        Approved steps are preserved — only incomplete work is reverted.
+
+     b. **Create agent team**:
+        Use TeamCreate to create a delivery team (e.g., `deliver-{feature-id}`).
+        This team persists for the entire Phase 2 execution.
+
+     c. **Parallel execution loop** — `next-steps` CLI is the SOLE authority for step ordering (ADR-019).
+        Do NOT extract steps from roadmap manually or sort by dependency. Always defer to next-steps.
+        ```
+        LOOP:
+          1. Run: python -m en.cli.team_state next-steps ROADMAP_PATH
+             - Output "DONE" → EXIT loop (all steps approved)
+             - Output "READY {step_id} {step_name}" lines → collect ALL ready steps
+
+          2. Start ALL ready steps (SEQUENTIAL — conflict detection needs current state):
+             For EACH ready step:
+               python -m en.cli.team_state start-step ROADMAP --step {step-id} --teammate crafter-{step-id}
+               → Record output: SHARED or WORKTREE + path
+             IMPORTANT: Call start-step one at a time. Each call sees the previous step
+             as active and correctly detects file conflicts for worktree isolation.
+
+          3. Spawn ALL crafters in a SINGLE message (PARALLEL):
+             Spawn all crafters simultaneously. For each step, spawn a {selected-crafter}
+             teammate named crafter-{step_id} with the DES Prompt Template from execute.md
+             (all 9 mandatory sections). See "Crafter Spawn Prompt" below.
+             Use standard prompt for SHARED steps, worktree prompt variant for WORKTREE steps.
+
+          4. Monitor crafters (messages arrive automatically in Agent Teams):
+             - Crafter messages Lead: "Step {step_id} ready for review. Files: {files}"
+               → Lead transitions step to review:
+                 python -m en.cli.team_state transition ROADMAP --step {step-id} --status review
+               → Lead spawns reviewer lazily (see Reviewer Spawning Protocol below)
+             - Reviewer approves:
+               → Lead runs complete-step (marks approved + merges worktree if used):
+                 python -m en.cli.team_state complete-step ROADMAP --step {step-id} \
+                   --outcome approved --feedback "Approved: meets quality standards"
+               → Lead shuts down reviewer (SendMessage type: shutdown_request)
+               → Lead shuts down crafter (SendMessage type: shutdown_request)
+               → This frees tmux panes for new spawns
+             - Reviewer rejects:
+               → Lead records rejection:
+                 python -m en.cli.team_state transition ROADMAP --step {step-id} --status in_progress \
+                   --outcome rejected --feedback "Reviewer feedback summary"
+               → Lead messages crafter with feedback (crafter revises and re-submits)
+               → Reviewer stays alive for re-review (do NOT re-spawn)
+             - On crafter failure: do NOT mark step complete. Step stays in_progress.
+
+          5. Eager next-layer spawning:
+             After each step completion, call next-steps IMMEDIATELY.
+             If newly unblocked steps appear, start-step + spawn them right away.
+             Do NOT wait for all current crafters to finish — layers blur.
+
+          6. GOTO 1 (next-steps resolves what is ready next)
+        ```
+
+     d. **Timeout recovery**: GREEN completed → resume (~5 turns)|GREEN partial → resume|Otherwise → restart with higher max_turns
+
+     e. **Crafter isolation**: Each crafter is spawned fresh per step via a new teammember invocation.
+        No context carries over between steps — each crafter receives only its step's DES template.
+        This is by design: steps are independent units of work with explicit inputs (roadmap context)
+        and outputs (execution-log entries). Never reuse a crafter agent across steps.
+
+     f. **Shutdown team**: After all steps are approved (next-steps returns DONE):
+        - Send shutdown_request to any remaining teammates
+        - Use TeamDelete to clean up the team
+        - If TeamDelete fails (stale members): `rm -rf ~/.claude/teams/{team-name} ~/.claude/tasks/{team-name}`
+
+     **Merge conflict handling** (complete-step MERGE_CONFLICT):
+     - Run `git diff --name-only --diff-filter=U` to list conflicting files
+     - If conflicting files < 3 and changes are mechanical (e.g., imports, formatting): attempt auto-resolve via `git checkout --theirs` for non-business files, then `git add` and `git merge --continue`
+     - If conflicting files >= 3 OR conflicts involve business logic: STOP and escalate to user with:
+       ```
+       MERGE CONFLICT in step {step_id}. {N} files conflicting:
+       {file list}
+       Please resolve manually, then run: git merge --continue
+       After resolving, re-run /en:deliver to resume.
+       ```
+     - NEVER force-resolve ambiguous business logic conflicts automatically
+
+     ### Reviewer Spawning Protocol
+
+     Reviewers are spawned **lazily by the Lead** — only when a crafter signals readiness for review.
+     This avoids burning context on idle reviewers while crafters are still working.
+
+     **1st review (reviewer does not exist yet)**:
+     1. Spawn an en-software-crafter-reviewer teammate named reviewer-{step_id} with this prompt:
+
+        "You are reviewer-{step_id}. Project root: {project_root}
+
+        You are paired with crafter-{step_id}. ONLY review work from crafter-{step_id}.
+
+        Your role:
+        - Review crafter work as messages arrive from crafter-{step_id}
+        - Apply Testing Theater detection (7 deadly patterns)
+        - Check test quality and coverage
+        - Respond with APPROVED or NEEDS_REVISION
+
+        When crafter-{step_id} messages you:
+        1. Read the files they mention
+        2. Check for: TDD discipline (tests exist and are meaningful), type safety,
+           validation correctness, testing theater patterns
+        3. Respond with one of:
+           - 'Step {step_id} APPROVED' — work meets quality standards
+           - 'Step {step_id} NEEDS_REVISION: {specific feedback}' — issues to fix
+
+        Stay available — crafter-{step_id} may re-submit after revision.
+        You are using en-software-crafter-reviewer methodology."
+
+     2. Message the reviewer with the crafter's review request (files to review)
+
+     **On NEEDS_REVISION (reviewer already running)**:
+     1. Lead messages the **same already-running `reviewer-{step_id}`** — do NOT re-spawn
+     2. Crafter addresses feedback and re-submits to the Lead
+
+     **On APPROVED**:
+     1. Lead runs `complete-step` with review outcome
+     2. Lead shuts down reviewer immediately, then crafter after merge
+
+     ### Worktree Isolation
+
+     Worktree detection is handled automatically by `start-step`. The Lead does NOT manually check conflicts.
+
+     **How it works**: `start-step` checks the step's files against all currently active steps. If overlap
+     is found, it creates a worktree. The output tells the Lead which prompt to use:
+     - `STARTED {step_id} [SHARED]` → standard crafter prompt
+     - `STARTED {step_id} [WORKTREE] {path}` → worktree crafter prompt (below)
+
+     **Worktree crafter prompt variant** — add to standard DES template:
+     ```
+     IMPORTANT: You are working in an ISOLATED WORKTREE at: {worktree_path}
+     Your working directory is this worktree, NOT the main repo.
+     Commit to your worktree branch (worktree-crafter-{step_id}).
+     The Lead will merge your worktree after review approval.
+     ```
+
+     The reviewer does NOT need a worktree — it can read files from any worktree path.
+
+     ### Support Team Triggers
+
+     | Situation | Action |
+     |-----------|--------|
+     | Crafter says "Blocked on unknown X" | Spawn en-researcher teammate |
+     | Step fails twice | Spawn en-troubleshooter teammate |
+     | Build/CI broken | Spawn en-platform-architect teammate |
+  |
+  4. Phase 3 — Complete Refactoring (L1-L4) [SKIP if rigor.refactor_pass = false]
+     a. Collect modified files: git diff --name-only {base-commit}..HEAD -- '*.py' | sort -u
+        Split: PRODUCTION_FILES (src/) | TEST_FILES (tests/)
+     b. /en:refactor {files} --levels L1-L4 via {selected-crafter} with DES orchestrator markers:
+        <!-- DES-VALIDATION : required -->|<!-- DES-PROJECT-ID : {feature-id} -->|<!-- DES-MODE : orchestrator -->
+     c. All tests green after each module
+  |
+  5. Phase 4 — Adversarial Review [SKIP if rigor.review_enabled = false]
+     a. If rigor.reviewer_model = "skip" → SKIP phase entirely
+     b. /en:review @en-software-crafter-reviewer implementation "{execution-log-path}"
+        Spawn en-software-crafter-reviewer teammate for review
+        Include DES orchestrator markers (same as Phase 3)
+     c. If rigor.double_review = true → run review a second time with different scope focus
+     d. Scope: ALL files modified during feature|includes Testing Theater 7-pattern detection
+     e. One revision pass on rejection → proceed
+  |
+  6. Phase 5 — Mutation Testing [SKIP if rigor.mutation_enabled = false]
+     If rigor.mutation_enabled = false → SKIP regardless of CLAUDE.md strategy
+     Otherwise, apply CLAUDE.md strategy:
+     per-feature → gate ≥80% kill rate (read commands/mutation-test.md)
+     nightly-delta → SKIP|log "handled by CI nightly pipeline"
+     pre-release → SKIP|log "handled at release boundary"
+     disabled → SKIP|log "disabled per project configuration"
+  |
+  7. Phase 6 — Deliver Integrity Verification
+     TDD integrity MUST pass before finalization. This is a hard gate — no bypass.
+     a. PYTHONPATH=src/ python -m des.cli.verify_deliver_integrity docs/feature/{feature-id}/deliver/
+     b. Exit 0 → proceed to finalize|Exit 1 → STOP, read output, remediate
+     c. Checks performed:
+        - Every roadmap step has a matching execution-log.json entry
+        - Each entry contains all required TDD phases (per rigor config)
+        - No entries = step was not executed through DES → re-dispatch crafter
+        - Partial entries = incomplete TDD cycle → re-dispatch crafter for missing phases
+        - Phase ordering is valid (PREPARE → RED_ACCEPTANCE → RED_UNIT → GREEN → COMMIT)
+        - No manually written entries (DES detects non-CLI-produced entries)
+     d. Violations → re-execute failing steps via crafter teammate with DES markers|Only proceed after clean pass
+     e. Re-run verification after remediation: loop until exit 0 or escalate after 2 retries
+  |
+  8. Phase 7 — Finalize
+     a. **Archive**: @en-platform-architect archives to docs/evolution/ (read commands/finalize.md)
+        - Creates {feature-id}-evolution.md with delivery summary, step outcomes, metrics
+     b. **Cleanup**: rm -f .en/des/deliver-session.json .en/des/des-task-active
+        - Remove temporary DES session files
+        - Orphaned worktrees already cleaned by complete-step in Phase 2
+     c. **Report**: Generate delivery report with:
+        - Total steps executed and pass/fail breakdown
+        - TDD phase compliance per step
+        - Review outcomes (if Phase 4 ran)
+        - Mutation kill rate (if Phase 5 ran)
+        - Files modified (git diff --stat {base-commit}..HEAD)
+     d. Commit + push final state
+  |
+  9. Phase 8 — Retrospective (conditional)
+     Skip if clean execution|@en-troubleshooter 5 Whys on issues found
+  |
+  10. Phase 9 — Report Completion
+      Display summary: phases|steps|reviews|artifacts|Return to DISCOVER for next iteration
 ```
 
-### Phase 3: Spawn Teammates
+## Orchestrator Responsibilities
 
-**MAXIMIZE PARALLELISM**: Spawn ALL steps in the current layer simultaneously. If a layer has 4 steps, spawn 4 crafter+reviewer pairs — not 1 or 2 "to be safe". The entire point of ensemble is parallel execution. Being conservative defeats the purpose.
+Follow this flow directly. Do not delegate orchestration.
 
-For each parallel layer, spawn:
+Per phase:
+1. Read the relevant command file (paths listed above)
+2. Extract instructions and embed them in the teammate spawn prompt
+3. Include task boundary instructions to prevent workflow continuation
+4. Verify output artifacts exist after each teammate completes
+5. Update .develop-progress.json for resume capability
 
-**Core Team** (spawn in pairs — ALL steps at once):
-- **N Crafter teammates** (one per step in the layer): Execute TDD cycle
-- **N Reviewer teammates** (one per crafter): Each crafter gets a dedicated reviewer to avoid bottlenecks
+## Crafter Spawn Prompt
 
-**Spawn order**: Spawn ALL crafter+reviewer pairs in a SINGLE message with multiple Agent tool calls. Do NOT spawn them one at a time.
+DES markers required for step execution. Without markers → unmonitored. Full DES Prompt Template (9 sections) in `commands/execute.md`.
 
-**IMPORTANT — Agent Types and Model**:
-- Crafters MUST use `subagent_type: nw-software-crafter`
-- Reviewer MUST use `subagent_type: nw-software-crafter-reviewer`
-- Support agents: `nw-researcher`, `nw-troubleshooter`, `nw-platform-architect`
-- NEVER use `general-purpose` for crafters or reviewers
-- ALL teammates MUST use `model: opus` to override agent defaults that may not resolve
+When spawning a crafter teammate, use the COMPLETE DES template from execute.md verbatim as the spawn prompt. Fill all `{placeholders}` from roadmap step context. The DES hook validates the prompt BEFORE the teammate starts — abbreviated prompts that delegate template reading to the teammate will be BLOCKED.
 
-**Naming Convention**:
-Use the **step_id** as the unique suffix for all teammate names. This avoids collisions across layers since step IDs are globally unique.
-- `crafter-{step_id}` ↔ `reviewer-{step_id}`
-- Examples: `crafter-02-01` ↔ `reviewer-02-01`, `crafter-02-04` ↔ `reviewer-02-04`
+Copy the template from the code block in `commands/execute.md` (between ``` markers), fill placeholders, and pass as the teammate's prompt. The template contains 9 mandatory sections: DES_METADATA, AGENT_IDENTITY, SKILL_LOADING, TASK_CONTEXT, TDD_PHASES, QUALITY_GATES, OUTCOME_RECORDING, RECORDING_INTEGRITY, BOUNDARY_RULES, TIMEOUT_INSTRUCTION.
 
-**Pairing Protocol**:
-Each crafter is paired with a dedicated reviewer AT SPAWN TIME using the step_id naming:
-- `crafter-{step_id}` always messages `reviewer-{step_id}`
-- NEVER change pairings mid-flight. The crafter prompt includes the reviewer name.
-
-**Spawn prompt for Crafter**:
-
-DO NOT dictate implementation details, file contents, or code in the prompt.
-Give the crafter the step requirements and let it drive TDD autonomously.
+Spawn a {selected-crafter} teammate named crafter-{step_id} with this prompt:
 
 ```
-Spawn a crafter teammate (subagent_type: nw-software-crafter, name: crafter-{step_id}) with this prompt:
+<!-- DES-VALIDATION : required -->
+<!-- DES-PROJECT-ID : {project_id} -->
+<!-- DES-STEP-ID : {step_id} -->
 
-"You are crafter-{step_id} on the {team} team. Project root: {project_root}
+# DES_METADATA
+Step: {step_id}
+Feature: {project_id}
+Command: /en:execute
 
-Execute step {step_id}: {step_name}
+# AGENT_IDENTITY
+Agent: {selected-crafter}
 
-Requirements:
-{step_description}
+# SKILL_LOADING
+Before starting TDD phases, read your skill files for methodology guidance.
+Skills path: skills/{agent-name}/
+Always load at PREPARE: tdd-methodology.md, quality-framework.md
+Load on-demand per phase as specified in your Skill Loading Strategy table.
 
-Acceptance criteria:
-{acceptance_criteria}
+# TASK_CONTEXT
+{step context extracted from roadmap - name|description|acceptance_criteria|test_file|scenario_name|quality_gates|implementation_notes|dependencies|estimated_hours|deliverables}
 
-Follow your Outside-In TDD methodology. You own the full cycle:
-PREPARE → RED_ACCEPTANCE → RED_UNIT → GREEN → COMMIT
+# TDD_PHASES
+... (copy remaining sections from execute.md template verbatim)
 
-Your dedicated reviewer is reviewer-{step_id}. ALWAYS send reviews to reviewer-{step_id}.
-When you reach COMMIT, message reviewer-{step_id}:
+# TIMEOUT_INSTRUCTION
+Target: 30 turns max. If approaching limit, COMMIT current progress.
+
+When you reach COMMIT, message the Lead (NOT a reviewer directly):
   'Step {step_id} ready for review. Files: {files_modified}'
-If reviewer responds NEEDS_REVISION, address feedback and re-submit.
-Only mark your task complete after reviewer APPROVED.
-
-Check TaskList after completing for next available work."
+The Lead will spawn a reviewer and route the review to you.
+If reviewer responds NEEDS_REVISION, address feedback and re-submit to the Lead.
 ```
 
-**Spawn prompt for Reviewer**:
-```
-Spawn a reviewer teammate (subagent_type: nw-software-crafter-reviewer, name: reviewer-{step_id}) with this prompt:
+## Roadmap Quality Gate (Automated, Zero Token Cost)
 
-"You are reviewer-{step_id} on the {team} team. Project root: {project_root}
+After roadmap creation, before reviewer:
+1. AC coupling: flag AC referencing private methods (`_method()`)
+2. Decomposition ratio: flag steps/files > 2.5
+3. Identical patterns: flag 3+ steps with same AC structure (batch them)
+4. Validation-only: flag steps with no files_to_modify
+5. Step ID format: flag non-matching `^\d{2}-\d{2}$`
 
-You are paired with crafter-{step_id}. ONLY review work from crafter-{step_id}.
+HIGH findings → return to architect for one revision.
 
-Your role:
-- Review crafter work as messages arrive from crafter-{step_id}
-- Apply Testing Theater detection (7 deadly patterns)
-- Check test quality and coverage
-- Respond with APPROVED or NEEDS_REVISION
+## Skip and Resume
 
-When crafter-{step_id} messages you:
-1. Read the files they mention
-2. Check for: TDD discipline (tests exist and are meaningful), type safety, validation correctness, testing theater patterns
-3. Respond with one of:
-   - 'Step {step_id} APPROVED' — work meets quality standards
-   - 'Step {step_id} NEEDS_REVISION: {specific feedback}' — issues to fix
+- Check `.develop-progress.json` on start for resume
+- Skip if file exists with validation.status == "approved"
+- Skip completed steps via execution-log.json COMMIT/PASS
+- Max 2 retry per review rejection → stop for manual intervention
+- **Interruption recovery**: On resume, Phase 2 runs `python -m en.cli.team_state recover ROADMAP_PATH` which:
+  - Resets in_progress/claimed/review steps back to pending
+  - Cleans up orphaned worktrees for those steps
+  - Preserves approved steps (completed work is kept)
+  - This ensures a clean slate for re-execution without losing completed progress
 
-Stay available — crafter-{step_id} may re-submit after revision, or pick up additional tasks.
-You are using nw-software-crafter-reviewer methodology."
-```
+## Input
 
-### Phase 4: Populate Task List and Assign
+- `feature-description` (string, required, min 10 chars)
+- feature-id: strip prefixes (implement|add|create)|remove stop words|kebab-case|max 5 words
 
-Create shared task list and assign tasks at spawn time:
-
-```
-For each step in the current parallel layer:
-- Create task with subject: "Step {step_id}: {step_name}"
-- Set blockedBy based on step dependencies
-- Assign each task to the crafter spawned for it (set owner in crafter spawn)
-```
-
-**IMPORTANT**: Assign tasks to crafters at spawn time. Do NOT let them self-claim — each crafter's spawn prompt already tells it which step to execute. Set the task owner when spawning.
-
-### Phase 5: Monitor and Coordinate
-
-**Tmux pane management**: Tmux has a pane limit. Shut down completed crafter+reviewer pairs IMMEDIATELY after approval — do NOT let idle teammates accumulate. Send shutdown_request as soon as a step is APPROVED and the crafter confirms completion. This frees panes for eager next-layer spawns.
-
-**Eager next-layer spawning**: When a crafter completes and its step unlocks steps in the NEXT layer, check if ALL dependencies for those next-layer steps are now satisfied. If so, spawn a new crafter+reviewer pair for the unblocked step immediately — don't wait for the entire current layer to finish. This maximizes throughput.
-
-Example: Layer 2 has steps A (dep: 1-1) and B (dep: 1-2, 1-3). If 1-1 finishes first, spawn crafter for A immediately while 1-2 and 1-3 are still running.
-
-**MANDATORY PRE-SPAWN CHECK — run BEFORE every crafter spawn:**
-
-```bash
-# 1. Check for conflicts
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state should-worktree .ensemble/state.yaml --step {step_id}
-
-# 2. If WORKTREE_REQUIRED:
-#    a. Create worktree
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree create {step_id}
-#    b. Mark step with worktree flag when updating status
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id} --worktree
-#    c. Use the WORKTREE spawn prompt (includes worktree path in "Worktree Isolation" section)
-
-# 3. If NO_WORKTREE_NEEDED:
-#    a. Use the standard spawn prompt (shared directory)
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id}
-```
-
-**IMPORTANT**: The `team_state update --status in_progress` command will BLOCK if file conflicts exist and `--worktree` is not passed. This is a hard gate — you cannot skip it. If blocked, create the worktree first, then retry with `--worktree`.
-
-While teammates are working:
-
-1. **Monitor progress**: Use CLI to track state
-   ```bash
-   # Show current team state
-   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state show .ensemble/state.yaml
-
-   # Update step status when teammate reports progress
-   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state update .ensemble/state.yaml --step {step_id} --status in_progress --teammate crafter-{step_id}
-
-   # Check if layer is complete
-   PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state check .ensemble/state.yaml --layer 1
-   ```
-
-2. **Handle blockers**: If a crafter messages you "Blocked on unknown X":
-   - Spawn a researcher teammate to investigate
-   - Route findings back to the blocked crafter
-
-3. **Handle failures**: If a step fails twice:
-   - Spawn a troubleshooter teammate to investigate
-   - Route root cause back to crafter or escalate to user
-
-4. **Handle infra issues**: If build/Docker/CI breaks:
-   - Spawn a platform-architect teammate to fix
-   - Notify crafters when fixed
-
-**Status Values**:
-- `pending` — Not started
-- `claimed` — Teammate has claimed the task
-- `in_progress` — Work underway
-- `review` — Submitted for review
-- `approved` — Reviewer approved
-- `failed` — Step failed
-
-### Phase 6: Convergence
-
-Wait for all teammates to complete:
-
-1. All crafters idle
-2. All steps have reviewer APPROVED
-3. All tasks marked complete
-
-Then verify quality:
-```bash
-# Verify DES integrity
-PYTHONPATH=$HOME/.claude/lib/python python -m des.cli.verify_deliver_integrity docs/feature/{project-id}/
-```
-
-### Phase 7: Next Layer or Finalize
-
-**With eager spawning, layers blur**: Because you eagerly spawn next-layer steps as soon as their deps are met, there is no clean "layer boundary". Instead of waiting for an entire layer to complete before starting the next, you continuously:
-1. Shut down each crafter+reviewer pair immediately after their step is APPROVED
-2. Check if any new steps are unblocked by this approval
-3. If yes, spawn fresh crafter+reviewer pair for the unblocked step
-4. If file conflicts exist with still-running steps, serialize via `blockedBy`
-
-This means Phases 5-7 are a continuous loop, not discrete stages.
-
-**Why fresh spawns per step**: Each crafter is spawned with a targeted prompt for one specific step. After approval, shut it down. Do NOT try to reassign a crafter to a different step — the original step context in its prompt will cause confusion.
-
-If all layers complete:
-1. Run final verification
-2. Clean up the team:
-   ```
-   Ask all remaining teammates to shut down gracefully.
-   Then clean up the team with TeamDelete.
-   ```
-3. **If TeamDelete fails** (stale members from earlier cycles still in config):
-   ```bash
-   # Force cleanup: remove team and task directories
-   rm -rf ~/.claude/teams/{team-name} ~/.claude/tasks/{team-name}
-   ```
-4. Report summary to user
-
-## Worktree Isolation
-
-### When Worktrees Are Used
-
-**Worktrees are MANDATORY when** (enforced by `team_state update`):
-- The target step's `files_to_modify` overlaps with any active (claimed/in_progress/review) step
-- The `should-worktree` check returns `WORKTREE_REQUIRED`
-
-**Shared directory is used when** (default):
-- No file overlap with active steps (`should-worktree` returns `NO_WORKTREE_NEEDED`)
-
-**Note**: The `team_state update --status in_progress` command enforces this automatically. If conflicts exist and `--worktree` is not passed, the command exits with an error. You cannot skip the check.
-
-### Detecting File Conflicts
-
-The execution plan includes per-step `conflicts_with` annotations (cross-layer):
-
-```bash
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.parallel_groups plan docs/feature/{project-id}/ --output .ensemble/plan.yaml
-```
-
-Plan output for conflicting steps:
-```yaml
-steps:
-  - step_id: "05-02"
-    name: "Frontend edit"
-    files_to_modify: [BookmarkItem.tsx, useBookmarks.ts, api.ts]
-    conflicts_with: ["05-03"]
-```
-
-At runtime, use `should-worktree` to check against currently active steps:
-```bash
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.team_state should-worktree .ensemble/state.yaml --step {step_id}
-```
-
-Output:
-```
-WORKTREE_REQUIRED
-  Conflicts with 05-02: BookmarkItem.tsx, useBookmarks.ts, api.ts
-```
-
-### Worktree Setup Protocol
-
-**Step 1: Create worktrees before spawning**
-
-Use the CLI to create worktrees for each crafter:
-```bash
-# Create worktree for each step in the layer
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree create {step_id}
-```
-
-Or manually:
-```bash
-git worktree add .claude/worktrees/crafter-{step_id} -b worktree-crafter-{step_id}
-```
-
-**Step 2: Spawn crafter in worktree**
+## Output Artifacts
 
 ```
-Spawn a crafter teammate with this prompt:
-
-"You are a crafter teammate executing step {step_id}: {step_name}.
-
-IMPORTANT: You are working in an ISOLATED WORKTREE at:
-  .claude/worktrees/crafter-{step_id}/
-
-Your working directory is this worktree, NOT the main repo.
-
-Your task:
-{step_description}
-
-Workflow:
-1. Execute the 5-phase TDD cycle in your worktree
-2. When you reach COMMIT phase:
-   - Commit your changes to your worktree branch (worktree-crafter-{step_id})
-   - Message the reviewer: 'Step {step_id} ready for review. Files: {files}'
-3. If reviewer responds NEEDS_REVISION, address feedback in your worktree and re-commit
-4. Only mark task complete after reviewer APPROVED
-
-You are using nw-software-crafter methodology."
+docs/feature/{feature-id}/deliver/
+  roadmap.json|execution-log.json|.develop-progress.json
+docs/evolution/
+  {feature-id}-evolution.md
 ```
 
-**Step 3: Reviewer works from main repo**
+## Quality Gates
 
-The reviewer teammate does NOT need a worktree. Reviewer can read files from any worktree path to review changes.
-
-### Merge Protocol (After Convergence)
-
-Once all crafters complete and reviewer has APPROVED all steps:
-
-**Step 1: Check worktree status**
-```bash
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree status
-```
-
-Output:
-```
-=== ensemble Worktree Status ===
-
-Step 01-01:
-  Path: /repo/.claude/worktrees/crafter-01-01
-  Branch: worktree-crafter-01-01
-  Commits: 3
-  Status: clean
-
-Step 01-02:
-  Path: /repo/.claude/worktrees/crafter-01-02
-  Branch: worktree-crafter-01-02
-  Commits: 2
-  Status: clean
-```
-
-**Step 2: Merge all branches sequentially**
-```bash
-# Merge all worktree branches in order (uses plan.yaml for ordering)
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree merge-all --plan .ensemble/plan.yaml
-```
-
-If conflicts occur, the CLI pauses and reports:
-```
-MERGE CONFLICT merging worktree-crafter-01-02
-Conflicting files:
-  src/models/user.ts
-
-Resolve conflicts, then run:
-  git add . && git commit
-Or abort with:
-  git merge --abort
-```
-
-**Step 3: Handle merge conflicts**
-
-If `git merge` fails with conflicts, the Lead resolves them:
-
-```bash
-# Get list of conflicting files
-git diff --name-only --diff-filter=U
-```
-
-**Lead Resolution Protocol:**
-
-1. **Read conflicting files** — examine the conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)
-
-2. **Understand both sides:**
-   - OURS = what was already merged (previous crafter's work)
-   - THEIRS = current crafter's work being merged
-
-3. **Resolve intelligently:**
-   - If changes are in different parts of the file → combine both
-   - If changes overlap but are complementary → merge semantically
-   - If changes truly conflict (same line, different logic) → analyze which is correct based on step requirements
-
-4. **Apply resolution:**
-   ```bash
-   # After editing the file to resolve conflicts
-   git add {resolved_file}
-   ```
-
-5. **Continue merge:**
-   ```bash
-   git merge --continue
-   ```
-
-**Example Resolution:**
-
-```
-<<<<<<< HEAD
-function getUser(id: string): User {
-  return this.userRepository.findById(id);
-}
-=======
-function getUser(id: string): User | null {
-  const user = this.userRepository.findById(id);
-  return user ?? null;
-}
->>>>>>> worktree-crafter-01-02
-```
-
-Lead analyzes: Crafter 01-02's version adds null safety. This is an improvement. Resolve by keeping THEIRS:
-```typescript
-function getUser(id: string): User | null {
-  const user = this.userRepository.findById(id);
-  return user ?? null;
-}
-```
-
-**Escalate to User only if:**
-- Conflict involves complex business logic Lead cannot judge
-- Both versions seem equally valid with different trade-offs
-- Conflict affects more than 3 files (high risk)
-
-```
-MERGE CONFLICT - ESCALATING TO USER
-
-I attempted to resolve the conflict but need your input:
-
-File: {filename}
-Crafter A (step 01-01) wrote: {description of their change}
-Crafter B (step 01-02) wrote: {description of their change}
-
-Both approaches seem valid. Which should we keep?
-1. Crafter A's version
-2. Crafter B's version
-3. Let me show you the diff and you decide
-```
-
-**Step 4: Cleanup worktrees after successful merge**
-```bash
-# Remove all ensemble worktrees and branches
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree cleanup --all
-```
-
-Or cleanup a specific step:
-```bash
-PYTHONPATH=$HOME/.claude/lib/python python -m agent_ensemble.cli.worktree cleanup {step_id}
-```
-
-### Worktree Lifecycle Summary
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    WORKTREE LIFECYCLE                           │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. DETECT CONFLICTS                                            │
-│     └── Analyze files_to_modify for overlaps                    │
-│                                                                 │
-│  2. CREATE WORKTREES                                            │
-│     └── git worktree add .claude/worktrees/crafter-{id}         │
-│                                                                 │
-│  3. SPAWN CRAFTERS IN WORKTREES                                 │
-│     └── Each crafter works in isolated copy                     │
-│                                                                 │
-│  4. CRAFTERS COMMIT TO WORKTREE BRANCHES                        │
-│     └── worktree-crafter-{step_id}                              │
-│                                                                 │
-│  5. REVIEWER REVIEWS (from main or worktree paths)              │
-│     └── APPROVED or NEEDS_REVISION                              │
-│                                                                 │
-│  6. MERGE BRANCHES SEQUENTIALLY                                 │
-│     └── git merge worktree-crafter-{id} --no-ff                 │
-│                                                                 │
-│  7. RESOLVE CONFLICTS (if any)                                  │
-│     └── Pause, alert user, wait for resolution                  │
-│                                                                 │
-│  8. CLEANUP WORKTREES                                           │
-│     └── git worktree remove + git branch -d                     │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Worktree Trade-offs
-
-| Aspect | Shared Directory | Worktree per Crafter |
-|--------|------------------|----------------------|
-| File conflicts | Immediate overwrites (BAD) | Deferred to merge (SAFE) |
-| Setup time | None | ~5s per worktree |
-| Disk space | Minimal | ~N × repo size |
-| Merge complexity | None | Must merge N branches |
-| True parallelism | Only different files | ANY files |
-
-## Support Team Triggers
-
-| Situation | Action |
-|-----------|--------|
-| Crafter says "Blocked on unknown X" | Spawn nw-researcher teammate |
-| Step fails twice | Spawn nw-troubleshooter teammate |
-| Build/Docker/CI broken | Spawn nw-platform-architect teammate |
-
-## Error Recovery
-
-| Error | Recovery |
-|-------|----------|
-| Teammate timeout | Resume or spawn replacement |
-| Step fails 3+ times | Escalate to user |
-| Merge conflict | Pause team, alert user |
-| DES verification fails | Report failed steps, re-execute |
-
-## Example Invocation
-
-```
-User: /ensemble:deliver auth-feature
-
-Lead (you):
-1. Read docs/feature/auth-feature/roadmap.{yaml,json}
-2. Analyze: 3 layers (3 steps, 2 steps, 1 step)
-3. Layer 1: spawn 3 crafter+reviewer pairs (all at once), assign tasks
-4. Monitor: wait for all 3 crafters APPROVED
-5. Layer 2: spawn 2 new crafter+reviewer pairs, assign tasks
-6. Monitor: wait for all 2 crafters APPROVED
-7. Layer 3: spawn 1 crafter+reviewer pair
-8. Monitor: wait for APPROVED
-9. Clean up team, report summary
-```
+Roadmap review (1 review, max 2 attempts)|Per-step 5-phase TDD (PREPARE→RED_ACCEPTANCE→RED_UNIT→GREEN→COMMIT)|Paradigm-appropriate crafter|L1-L4 refactoring (Phase 3)|Adversarial review + Testing Theater detection (Phase 4)|Mutation ≥80% if per-feature (Phase 5)|Integrity verification (Phase 6)|All tests passing per phase
 
 ## Success Criteria
 
-- [ ] All steps have COMMIT/PASS in execution-log
-- [ ] All steps have reviewer APPROVED
-- [ ] DES integrity verification passed
-- [ ] Team cleaned up properly
+- [ ] Roadmap created and approved
+- [ ] All steps COMMIT/PASS (5-phase TDD)
+- [ ] L1-L4 refactoring complete (Phase 3)
+- [ ] Adversarial review passed (Phase 4)
+- [ ] Mutation gate ≥80% or skipped per strategy (Phase 5)
+- [ ] Integrity verification passed (Phase 6)
+- [ ] Evolution archived (Phase 7)
+- [ ] Retrospective or clean execution noted (Phase 8)
+- [ ] Completion report (Phase 9)
+
+## Edge Cases
+
+### Single-Step Roadmap
+A roadmap with only one step completes in a single iteration of the next-steps loop:
+1. `next-steps` returns `READY 01-01 {name}` → dispatch crafter → complete step
+2. `next-steps` returns `DONE` → exit loop
+No special handling needed — the reactive loop naturally terminates after one iteration.
+
+### Bottleneck Step Unblocking
+When multiple steps depend on a single bottleneck step (e.g., 02-01, 02-02, 02-03 all depend on 01-01):
+- After 01-01 is approved via `complete-step`, ALL dependent steps become READY simultaneously
+- `next-steps` CLI returns them all as READY in the next invocation
+- Spawn all unblocked steps concurrently as crafter teammates
+- The orchestrator does NOT need to track dependencies — `next-steps` resolves ordering automatically (ADR-019)
+
+### Crafter Freshness Guarantee
+Crafters are spawned fresh per step — no context carryover between steps. This means:
+- Each teammate spawn creates a new crafter instance with clean context
+- The crafter receives ONLY its step's DES template (roadmap context, AC, files)
+- No shared memory, variables, or state between step executions
+- If a crafter fails mid-step, the retry also starts fresh (after `recover` resets the step to pending)
+- This isolation prevents cross-step contamination: a workaround in step 01-01 cannot silently propagate to 01-02
+
+## Examples
+
+### 1: Fresh Feature
+`/en:deliver "Implement user authentication with JWT"` → roadmap → review → TDD all steps → mutation → finalize → report
+
+### 2: Resume After Failure
+Same command → loads .develop-progress.json → skips completed → resumes from failure
+
+### 3: Single Step Alternative
+For manual granular control, use individual commands:
+```
+/en:roadmap @en-solution-architect "goal"
+/en:execute {selected-crafter} "feature-id" "01-01"
+/en:finalize @en-platform-architect "feature-id"
+```
+
+## Completion
+
+DELIVER is final wave. After completion → DISCOVER for next feature or mark project complete.

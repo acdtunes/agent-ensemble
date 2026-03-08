@@ -1,0 +1,586 @@
+roadmap:
+  project_id: en-consolidation
+  short_description: Consolidate nWave vendor into en-prefixed local packages
+  description: >
+    Sync upstream nWave artifacts into a pristine vendor directory, rename
+    agent_ensemble to en, generate en-prefixed commands/agents/skills via
+    sync script, rewrite deliver as deterministic parallel executor, and
+    provide a single install.sh for setup.
+  created_at: '2026-03-07T23:19:15Z'
+  total_steps: 19
+  phases: 5
+phases:
+- id: '01'
+  name: 'Vendor Setup'
+  steps:
+  - id: 01-01
+    name: 'Fetch nWave upstream into nwave/'
+    description: >
+      Download nWave upstream (commands, agents, skills, DES scripts, templates)
+      into nwave/ as pristine vendor directory. No renames, no edits.
+    criteria:
+    - "nwave/ contains commands/, agents/, skills/, scripts/des/, scripts/templates/
+      from upstream"
+    - "All files are byte-for-byte identical to upstream source"
+    - "nwave/ is committed to git as a trackable vendor directory"
+    time_estimate: 30m
+    dependencies: []
+    files_to_modify:
+    - nwave/commands/
+    - nwave/agents/
+    - nwave/skills/
+    - nwave/scripts/des/
+    - nwave/scripts/templates/
+    status: approved
+    teammate_id: crafter-01-01
+    started_at: '2026-03-07T23:27:29.872148+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-07T23:37:59.597521+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:37:59.597521+00:00'
+      outcome: approved
+      feedback: nwave/ populated from upstream
+  - id: 01-02
+    name: 'Validate vendor integrity and structure'
+    description: >
+      Verify vendor directory matches upstream structure. Confirm no files
+      were renamed or edited during population. Validate git tracking.
+    criteria:
+    - "Vendor files match upstream byte-for-byte (no modifications)"
+    - "Missing upstream directory triggers clear error"
+    - "Manual edits to nwave/ are overwritten on next sync"
+    time_estimate: 20m
+    dependencies:
+    - 01-01
+    files_to_modify:
+    - nwave/
+    status: approved
+    teammate_id: crafter-01-02
+    started_at: '2026-03-07T23:41:15.042184+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-07T23:54:49.447366+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:54:49.447366+00:00'
+      outcome: approved
+      feedback: 'Approved: SHA-based validation, required dirs check, bash 3.x compatible'
+  - id: 01-03
+    name: 'Handle upstream unavailability'
+    description: >
+      Vendor population fails gracefully when upstream is unreachable.
+      Existing vendor directory is not modified on failure.
+    criteria:
+    - "Unreachable upstream produces clear connectivity error"
+    - "Existing nwave/ is not modified on failure"
+    - "Exit code is non-zero on failure"
+    time_estimate: 15m
+    dependencies:
+    - 01-01
+    files_to_modify:
+    - nwave/
+
+    status: approved
+    teammate_id: crafter-01-03
+    started_at: '2026-03-07T23:41:17.967671+00:00'
+    worktree: 
+      /Users/andres.dandrea/projects/personal/nw-teams/.claude/worktrees/crafter-01-03
+    review_attempts: 2
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:47:49.513461+00:00'
+      outcome: rejected
+      feedback: 'Files not found: scripts/fetch-vendor.sh and tests/test_fetch_vendor.sh
+        do not exist in the project'
+    - cycle: 2
+      timestamp: '2026-03-07T23:49:43.230934+00:00'
+      outcome: approved
+      feedback: 'Approved: atomic replacement, proper error handling, clear exit codes,
+        graceful failure'
+    completed_at: '2026-03-07T23:49:43.230934+00:00'
+- id: '02'
+  name: 'Package Rename'
+  steps:
+  - id: 02-01
+    name: 'Rename agent_ensemble to en and update imports'
+    description: >
+      Rename src/agent_ensemble/ to src/en/. Update all internal imports.
+      Update pyproject.toml package name. Verify editable install works.
+    criteria:
+    - "src/en/cli/ contains team_state, parallel_groups, worktree, migrate_roadmap
+      modules"
+    - "src/en/adapters/ contains roadmap_adapter and execlog_adapter"
+    - "All CLI commands work via python -m en.cli.<module>"
+    - "pyproject.toml references en package; pip install -e . succeeds"
+    - "No imports reference agent_ensemble anywhere in src/en/"
+    time_estimate: 45m
+    dependencies: []
+    files_to_modify:
+    - src/en/
+    - src/en/cli/team_state.py
+    - src/en/cli/parallel_groups.py
+    - src/en/cli/worktree.py
+    - src/en/cli/migrate_roadmap.py
+    - src/en/adapters/roadmap_adapter.py
+    - src/en/adapters/execlog_adapter.py
+    - pyproject.toml
+    status: approved
+    teammate_id: crafter-02-01
+    started_at: '2026-03-07T23:27:32.334686+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-07T23:38:05.268012+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:38:05.268012+00:00'
+      outcome: approved
+      feedback: src/en/ created with updated imports
+  - id: 02-02
+    name: 'Enforce dependency direction en -> des'
+    description: >
+      Validate en/ may import from des/ but des/ never imports from en/.
+      Delete src/agent_ensemble/ after confirming rename is complete.
+    criteria:
+    - "No module in des/ imports from en/"
+    - "en/ modules may import from des/"
+    - "src/agent_ensemble/ no longer exists"
+    time_estimate: 15m
+    dependencies:
+    - 02-01
+    files_to_modify:
+    - src/agent_ensemble/    # deletion
+    - src/en/
+    status: approved
+    teammate_id: crafter-02-02
+    started_at: '2026-03-07T23:41:20.822220+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-07T23:45:46.727052+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:45:46.727052+00:00'
+      outcome: approved
+      feedback: 'Approved: dependency direction verified, agent_ensemble deleted'
+  - id: 02-03
+    name: 'Delete unused ensemble commands'
+    description: >
+      Remove all legacy ensemble command files from commands/.
+      Clean slate for generated en: commands.
+    criteria:
+    - "audit.md, debug.md, discover.md, document.md, review.md, refactor.md, deliver.md,
+      design.md, distill.md, execute.md are removed"
+    - "commands/ is clean for newly generated en: commands"
+    time_estimate: 10m
+    dependencies: []
+    files_to_modify:
+    - commands/audit.md    # deletion
+    - commands/debug.md    # deletion
+    - commands/discover.md    # deletion
+    - commands/document.md    # deletion
+    - commands/review.md    # deletion
+    - commands/refactor.md    # deletion
+    - commands/deliver.md    # deletion
+    - commands/design.md    # deletion
+    - commands/distill.md    # deletion
+    - commands/execute.md    # deletion
+    status: approved
+    teammate_id: crafter-02-03
+    started_at: '2026-03-07T23:27:35.418611+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-07T23:38:06.214763+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:38:06.214763+00:00'
+      outcome: approved
+      feedback: All 10 legacy command files deleted
+- id: '03'
+  name: 'Sync Generation'
+  steps:
+  - id: 03-01
+    name: 'Generate commands/ with en: prefix and local paths'
+    description: >
+      Sync script generates commands/ from nwave/commands/ applying all
+      content transforms: nw:->en:, nw-->en-, skill paths, PYTHONPATH.
+      deliver.md is never overwritten (project override).
+    criteria:
+    - "Each generated command uses /en: prefix in slash command metadata"
+    - "All nw- agent references replaced with en-"
+    - "All skill paths point to skills/ relative to project root"
+    - "All PYTHONPATH references use src/"
+    - "deliver.md is preserved if it exists as project override"
+    time_estimate: 45m
+    dependencies:
+    - 01-01
+    - 02-03
+    files_to_modify:
+    - scripts/sync-nwave.sh
+    - commands/*.md    # generated output
+    status: approved
+    teammate_id: crafter-03-01
+    started_at: '2026-03-07T23:41:23.427381+00:00'
+    review_attempts: 2
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:46:26.183501+00:00'
+      outcome: rejected
+      feedback: '3 untransformed nw- references: forge.md nw-agent-builder, forge.md
+        agents/nw-{agent-name}, review.md nw-*-reviewer'
+    - cycle: 2
+      timestamp: '2026-03-07T23:48:27.495207+00:00'
+      outcome: approved
+      feedback: 'Approved: all transforms verified, 0 remaining nw- refs'
+    completed_at: '2026-03-07T23:48:27.495207+00:00'
+  - id: 03-02
+    name: 'Generate agents/ with en- prefix and explicit model'
+    description: >
+      Sync script generates agents/ from nwave/agents/ with file rename
+      (nw-*.md -> en-*.md), content transforms, and model:inherit replacement.
+    criteria:
+    - "All agent files renamed from nw-*.md to en-*.md"
+    - "All internal nw- references replaced with en-; subagent_type uses en-"
+    - "All model:inherit replaced with explicit model identifier"
+    - "All skill paths point to skills/ relative to project root"
+    time_estimate: 30m
+    dependencies:
+    - 01-01
+    - 03-01
+    files_to_modify:
+    - scripts/sync-nwave.sh
+    - agents/*.md    # generated output
+    status: approved
+    teammate_id: crafter-03-02
+    started_at: '2026-03-07T23:48:42.953306+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-07T23:57:34.288645+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:57:34.288645+00:00'
+      outcome: approved
+      feedback: 23 en- agent files generated with all transforms
+  - id: 03-03
+    name: 'Generate skills/ and src/des/ from vendor'
+    description: >
+      Copy nwave/skills/ to skills/ (no transforms). Copy nwave/scripts/des/
+      to src/des/ (no transforms). Verify no global path references remain.
+    criteria:
+    - "skills/ mirrors upstream directory structure exactly"
+    - "src/des/ matches nwave/scripts/des/ content"
+    - "No references to ~/.claude/skills/nw/ remain in any generated file"
+    - "No references to ~/.claude/agents/ remain in any generated file"
+    time_estimate: 20m
+    dependencies:
+    - 01-01
+    - 03-01
+    files_to_modify:
+    - scripts/sync-nwave.sh
+    - skills/    # generated output
+    - src/des/    # generated output
+    status: approved
+    teammate_id: crafter-03-03
+    started_at: '2026-03-07T23:48:43.209908+00:00'
+    worktree: 
+      /Users/andres.dandrea/projects/personal/nw-teams/.claude/worktrees/crafter-03-03
+    review_attempts: 1
+    completed_at: '2026-03-07T23:57:46.494186+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:57:46.494186+00:00'
+      outcome: approved
+      feedback: skills/ and src/des/ copied from vendor
+  - id: 03-04
+    name: 'Sync script idempotency, dry-run, and error handling'
+    description: >
+      Add --dry-run mode, idempotency guarantee, change reporting, and
+      graceful handling of missing upstream directories.
+    criteria:
+    - "Running sync twice without upstream changes produces no modifications"
+    - "--dry-run previews changes without writing files"
+    - "Missing nwave/ fails with clear error; missing subdirectories reported but
+      other dirs still processed"
+    time_estimate: 30m
+    dependencies:
+    - 03-01
+    - 03-02
+    - 03-03
+    files_to_modify:
+    - scripts/sync-nwave.sh
+    status: approved
+    teammate_id: crafter-03-04
+    started_at: '2026-03-07T23:57:50.219348+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-08T00:04:06.378482+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-08T00:04:06.378482+00:00'
+      outcome: approved
+      feedback: Idempotency, dry-run, error handling all pass
+  - id: 03-05
+    name: 'Sync script version tracking'
+    description: >
+      Write nwave/VERSION with upstream tag, commit SHA, and sync timestamp
+      on every sync run. VERSION is committed to git for auditability.
+    criteria:
+    - "nwave/VERSION contains tag, commit SHA, and sync timestamp"
+    - "VERSION is updated on each sync run"
+    - "nwave/VERSION is committed alongside vendor directory"
+    time_estimate: 15m
+    dependencies:
+    - 03-04
+    files_to_modify:
+    - scripts/sync-nwave.sh
+    - nwave/VERSION
+
+    status: approved
+    teammate_id: crafter-03-05
+    started_at: '2026-03-08T00:04:10.810373+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-08T00:06:48.135040+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-08T00:06:48.135040+00:00'
+      outcome: approved
+      feedback: VERSION tracking clean, all AC pass
+- id: '04'
+  name: 'Deliver Rewrite'
+  steps:
+  - id: 04-01
+    name: 'Add next-steps command to team_state'
+    description: >
+      Implement next-steps subcommand in team_state CLI. Reads roadmap deps
+      and step statuses, computes ready steps via Kahn's algorithm,
+      outputs machine-parseable list with isolation indicators.
+    criteria:
+    - "Steps with all deps in approved status and own status pending are returned
+      as READY"
+    - "Steps in_progress, review, approved, or failed are excluded"
+    - "Output is deterministic: same roadmap state always produces same result"
+    - "Exit 0 with step list or exit 0 with DONE when all complete"
+    time_estimate: 60m
+    dependencies:
+    - 02-01
+    files_to_modify:
+    - src/en/cli/team_state.py
+    status: approved
+    teammate_id: crafter-04-01
+    started_at: '2026-03-07T23:41:26.272356+00:00'
+    review_attempts: 2
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:46:48.636993+00:00'
+      outcome: rejected
+      feedback: Test budget exceeded (11 vs 8 max), driving port violation (all 
+        tests go through main instead of _compute_ready_steps directly)
+    - cycle: 2
+      timestamp: '2026-03-07T23:49:53.982813+00:00'
+      outcome: approved
+      feedback: "Approved: Kahn's algorithm correct, test budget met, driving port
+        fixed"
+    completed_at: '2026-03-07T23:49:53.982813+00:00'
+  - id: 04-02
+    name: 'File conflict detection in next-steps'
+    description: >
+      Extend next-steps to detect file conflicts between ready steps and
+      active steps. Annotate output with isolation type (SHARED vs WORKTREE).
+    criteria:
+    - "Non-conflicting steps marked with SHARED isolation"
+    - "Steps conflicting with active steps marked WORKTREE with conflict reference"
+    - "Only approved deps count as satisfied; in_progress does not unblock"
+    - "Steps blocked by failed deps are never returned"
+    time_estimate: 30m
+    dependencies:
+    - 04-01
+    files_to_modify:
+    - src/en/cli/team_state.py
+    status: approved
+    teammate_id: crafter-04-02
+    started_at: '2026-03-07T23:50:03.076838+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-07T23:54:59.719770+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:54:59.719770+00:00'
+      outcome: approved
+      feedback: Completed by crafter
+  - id: 04-03
+    name: 'Write en:deliver command definition'
+    description: >
+      Create commands/deliver.md as project override. Defines the 4-phase
+      workflow: roadmap creation, deterministic parallel execution via
+      next-steps loop, TDD tracking, and verification/cleanup.
+    criteria:
+    - "deliver.md defines roadmap phase that spawns en-solution-architect when no
+      roadmap exists"
+    - "Execution phase loops: call next-steps, spawn crafters, review, complete-step,
+      repeat"
+    - "Lead spawns only what next-steps returns; no LLM judgment for ordering"
+    - "TDD tracking uses des.cli.* throughout execution"
+    time_estimate: 60m
+    dependencies:
+    - 03-01
+    - 04-01
+    files_to_modify:
+    - commands/deliver.md
+    status: approved
+    teammate_id: crafter-04-03
+    started_at: '2026-03-07T23:50:03.155492+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-07T23:54:59.895798+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:54:59.895798+00:00'
+      outcome: approved
+      feedback: Completed by crafter
+  - id: 04-04
+    name: 'Worktree isolation and merge in delivery loop'
+    description: >
+      Integrate worktree lifecycle into deliver workflow. Conflicting steps
+      get isolated worktrees. Completed steps merge back. Handle merge
+      conflicts and interruption recovery.
+    criteria:
+    - "Conflicting steps are isolated in separate worktrees via start-step"
+    - "Approved steps merge worktree back to main via complete-step"
+    - "Merge conflicts with >= 3 files or ambiguous logic escalated to user"
+    - "Interrupted delivery is resumable: approved steps stay, in_progress reverts
+      to pending"
+    time_estimate: 45m
+    dependencies:
+    - 04-02
+    - 04-03
+    files_to_modify:
+    - commands/deliver.md
+    - src/en/cli/team_state.py
+    status: approved
+    teammate_id: crafter-04-04
+    started_at: '2026-03-07T23:55:50.655723+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-08T00:04:33.304308+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-08T00:04:33.304308+00:00'
+      outcome: approved
+      feedback: Save-after-merge fix verified
+  - id: 04-05
+    name: 'Verification, finalization, and edge cases'
+    description: >
+      Add verification phase (TDD integrity, smoke test, refactoring,
+      mutation testing) and finalization (archive, cleanup, report).
+      Handle edge cases: single-step roadmap, bottleneck deps, fresh spawns.
+    criteria:
+    - "TDD integrity verified via des.cli.verify_deliver_integrity before finalize"
+    - "Crafters spawned fresh per step; no context carryover between steps"
+    - "Single-step roadmap completes in one iteration"
+    - "All steps depending on bottleneck unblock simultaneously after approval"
+    time_estimate: 30m
+    dependencies:
+    - 04-04
+    files_to_modify:
+    - commands/deliver.md
+
+    status: approved
+    teammate_id: crafter-04-05
+    started_at: '2026-03-08T00:04:38.488345+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-08T00:07:23.618233+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-08T00:07:23.618233+00:00'
+      outcome: approved
+      feedback: All 4 AC pass, zero defects
+- id: '05'
+  name: 'Install Script'
+  steps:
+  - id: 05-01
+    name: 'Python deps and old installation cleanup'
+    description: >
+      Rewrite install.sh for post-consolidation structure. Install Python
+      deps via uv (pip fallback). Clean up old global installations at
+      ~/.claude/. Fail with instructions if no package manager found.
+    criteria:
+    - "uv pip install -e . used when uv available; pip install -e . as fallback"
+    - "Old paths removed: ~/.claude/commands/ensemble/, ~/.claude/lib/python/agent_ensemble/,
+      ~/.claude/ensemble-manifest.txt"
+    - "Non-zero exit with instructions when neither uv nor pip available"
+    - "en.cli and des.cli modules importable after install"
+    time_estimate: 45m
+    dependencies:
+    - 02-01
+    - 03-01
+    files_to_modify:
+    - install.sh
+    status: approved
+    teammate_id: crafter-05-01
+    started_at: '2026-03-07T23:48:43.286393+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-07T23:55:00.071670+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:55:00.071670+00:00'
+      outcome: approved
+      feedback: Completed by crafter
+  - id: 05-02
+    name: 'Claude Code settings auto-configuration'
+    description: >
+      Auto-configure CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 in
+      ~/.claude/settings.json. Safe merge into existing settings.
+      Skip if already configured.
+    criteria:
+    - "Creates ~/.claude/settings.json with agent teams enabled if not exists"
+    - "Merges into existing settings without overwriting other values"
+    - "Skips with message when already configured"
+    - "JSON remains valid and properly formatted after merge"
+    time_estimate: 30m
+    dependencies:
+    - 05-01
+    files_to_modify:
+    - install.sh
+    status: approved
+    teammate_id: crafter-05-02
+    started_at: '2026-03-07T23:55:50.739280+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-07T23:57:07.945098+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-07T23:57:07.945098+00:00'
+      outcome: approved
+      feedback: configure_settings() added to install.sh
+  - id: 05-03
+    name: 'Board UI install and idempotency'
+    description: >
+      Install board UI deps (npm install in board/). Warn and continue if
+      npm unavailable. Ensure full install.sh is idempotent. Print
+      post-install summary with available /en:* commands.
+    criteria:
+    - "npm install runs in board/ when npm available; warning printed if not"
+    - "Running install.sh twice produces same result with no errors or duplicate entries"
+    - "Post-install summary lists available /en:* commands"
+    time_estimate: 20m
+    dependencies:
+    - 05-02
+    files_to_modify:
+    - install.sh
+    status: approved
+    teammate_id: crafter-05-03
+    started_at: '2026-03-07T23:57:11.620422+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-08T00:00:25.171057+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-08T00:00:25.171057+00:00'
+      outcome: approved
+      feedback: 'All 3 AC pass: npm install, idempotency, dynamic command listing'
+implementation_scope:
+  source_directories:
+  - src/en/
+  - src/des/
+  - commands/
+  - agents/
+  - skills/
+  - nwave/
+  - scripts/
+  test_directories:
+  - tests/acceptance/en-consolidation/
+  excluded_patterns:
+  - __init__.py
+  - __pycache__/**
+validation:
+  status: pending
+  reviewer: en-solution-architect-reviewer
+  approved_at:

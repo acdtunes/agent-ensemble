@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agent-ensemble"
+name = "en"
 version = "0.1.0"
-description = "Agent Ensemble coordination for AI agent teams"
+description = "EN coordination for AI agent teams"
 requires-python = ">=3.11"
 dependencies = [
     "pyyaml>=6.0",

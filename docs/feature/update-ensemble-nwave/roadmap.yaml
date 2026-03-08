@@ -1,0 +1,355 @@
+roadmap:
+  project_id: update-ensemble-nwave
+  short_description: 'nWave v2.0.0 compatibility (JSON, Agent, deliver/)'
+  description: 'Update agent-ensemble framework to support nWave v2.0.0 breaking changes:
+    JSON roadmaps, Agent tool (replacing Task), deliver/ subdirectory structure, and
+    uvx installation.'
+  created_at: '2026-03-05T20:03:51Z'
+  total_steps: 12
+  phases: 4
+phases:
+- id: '01'
+  name: 'CLI Roadmap Adapter Layer'
+  steps:
+  - id: 01-01
+    name: 'Create roadmap adapter with dual JSON/YAML support'
+    description: 'Create roadmap_adapter.py module providing format-agnostic roadmap
+      I/O. Implement detect_format(), load_roadmap(), save_roadmap(), and migrate_yaml_to_json()
+      as pure functions. Support both deliver/ subdirectory (v2.0.0) and flat structure
+      (v1.x).'
+    criteria:
+    - 'load_roadmap returns (data, format) tuple for both .yaml and .json files'
+    - 'detect_format finds roadmap in deliver/roadmap.json, roadmap.json, or roadmap.yaml
+      (priority order)'
+    - 'save_roadmap preserves YAML comments when writing YAML format'
+    - 'migrate_yaml_to_json converts existing YAML to JSON in deliver/ subdirectory'
+    time_estimate: '2h'
+    dependencies: []
+    files_to_modify:
+    - 'src/agent_ensemble/adapters/roadmap_adapter.py (new)'
+    status: approved
+    teammate_id: crafter-01-01
+    started_at: '2026-03-05T22:51:09.437537+00:00'
+    review_attempts: 2
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-05T22:57:10.516704+00:00'
+      outcome: rejected
+      feedback: Test budget exceeded by 1 (9 tests vs 8 budget). Consolidate 2 
+        migration tests into 1 parametrized test.
+    - cycle: 2
+      timestamp: '2026-03-05T22:59:31.719865+00:00'
+      outcome: approved
+      feedback: Approved on revision 2. Test budget fixed to 8/8 with 
+        parametrized migration test.
+    completed_at: '2026-03-05T22:59:31.719865+00:00'
+  - id: 01-02
+    name: 'Update team_state.py to use roadmap adapter'
+    description: 'Replace direct ruamel.yaml usage in team_state.py with roadmap adapter.
+      Update _load_roadmap() and _save_roadmap() helpers to delegate to adapter functions.
+      Maintain backward compatibility with existing YAML roadmaps.'
+    criteria:
+    - 'team_state.py imports and uses roadmap_adapter for all roadmap I/O'
+    - 'step-complete command works with both JSON and YAML roadmaps'
+    - 'step-claim command works with both formats'
+    - 'All existing team_state tests pass without modification'
+    time_estimate: '1.5h'
+    dependencies: ['01-01']
+    files_to_modify:
+    - 'src/agent_ensemble/cli/team_state.py'
+    status: approved
+    teammate_id: crafter-01-02
+    started_at: '2026-03-05T22:54:59.828550+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-05T23:08:16.835413+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-05T23:08:16.835413+00:00'
+      outcome: approved
+      feedback: Zero defects. 2/4 test budget, 4/4 AC, clean adapter delegation,
+        backward compat maintained.
+  - id: 01-03
+    name: 'Update parallel_groups.py to use roadmap adapter'
+    description: 'Replace yaml.safe_load in parallel_groups.py with roadmap adapter.
+      Update docstrings referencing .yaml extension. Ensure dependency analysis works
+      identically regardless of source format.'
+    criteria:
+    - 'parallel_groups.py uses roadmap_adapter.load_roadmap()'
+    - 'Dependency graph computation produces identical results for equivalent YAML
+      and JSON'
+    - 'CLI help text updated to mention both formats'
+    time_estimate: '1h'
+    dependencies: ['01-01']
+    files_to_modify:
+    - 'src/agent_ensemble/cli/parallel_groups.py'
+    status: approved
+    teammate_id: crafter-01-03
+    started_at: '2026-03-05T22:55:03.017955+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-05T23:03:04.439890+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-05T23:03:04.439890+00:00'
+      outcome: approved
+      feedback: Zero defects. 4/6 test budget, 3/3 AC, clean adapter 
+        integration, pure functional.
+  - id: 01-04
+    name: 'Create execution log adapter for JSON/YAML'
+    description: 'Create execlog_adapter.py module for execution log I/O. Support
+      both execution-log.yaml (v1.x) and deliver/execution-log.json (v2.0.0). Include
+      migration utility for existing YAML logs.'
+    criteria:
+    - 'load_execlog returns (data, format) for both YAML and JSON execution logs'
+    - 'save_execlog writes to appropriate format based on detection'
+    - 'migrate_execlog_to_json converts YAML log to JSON in deliver/ subdirectory'
+    time_estimate: '1.5h'
+    dependencies: ['01-01']
+    files_to_modify:
+    - 'src/agent_ensemble/adapters/execlog_adapter.py (new)'
+    status: approved
+    teammate_id: crafter-01-04
+    started_at: '2026-03-05T22:55:07.432618+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-05T23:00:23.915562+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-05T23:00:23.915562+00:00'
+      outcome: approved
+      feedback: Approved. 7/8 test budget, 3/3 AC, pure functional, consistent 
+        with roadmap_adapter.
+- id: '02'
+  name: 'Board App Dual Format Support'
+  steps:
+  - id: 02-01
+    name: 'Add JSON parsing to parser.ts'
+    description: 'Extend parser.ts to handle both YAML and JSON roadmap formats. Add
+      RoadmapFormat type and format-aware parseRoadmap function. Validation logic
+      remains unchanged since schema structure is identical.'
+    criteria:
+    - 'parseRoadmap accepts optional format parameter (yaml | json)'
+    - 'JSON parsing uses native JSON.parse with proper error handling'
+    - 'ParseError type includes invalid_json variant'
+    - 'Validation produces identical results for equivalent YAML and JSON content'
+    time_estimate: '1h'
+    dependencies: []
+    files_to_modify:
+    - 'board/server/parser.ts'
+    - 'board/server/__tests__/parse-roadmap.test.ts'
+    status: approved
+    teammate_id: crafter-02-01
+    started_at: '2026-03-05T22:51:12.611510+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-05T22:58:01.558112+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-05T22:58:01.558112+00:00'
+      outcome: approved
+      feedback: Zero defects. 5/6 test budget, 4/4 AC coverage, pure functional 
+        style.
+  - id: 02-02
+    name: 'Update feature-discovery.ts for multi-location roadmap finding'
+    description: 'Add findRoadmapPath() function that checks deliver/roadmap.json,
+      roadmap.json, roadmap.yaml in priority order. Update loadFeatureRoadmapFs to
+      use multi-location finder and pass format to parser.'
+    criteria:
+    - 'findRoadmapPath checks three locations with v2.0.0 priority'
+    - 'loadFeatureRoadmapFs returns roadmap from first found location'
+    - 'Returned FeatureRoadmap includes detected format'
+    time_estimate: '1.5h'
+    dependencies: ['02-01']
+    files_to_modify:
+    - 'board/server/feature-discovery.ts'
+    - 'board/server/__tests__/feature-discovery.test.ts'
+    - 'board/server/__tests__/feature-discovery-io.test.ts'
+    status: approved
+    teammate_id: crafter-02-02
+    started_at: '2026-03-05T22:56:19.071378+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-05T23:05:42.229111+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-05T23:05:42.229111+00:00'
+      outcome: approved
+      feedback: Zero defects. 6/6 test budget, 3/3 AC, clean v2.0.0 priority 
+        implementation.
+  - id: 02-03
+    name: 'Update file watchers for both YAML and JSON patterns'
+    description: 'Extend watcher.ts and directory-watcher.ts to watch for both roadmap.yaml
+      and deliver/roadmap.json patterns. Update multi-project-server.ts to handle
+      dynamic path resolution instead of hardcoded roadmap.yaml.'
+    criteria:
+    - 'Watcher responds to changes in roadmap.yaml, roadmap.json, and deliver/roadmap.json'
+    - 'multi-project-server uses dynamic roadmap path resolution'
+    - 'File change events include detected format'
+    time_estimate: '1.5h'
+    dependencies: ['02-02']
+    files_to_modify:
+    - 'board/server/watcher.ts'
+    - 'board/server/directory-watcher.ts'
+    - 'board/server/multi-project-server.ts'
+    - 'board/server/__tests__/watcher.test.ts'
+    - 'board/server/__tests__/directory-watcher.test.ts'
+    status: approved
+    teammate_id: crafter-02-03
+    started_at: '2026-03-05T23:03:58.341631+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-05T23:10:39.638487+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-05T23:10:39.638487+00:00'
+      outcome: approved
+      feedback: Zero defects. 6/10 test budget, 3/3 AC, v2.0.0 priority correct,
+        pure functional.
+- id: '03'
+  name: 'Command Files Task to Agent Migration'
+  steps:
+  - id: 03-01
+    name: 'Update execute.md: Task to Agent and path references'
+    description: 'Update execute.md with 50+ path references from roadmap.yaml to
+      format-agnostic or deliver/roadmap.json. Replace all Task(...) tool invocations
+      with Agent(...). Update CLI invocations to use adapter-aware commands.'
+    criteria:
+    - 'All Task tool calls replaced with Agent tool calls'
+    - 'Roadmap paths use deliver/roadmap.json or format-agnostic references'
+    - 'CLI invocations use updated team_state and parallel_groups commands'
+    - 'DES-VALIDATION markers preserved'
+    time_estimate: '2h'
+    dependencies: ['01-02', '01-03']
+    files_to_modify:
+    - 'commands/execute.md'
+    status: approved
+    teammate_id: crafter-03-01
+    started_at: '2026-03-05T23:06:21.805528+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-05T23:11:29.434985+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-05T23:11:29.434985+00:00'
+      outcome: approved
+      feedback: Approved. 15 Agent refs, 20+ correct paths, document structure 
+        preserved.
+  - id: 03-02
+    name: 'Update deliver.md and refactor.md: Task to Agent migration'
+    description: 'Update deliver.md (8+ refs) and refactor.md (3+ refs) with Agent
+      tool calls and updated roadmap paths. Ensure parallel analysis workflow uses
+      correct path patterns.'
+    criteria:
+    - 'deliver.md uses Agent tool for all subagent spawns'
+    - 'refactor.md uses Agent tool and updated paths'
+    - 'Parallel analysis references correct roadmap location'
+    time_estimate: '1.5h'
+    dependencies: ['01-02']
+    files_to_modify:
+    - 'commands/deliver.md'
+    - 'commands/refactor.md'
+    status: approved
+    teammate_id: crafter-03-02
+    started_at: '2026-03-05T23:06:25.410081+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-05T23:09:38.359693+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-05T23:09:38.359693+00:00'
+      outcome: approved
+      feedback: Approved. All Task refs replaced with Agent, format-agnostic 
+        paths, document structure preserved.
+  - id: 03-03
+    name: 'Update remaining command files and CLI tests'
+    description: 'Update design.md and distill.md with any Task to Agent changes.
+      Update Python test fixtures in tests/ to support dual format testing. Add JSON
+      fixture variants alongside existing YAML fixtures.'
+    criteria:
+    - 'design.md and distill.md use Agent tool where applicable'
+    - 'test_team_state.py passes with JSON roadmap fixtures'
+    - 'test_parallel_groups.py passes with JSON fixtures'
+    - 'test_review_history_persistence.py updated for JSON support'
+    time_estimate: '2h'
+    dependencies: ['03-01', '03-02']
+    files_to_modify:
+    - 'commands/design.md'
+    - 'commands/distill.md'
+    - 'tests/test_team_state.py'
+    - 'tests/test_parallel_groups.py'
+    - 'tests/test_review_history_persistence.py'
+    status: approved
+    teammate_id: crafter-03-03
+    started_at: '2026-03-05T23:11:35.071992+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-05T23:15:50.494899+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-05T23:15:50.494899+00:00'
+      outcome: approved
+      feedback: Approved. 3/6 test budget, 4/4 AC, no testing theater, JSON 
+        parity verified.
+- id: '04'
+  name: 'Installation and Backward Compatibility'
+  steps:
+  - id: 04-01
+    name: 'Update install.sh for uvx support and version pinning'
+    description: 'Add uvx as preferred installation method over pipx. Pin nWave to
+      v1.9.0 during migration period. Add version compatibility check and clear error
+      messaging.'
+    criteria:
+    - 'install.sh tries uvx first, falls back to pipx'
+    - 'nWave version pinned to 1.9.0 during migration'
+    - 'Version compatibility check warns about nWave v2.0.0'
+    - 'Error messages guide user to correct installation method'
+    time_estimate: '1h'
+    dependencies: []
+    files_to_modify:
+    - 'install.sh'
+    status: approved
+    teammate_id: crafter-04-01
+    started_at: '2026-03-05T22:51:15.721941+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-05T22:58:01.739862+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-05T22:58:01.739862+00:00'
+      outcome: approved
+      feedback: All AC verified. Solid shell script quality, proper error 
+        handling, pure functions.
+  - id: 04-02
+    name: 'Add backward compatibility and deprecation warnings'
+    description: 'Add format detection with deprecation warnings for YAML format.
+      Update migrate_roadmap.py to support JSON output or mark deprecated. Update
+      README.md with uvx uninstall instructions and migration documentation.'
+    criteria:
+    - 'CLI tools emit deprecation warning when loading roadmap.yaml'
+    - 'migrate_roadmap.py supports --output-format json flag'
+    - 'README.md documents uvx uninstall command'
+    - 'README.md references deliver/ subdirectory structure'
+    time_estimate: '1.5h'
+    dependencies: ['01-01', '04-01']
+    files_to_modify:
+    - 'src/agent_ensemble/cli/migrate_roadmap.py'
+    - 'README.md'
+    status: approved
+    teammate_id: crafter-04-02
+    started_at: '2026-03-05T22:59:42.506220+00:00'
+    review_attempts: 1
+    completed_at: '2026-03-05T23:07:17.139241+00:00'
+    review_history:
+    - cycle: 1
+      timestamp: '2026-03-05T23:07:17.139241+00:00'
+      outcome: approved
+      feedback: Approved. No version pinning confirmed. 2/4 test budget, 4/4 AC,
+        zero defects.
+implementation_scope:
+  source_directories:
+  - src/agent_ensemble/cli/
+  - src/agent_ensemble/adapters/
+  - board/server/
+  - commands/
+  test_directories:
+  - tests/
+  - board/server/__tests__/
+  excluded_patterns:
+  - __init__.py
+  - __pycache__/**
+  - node_modules/**
+validation:
+  status: pending
+  reviewer: solution-architect-reviewer
+  approved_at:

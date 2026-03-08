@@ -25,7 +25,7 @@ from datetime import datetime
 import pytest
 from ruamel.yaml import YAML
 
-from agent_ensemble.cli.team_state import main
+from en.cli.team_state import main
 
 
 # --- Fixtures ---

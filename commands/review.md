@@ -1,178 +1,151 @@
-# Multi-Perspective Code Review with Agent Teams
+---
+description: "Dispatches an expert reviewer agent to critique workflow artifacts. Use when a roadmap, implementation, or step needs quality review before proceeding."
+argument-hint: '[agent] [artifact-type] [artifact-path] - Example: @software-crafter task "roadmap.json"'
+---
 
-**Command**: `/ensemble:review`
-**Requires**: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json or environment
+# EN-REVIEW: Expert Critique and Quality Assurance
+
+**Wave**: CROSS_WAVE
+**Agent**: Dynamic (en-*-reviewer)
 
 ## Overview
 
-Execute parallel code review using Claude Code Agent Teams. You (the Lead) will create a team of reviewer teammates, each applying a different lens to the code. This catches more issues than a single-perspective review.
+Dispatches expert reviewer agent to critique workflow artifacts. Takes base agent name, appends `-reviewer`, invokes with artifact. Reviewer agent owns all review methodology|criteria|output format.
 
-## Your Role: Team Lead
+## Review Philosophy: Radical Candor
 
-You are the **Team Lead** — orchestrate the review team, synthesize findings, produce unified report.
+Every review MUST embody Radical Candor — kind AND clear, specific AND sincere:
 
-## Workflow
+- **Care personally**: Acknowledge what works. Understand author's intent before critiquing. Include at least one genuine `praise:` per review.
+- **Challenge directly**: Be specific about what is wrong and WHY. Ground feedback in evidence|consequences, not preference. Never soften security/data-loss issues.
+- **Avoid ruinous empathy**: Never "LGTM" when real issues exist. Hedging ("maybe consider possibly...") on blocking concerns is a review failure.
+- **Avoid obnoxious aggression**: Never "this is terrible" without constructive alternative. Focus on work, not author. Explain "why" behind every critique.
 
-### Phase 1: Understand Review Scope
+## Feedback Format: Conventional Comments
 
-Ask the user:
-1. What to review? (PR, specific files, recent changes)
-2. Any specific concerns? (security, performance, etc.)
+All findings MUST use Conventional Comments labels:
 
-Get the scope:
-```bash
-# For PR review
-gh pr diff {pr-number}
+| Label | Purpose | Blocking? |
+|---|---|---|
+| `praise:` | Highlight something done well (genuine, not filler) | No |
+| `issue (blocking):` | Must be resolved before proceeding | Yes |
+| `issue (blocking, security):` | Security vulnerability — maximum directness | Yes |
+| `suggestion:` | Propose improvement with reasoning | Mark `(blocking)` or `(non-blocking)` |
+| `nitpick (non-blocking):` | Trivial, preference-based | No |
+| `question (non-blocking):` | Seek clarification before assuming | No |
+| `thought (non-blocking):` | Idea sparked by the review | No |
 
-# For recent changes
-git diff main...HEAD
+Findings MUST be priority-ordered: blocking issues first, then suggestions, then nitpicks/praise.
 
-# For specific files
-# User provides file paths
-```
+## Approval Criteria
 
-### Phase 2: Create Team
+| Verdict | Criteria |
+|---|---|
+| **APPROVED** | No blocking issues. Non-blocking feedback is advisory. |
+| **NEEDS_REVISION** | Blocking issues exist. Author must address. Each blocking issue enumerated. |
+| **REJECTED** | Fundamental design problems requiring significant rework. Rare — explain thoroughly, offer alternatives. |
 
-```
-Create an agent team for multi-perspective code review.
-```
-
-### Phase 3: Spawn Reviewer Teammates
-
-Spawn 3 reviewer teammates with different focuses:
-
-**Reviewer 1: Testing Theater & TDD Quality**
-```
-Spawn a reviewer teammate with this prompt:
-
-"You are a Testing Theater specialist reviewer.
-
-Focus areas:
-- 7 Deadly Patterns: Happy Path Hero, Tautological Tests, The Mockaholic,
-  Line Coverage Junkie, Shallow Diver, The Time Traveler, Test Pollution
-- Test-to-implementation coupling
-- Missing edge cases and error paths
-- Test naming and readability
-
-Review the code and report findings with severity (Critical/High/Medium/Low).
-Message me when done with your findings."
-```
-
-**Reviewer 2: Security & Input Validation**
-```
-Spawn a reviewer teammate with this prompt:
-
-"You are a security specialist reviewer.
-
-Focus areas:
-- OWASP Top 10 vulnerabilities
-- Input validation and sanitization
-- Authentication and authorization
-- Secrets exposure
-- SQL injection, XSS, command injection
-- Dependency vulnerabilities
-
-Review the code and report findings with severity (Critical/High/Medium/Low).
-Message me when done with your findings."
-```
-
-**Reviewer 3: Performance & Architecture**
-```
-Spawn a reviewer teammate with this prompt:
-
-"You are a performance and architecture reviewer.
-
-Focus areas:
-- N+1 queries and database performance
-- Memory leaks and resource management
-- Algorithmic complexity
-- Caching opportunities
-- SOLID principle violations
-- Dependency inversion compliance
-
-Review the code and report findings with severity (Critical/High/Medium/Low).
-Message me when done with your findings."
-```
-
-### Phase 4: Wait for Findings
-
-Monitor teammate progress. Each reviewer will message you with their findings.
-
-### Phase 5: Synthesize Report
-
-Once all reviewers complete:
-
-1. **Collect all findings** from reviewer messages
-2. **Deduplicate**: Same issue found by multiple reviewers → merge
-3. **Flag contradictions**: Reviewers disagree → note for user resolution
-4. **Prioritize**: Order by severity (Critical > High > Medium > Low)
-5. **Produce unified report**:
-
-```markdown
-# Code Review Report
-
-## Summary
-- Critical: {count}
-- High: {count}
-- Medium: {count}
-- Low: {count}
-
-## Critical Issues
-{findings}
-
-## High Priority
-{findings}
-
-## Medium Priority
-{findings}
-
-## Low Priority / Suggestions
-{findings}
-
-## Contradictions (Needs User Input)
-{any conflicting reviewer opinions}
-
----
-Reviewed by: Testing Theater Specialist, Security Specialist, Performance Specialist
-```
-
-### Phase 6: Cleanup
+## Syntax
 
 ```
-Ask all reviewer teammates to shut down.
-Clean up the team.
+/en:review @{agent-name} {artifact-type} "{artifact-path}" [step_id={id}] [--dimensions=rpp] [--from=1] [--to=3]
 ```
 
-Present the unified report to the user.
+**Parameters:**
+- `@{agent-name}` - Base agent (e.g., `@en-software-crafter`). `-reviewer` suffix appended automatically.
+- `{artifact-type}` - One of: `baseline`, `roadmap`, `step`, `task`, `implementation`
+- `{artifact-path}` - Path to artifact file (resolved to absolute)
+- `step_id={id}` - Required for step and implementation reviews
+- `--dimensions=rpp` - Triggers RPP code smell scan alongside standard review (Dimension 4)
+- `--from=N` / `--to=N` - RPP level range (default: 1-6). Requires `--dimensions=rpp`
 
-## Customizing Review Focus
+## Rigor Profile Integration
 
-Users can request specific focus areas:
+Before dispatching the reviewer agent, read rigor config from `.en/des-config.json` (key: `rigor`). If absent, use standard defaults.
 
+- **`review_enabled`**: If `false`, skip the review entirely. Output: "Review skipped per rigor profile (review_enabled=false)."
+- **`reviewer_model`**: Pass as `model` parameter to Task tool. If `"skip"`, skip the review. Overrides the default Haiku model.
+- **`double_review`**: If `true` and called from deliver Phase 4, the caller is responsible for invoking review twice.
+
+## Agent Derivation
+
+| User provides | Reviewer invoked |
+|---|---|
+| `@en-software-crafter` | `en-software-crafter-reviewer` |
+| `@en-solution-architect` | `en-solution-architect-reviewer` |
+| `@en-platform-architect` | `en-platform-architect-reviewer` |
+
+Default model: Haiku (overridden by `rigor.reviewer_model` when set).
+
+## Agent Invocation
+
+Parse parameters, validate, then invoke via Task tool:
+
+```python
+Task(
+    subagent_type="{agent-name}-reviewer",
+    model=rigor_reviewer_model,  # omit if using default haiku
+    prompt="Review {artifact-type}: {absolute-artifact-path} [step_id={id}]"
+)
 ```
-/ensemble:review --focus security,performance
-```
 
-This spawns only the requested reviewer types.
+Reviewer handles: reading artifact|applying domain expertise|generating structured critique|updating original artifact with review metadata.
 
-## Example Invocation
+## Validation (before invoking)
 
-```
-User: /ensemble:review PR #142
+1. Base agent name exists (strip `@`, check agent registry)
+2. Artifact type valid (baseline, roadmap, step, task, implementation)
+3. Artifact file exists at resolved absolute path
+4. step_id provided when artifact type is `step` or `implementation`
 
-Lead (you):
-1. Fetch PR diff
-2. Create team with 3 reviewers
-3. Wait for all findings
-4. Synthesize: 2 Critical, 5 High, 8 Medium issues found
-5. Clean up team
-6. Present unified report
-```
+On validation failure, return specific error and stop.
 
 ## Success Criteria
 
-- [ ] All reviewer teammates completed
-- [ ] Findings deduplicated and prioritized
-- [ ] Contradictions flagged
-- [ ] Unified report produced
-- [ ] Team cleaned up
+- [ ] Reviewer agent invoked (not self-performed)
+- [ ] Original artifact file updated with review metadata
+- [ ] Review includes severity levels and approval status (APPROVED, NEEDS_REVISION, REJECTED)
+
+## Examples
+
+### Example 1: Step review
+```
+/en:review @en-software-crafter step "docs/feature/auth-upgrade/execution-log.json" step_id=02-01
+```
+Invokes `en-software-crafter-reviewer` with step review of execution log, step 02-01.
+
+### Example 2: Roadmap review
+```
+/en:review @en-solution-architect roadmap "docs/feature/auth-upgrade/roadmap.json"
+```
+Invokes `en-solution-architect-reviewer` with roadmap review.
+
+### Example 3: Implementation review
+```
+/en:review @en-platform-architect implementation "docs/feature/auth-upgrade/execution-log.json" step_id=01-01
+```
+Invokes `en-platform-architect-reviewer` with implementation review of step 01-01.
+
+### Example 4: RPP code quality review
+```
+/en:review @en-software-crafter implementation "src/des/" --dimensions=rpp --from=1 --to=3
+```
+Invokes `en-software-crafter-reviewer` with implementation review + RPP L1-L3 code smell detection using cascade rule.
+
+## Error Messages
+
+- Invalid agent: "Unknown agent: {name}. Check available agents with /en:agents."
+- Invalid type: "Invalid artifact type: {type}. Use: baseline, roadmap, step, task, implementation."
+- Missing file: "Artifact not found: {path}."
+- Missing step_id: "step_id required for {type} reviews."
+
+## Next Wave
+
+**Handoff To**: Depends on review outcome (rework or proceed)
+**Deliverables**: Updated artifact file with embedded review metadata
+
+## Expected Outputs
+
+```
+Updated artifact file (roadmap.json, execution-log.json, etc.) with reviews section
+```

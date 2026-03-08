@@ -3,30 +3,6 @@ revision = 3
 requires-python = ">=3.11"
 
 [[package]]
-name = "agent-ensemble"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "pyyaml" },
-    { name = "ruamel-yaml" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "ruamel-yaml", specifier = ">=0.18" },
-]
-provides-extras = ["dev"]
-
-[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -138,6 +114,30 @@ wheels = [
 toml = [
     { name = "tomli", marker = "python_full_version <= '3.11'" },
 ]
+
+[[package]]
+name = "en"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "pyyaml" },
+    { name = "ruamel-yaml" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "ruamel-yaml", specifier = ">=0.18" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "iniconfig"
