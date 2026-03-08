@@ -88,12 +88,14 @@ cp -r "$SCRIPT_DIR/skills/"* "$CLAUDE_DIR/skills/en/"
 echo "  Installed to ~/.claude/skills/en/"
 echo ""
 
-# 5. Copy Python library
-echo "=== Installing Python library ==="
+# 5. Copy Python libraries (en + des)
+echo "=== Installing Python libraries ==="
 mkdir -p "$CLAUDE_DIR/lib/python/en"
 cp -r "$SCRIPT_DIR/src/en/"* "$CLAUDE_DIR/lib/python/en/"
-find "$CLAUDE_DIR/lib/python/en" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-echo "  Installed to ~/.claude/lib/python/en/"
+mkdir -p "$CLAUDE_DIR/lib/python/des"
+cp -r "$SCRIPT_DIR/src/des/"* "$CLAUDE_DIR/lib/python/des/"
+find "$CLAUDE_DIR/lib/python/en" "$CLAUDE_DIR/lib/python/des" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+echo "  Installed en + des to ~/.claude/lib/python/"
 echo ""
 
 # 6. Install board UI dependencies
@@ -117,4 +119,4 @@ for cmd_file in "$SCRIPT_DIR/commands/"*.md; do
 done
 echo ""
 echo "To update: git pull && ./install.sh"
-echo "To uninstall: rm -rf ~/.claude/commands/en ~/.claude/agents/en ~/.claude/skills/en ~/.claude/lib/python/en"
+echo "To uninstall: rm -rf ~/.claude/commands/en ~/.claude/agents/en ~/.claude/skills/en ~/.claude/lib/python/en ~/.claude/lib/python/des"

@@ -76,7 +76,12 @@ INPUT: "{feature-description}"
      a. Skip if docs/feature/{feature-id}/deliver/roadmap.json exists with validation.status == "approved"
         IMPORTANT: Only check the deliver/ subdirectory. If roadmap.json is found in design/ instead,
         MOVE it to deliver/ and log warning: "Roadmap relocated from design/ to deliver/ — was created in wrong wave."
-     b. @en-solution-architect creates roadmap.json (read commands/roadmap.md)
+     b. Spawn @en-solution-architect to create roadmap.json.
+        YOU (the Lead) MUST read commands/roadmap.md FIRST, then include its full
+        orchestration steps (scaffold via CLI, fill content, validate) in the
+        architect's spawn prompt. The architect does NOT know how to scaffold
+        unless you tell it. Pass the feature-id, goal, and the roadmap.md
+        instructions verbatim in the prompt.
         Step IDs: NN-NN format (01-01, 01-02, 02-01). 01-A or 1-1 = invalid.
      c. Automated quality gate (see below)
      d. @en-software-crafter-reviewer reviews (read commands/review.md)
