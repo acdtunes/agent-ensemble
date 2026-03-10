@@ -70,6 +70,15 @@ while IFS=$'\t' read -r path expected_sha; do
     [[ "$path" == .claude-plugin/* ]] && continue
     [[ "$path" == marketplace-manifest.json ]] && continue
 
+    # Skip files intentionally diverged from upstream (nw→en rename, local customizations)
+    [[ "$path" == commands/deliver.md ]] && continue
+    [[ "$path" == commands/design.md ]] && continue
+    [[ "$path" == commands/devops.md ]] && continue
+    [[ "$path" == commands/discover.md ]] && continue
+    [[ "$path" == commands/discuss.md ]] && continue
+    [[ "$path" == commands/distill.md ]] && continue
+    [[ "$path" == hooks/hooks.json ]] && continue
+
     local_file="$VENDOR_PATH/$path"
     if [ ! -f "$local_file" ]; then
         error "Missing from vendor: $path"
