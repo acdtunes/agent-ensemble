@@ -217,4 +217,6 @@ rm -rf ~/.claude/lib/python/des
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
+
+This project vendors and derives from [nWave](https://github.com/nWave-ai/nWave) by Alessandro Digioia & Michele Brissoni, also MIT licensed — see [THIRD-PARTY-LICENSES](THIRD-PARTY-LICENSES).
