@@ -104,31 +104,19 @@ The flagship command. Spawns teams of crafter+reviewer agents working in paralle
 
 ### Code Review
 
-Get multiple perspectives on your code changes:
-
 ```
-> /ensemble:review
+> /en:review implementation "docs/feature/auth/deliver/execution-log.json"
 
-# Spawns parallel reviewers:
-# - Security Auditor
-# - Performance Optimizer
-# - Maintainability Expert
-# - Testing Specialist
-#
-# Each provides independent feedback
+# Dispatches a reviewer agent to critique implementation artifacts
+# Includes Testing Theater 7-pattern detection
 ```
 
-### Debugging
-
-Attack problems from multiple angles:
+### Root Cause Analysis
 
 ```
-> /ensemble:debug
+> /en:root-why "Login fails intermittently under load"
 
-# Spawns competing hypothesis investigators:
-# - Each proposes and tests different root causes
-# - Evidence-based elimination
-# - Fastest path to resolution
+# Systematic debugging with evidence-based investigation
 ```
 
 ## How It Works
