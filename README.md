@@ -21,20 +21,48 @@ cd agent-ensemble
 
 ## What You Get
 
-### 10 Ensemble Commands
+### 23 EN Commands
+
+| Command | Description |
+|---------|-------------|
+| `/en:deliver` | Parallel feature delivery with crafter+reviewer teams |
+| `/en:execute` | Parallel feature execution (single-step dispatch) |
+| `/en:review` | Multi-perspective code review |
+| `/en:design` | System architecture with C4 diagrams and tech selection |
+| `/en:discover` | Evidence-based product discovery |
+| `/en:discuss` | Jobs-to-be-Done analysis and UX journey design |
+| `/en:distill` | Acceptance test design in Given-When-Then format |
+| `/en:document` | Documentation following DIVIO/Diataxis principles |
+| `/en:refactor` | Structured refactoring (RPP levels L1-L6) |
+| `/en:devops` | CI/CD pipelines, infrastructure, deployment strategy |
+| `/en:research` | Evidence-driven research with source verification |
+| `/en:forge` | Create new specialized agents (5-phase workflow) |
+| `/en:diagram` | C4 architecture diagrams in Mermaid or PlantUML |
+| `/en:mutation-test` | Feature-scoped mutation testing (kill rate >= 80%) |
+| `/en:root-why` | Root cause analysis and debugging |
+| `/en:roadmap` | Roadmap creation for feature delivery |
+| `/en:finalize` | Archive and close a delivered feature |
+| `/en:mikado` | Complex refactoring roadmaps with visual tracking |
+| `/en:hotspot` | Git change frequency hotspot analysis |
+| `/en:rigor` | Configure rigor profile for delivery |
+| `/en:new` | Scaffold a new feature |
+| `/en:continue` | Resume an interrupted delivery |
+| `/en:fast-forward` | Skip ahead in a delivery workflow |
+
+### 10 Ensemble Commands (Agent Teams)
 
 | Command | Description |
 |---------|-------------|
 | `/ensemble:deliver` | Parallel feature delivery with crafter+reviewer teams |
+| `/ensemble:execute` | Parallel feature execution |
 | `/ensemble:review` | Multi-perspective code review |
-| `/ensemble:debug` | Competing hypotheses debugging |
 | `/ensemble:design` | Cross-discipline architecture exploration |
 | `/ensemble:discover` | Parallel research and requirements gathering |
 | `/ensemble:distill` | Parallel acceptance test design |
 | `/ensemble:document` | Parallel documentation generation |
-| `/ensemble:execute` | Parallel feature execution |
 | `/ensemble:refactor` | Parallel refactoring with multiple approaches |
 | `/ensemble:audit` | Multi-perspective quality audit |
+| `/ensemble:debug` | Competing hypotheses debugging |
 
 ### Project Dashboard (Optional)
 
@@ -55,7 +83,6 @@ Add projects via the UI or create `.nw-board-projects.json` (see Configuration).
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed
 - Python 3.11+
 - Node.js 18+ (for dashboard only)
-- `pipx` recommended (for nWave installation)
 
 ## Usage
 
@@ -64,7 +91,7 @@ Add projects via the UI or create `.nw-board-projects.json` (see Configuration).
 The flagship command. Spawns teams of crafter+reviewer agents working in parallel:
 
 ```
-> /ensemble:deliver auth-feature
+> /en:deliver auth-feature
 
 # Lead analyzes roadmap, identifies parallel groups:
 # Layer 1: steps 01-01, 01-02, 01-03 (spawn 3 crafter+reviewer pairs)
@@ -106,32 +133,36 @@ Attack problems from multiple angles:
 
 ## How It Works
 
-1. **You invoke** an ensemble command
+1. **You invoke** an en: or ensemble: command
 2. **Lead agent** analyzes the task and creates a team
 3. **Specialist agents** work in parallel (crafters, reviewers, researchers)
 4. **Agents communicate** via direct messages
 5. **Lead coordinates** results, handles conflicts, reports summary
 
-The ensemble commands build on [nWave](https://github.com/nWave-ai/nWave) agents, adding:
+The commands build on [nWave](https://github.com/nWave-ai/nWave) agents, adding:
 - Parallel execution coordination
 - Worktree isolation for file conflicts
-- Team state tracking
+- Team state tracking via DES (Delivery Execution System)
 - Automatic merge handling
 
 ## Project Structure
 
 ```
 agent-ensemble/
-├── commands/           # Ensemble command definitions (.md files)
-│   ├── deliver.md      # /ensemble:deliver
-│   ├── review.md       # /ensemble:review
-│   └── ...
+├── commands/           # Command definitions (.md files)
+│   ├── deliver.md      # /en:deliver
+│   ├── review.md       # /en:review
+│   └── ...             # 23 commands total
+├── agents/             # Agent definitions (.md files)
+├── skills/             # Agent skill files
 ├── src/
-│   └── agent_ensemble/ # Python coordination library
-│       └── cli/        # CLI tools for parallel execution
+│   ├── en/             # Python coordination library + CLI
+│   └── des/            # Delivery Execution System (TDD tracking)
 ├── board/              # Feature dashboard (React + Vite)
 │   ├── src/            # React components
 │   └── server/         # Express server with WebSocket
+├── nwave/              # Vendored nWave upstream
+├── scripts/            # Sync and validation scripts
 └── docs/               # Feature documentation
 ```
 
@@ -184,13 +215,11 @@ git pull
 
 ```bash
 # Remove installed files
-rm -rf ~/.claude/commands/ensemble
-rm -rf ~/.claude/lib/python/agent_ensemble
-rm -f ~/.claude/ensemble-manifest.txt
-
-# Optionally remove nWave (uvx or pipx)
-uvx uninstall nwave-ai
-# or: pipx uninstall nwave-ai
+rm -rf ~/.claude/commands/en
+rm -rf ~/.claude/agents/en
+rm -rf ~/.claude/skills/en
+rm -rf ~/.claude/lib/python/en
+rm -rf ~/.claude/lib/python/des
 ```
 
 ## Related
