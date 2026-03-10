@@ -4,7 +4,7 @@
 
 Instead of sequential agent workflows, Agent Ensemble coordinates teams of specialized agents (crafters, reviewers, researchers) working simultaneously with automatic worktree isolation and merge handling.
 
-**Requires**: [nWave](https://github.com/nWave-ai/nWave) (installed automatically)
+Originally forked from [nWave](https://github.com/nWave-ai/nWave).
 
 ## Quick Start
 
@@ -13,10 +13,8 @@ Instead of sequential agent workflows, Agent Ensemble coordinates teams of speci
 git clone https://github.com/acdtunes/agent-ensemble.git
 cd agent-ensemble
 
-# Install commands and CLI tools (also installs nWave if missing)
+# Install commands, agents, skills, and CLI tools
 ./install.sh
-
-# Enable agent teams in Claude Code settings (see Configuration below)
 ```
 
 ## What You Get
@@ -26,8 +24,8 @@ cd agent-ensemble
 | Command | Description |
 |---------|-------------|
 | `/en:deliver` | Parallel feature delivery with crafter+reviewer teams |
-| `/en:execute` | Parallel feature execution (single-step dispatch) |
-| `/en:review` | Multi-perspective code review |
+| `/en:execute` | Single-step dispatch for TDD execution |
+| `/en:review` | Code review with Testing Theater detection |
 | `/en:design` | System architecture with C4 diagrams and tech selection |
 | `/en:discover` | Evidence-based product discovery |
 | `/en:discuss` | Jobs-to-be-Done analysis and UX journey design |
@@ -48,21 +46,6 @@ cd agent-ensemble
 | `/en:new` | Scaffold a new feature |
 | `/en:continue` | Resume an interrupted delivery |
 | `/en:fast-forward` | Skip ahead in a delivery workflow |
-
-### 10 Ensemble Commands (Agent Teams)
-
-| Command | Description |
-|---------|-------------|
-| `/ensemble:deliver` | Parallel feature delivery with crafter+reviewer teams |
-| `/ensemble:execute` | Parallel feature execution |
-| `/ensemble:review` | Multi-perspective code review |
-| `/ensemble:design` | Cross-discipline architecture exploration |
-| `/ensemble:discover` | Parallel research and requirements gathering |
-| `/ensemble:distill` | Parallel acceptance test design |
-| `/ensemble:document` | Parallel documentation generation |
-| `/ensemble:refactor` | Parallel refactoring with multiple approaches |
-| `/ensemble:audit` | Multi-perspective quality audit |
-| `/ensemble:debug` | Competing hypotheses debugging |
 
 ### Project Dashboard (Optional)
 
@@ -121,13 +104,13 @@ The flagship command. Spawns teams of crafter+reviewer agents working in paralle
 
 ## How It Works
 
-1. **You invoke** an en: or ensemble: command
+1. **You invoke** an en: command
 2. **Lead agent** analyzes the task and creates a team
 3. **Specialist agents** work in parallel (crafters, reviewers, researchers)
 4. **Agents communicate** via direct messages
 5. **Lead coordinates** results, handles conflicts, reports summary
 
-The commands build on [nWave](https://github.com/nWave-ai/nWave) agents, adding:
+Key capabilities:
 - Parallel execution coordination
 - Worktree isolation for file conflicts
 - Team state tracking via DES (Delivery Execution System)
@@ -149,26 +132,11 @@ agent-ensemble/
 ├── board/              # Feature dashboard (React + Vite)
 │   ├── src/            # React components
 │   └── server/         # Express server with WebSocket
-├── nwave/              # Vendored nWave upstream
-├── scripts/            # Sync and validation scripts
+├── scripts/            # Dev scripts
 └── docs/               # Feature documentation
 ```
 
 ## Configuration
-
-### Claude Code Settings
-
-Enable agent teams (required). Edit `~/.claude/settings.json`:
-
-```json
-{
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-  }
-}
-```
-
-If you already have settings, just add the `env` section to your existing file.
 
 ### Dashboard Projects (Optional)
 
@@ -202,7 +170,6 @@ git pull
 ## Uninstalling
 
 ```bash
-# Remove installed files
 rm -rf ~/.claude/commands/en
 rm -rf ~/.claude/agents/en
 rm -rf ~/.claude/skills/en
@@ -212,11 +179,11 @@ rm -rf ~/.claude/lib/python/des
 
 ## Related
 
-- [nWave](https://github.com/nWave-ai/nWave) - Core agent framework (required dependency)
+- [nWave](https://github.com/nWave-ai/nWave) - Upstream agent framework
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) - Anthropic's AI-powered CLI
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
 
-This project vendors and derives from [nWave](https://github.com/nWave-ai/nWave) by Alessandro Digioia & Michele Brissoni, also MIT licensed — see [THIRD-PARTY-LICENSES](THIRD-PARTY-LICENSES).
+This project is forked from [nWave](https://github.com/nWave-ai/nWave) by Alessandro Digioia & Michele Brissoni, also MIT licensed — see [THIRD-PARTY-LICENSES](THIRD-PARTY-LICENSES).
