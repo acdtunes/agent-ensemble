@@ -222,6 +222,12 @@ INPUT: "{feature-description}"
              IMPORTANT: Call start-step one at a time. Each call sees the previous step
              as active and correctly detects file conflicts for worktree isolation.
 
+             **HARD RULE: NEVER spawn a crafter before running start-step for that step.**
+             start-step updates roadmap status to in_progress — without it, the step
+             appears stuck in "pending" and next-steps will re-dispatch it.
+             Sequence per step: start-step → record SHARED/WORKTREE → spawn crafter.
+             Violating this order causes status tracking drift and duplicate dispatches.
+
           3. Spawn ALL crafters in a SINGLE message (PARALLEL):
              Spawn all crafters simultaneously. For each step, spawn a {selected-crafter}
              teammate named crafter-{step_id} with the DES Prompt Template from execute.md
@@ -346,6 +352,21 @@ INPUT: "{feature-description}"
      | Step fails twice | Spawn en-troubleshooter teammate |
      | Build/CI broken | Spawn en-platform-architect teammate |
   |
+  ## POST-EXECUTION DISCIPLINE (Phases 3-8)
+
+  MANDATORY: Every phase below MUST execute unless the rigor config field
+  for that phase is explicitly set to false/skip.
+
+  These are NOT valid reasons to skip a phase:
+  - "Code is fresh from TDD" — TDD catches unit-level issues, not cross-step duplication or architectural drift
+  - "I already reviewed during execution" — step-level review ≠ adversarial feature review
+  - "Reviewers were unresponsive" — respawn or review directly, then still run Phase 4
+  - "No des-config.json found" — absent config = standard rigor = ALL phases run
+  - "It would be faster" — speed is not a quality gate
+
+  If you catch yourself writing "skipping for efficiency" or similar, STOP.
+  That sentence is the signal that you are about to violate protocol.
+
   4. Phase 3 — Complete Refactoring (L1-L4) [SKIP if rigor.refactor_pass = false]
      a. Collect modified files: git diff --name-only {base-commit}..HEAD -- '*.py' | sort -u
         Split: PRODUCTION_FILES (src/) | TEST_FILES (tests/)
