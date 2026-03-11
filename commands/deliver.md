@@ -44,6 +44,31 @@ Before dispatching any agent, read the rigor profile from `.en/des-config.json` 
 - Crafters: `crafter-{step_id}` (e.g., `crafter-01-01`)
 - Reviewers: `reviewer-{step_id}` (e.g., `reviewer-01-01`)
 
+## Prior Wave Consultation
+
+Before beginning DELIVER work, read targeted prior wave artifacts. DISTILL is the major synthesis point — its acceptance tests encode all prior wave decisions into executable specifications.
+
+1. **DISCOVER** (skip): Synthesized into DISCUSS, then into DISTILL acceptance tests.
+2. **DISCUSS** (skip): Synthesized into DISTILL acceptance tests. If needed during implementation, read specific files on demand.
+3. **DESIGN** (structural context): Read from `docs/feature/{feature-id}/design/`:
+   - `architecture-design.md` — component structure and C4 diagrams guide implementation
+   - `component-boundaries.md` — dependency-inversion boundaries
+   - `wave-decisions.md` — paradigm, tech stack, upstream changes
+4. **DEVOPS** (skip): Infrastructure setup is independent of implementation. Read `wave-decisions.md` only if test environment issues arise.
+5. **DISTILL** (primary input): Read all files in `docs/feature/{feature-id}/distill/` — test scenarios, walking skeleton, acceptance review are the authoritative specification for implementation.
+
+Additionally, check for `upstream-changes.md` and `upstream-issues.md` in DESIGN and DISTILL directories. If unresolved issues exist, flag them to the user before starting implementation. Do not implement against contradictory specifications.
+
+**On-demand escalation**: If during implementation a crafter encounters ambiguity not resolved by DISTILL tests or DESIGN architecture, the orchestrator reads the specific prior wave file referenced in wave-decisions.md — never re-reads entire directories.
+
+## Document Update (Back-Propagation)
+
+When DELIVER implementation reveals gaps or contradictions in prior waves:
+1. Document findings in `docs/feature/{feature-id}/deliver/upstream-issues.md`
+2. Reference the original prior-wave document and describe the issue
+3. If implementation requires deviating from architecture or requirements, document the deviation and rationale
+4. Resolve with user before continuing past the affected step
+
 ## Orchestration Flow
 
 ```
@@ -51,6 +76,9 @@ INPUT: "{feature-description}"
   |
   0. Read rigor profile from .en/des-config.json (default: standard)
      Store: agent_model|reviewer_model|tdd_phases|review_enabled|double_review|mutation_enabled|refactor_pass
+  |
+  0.5. Prior Wave Consultation (see section above)
+     Read DISTILL (all) + DESIGN (architecture + boundaries + wave-decisions)|flag contradictions|resolve before proceeding
   |
   1. Parse input|derive feature-id (kebab-case)|create docs/feature/{feature-id}/deliver/
      a. Create execution-log.json if missing via CLI:
@@ -167,6 +195,12 @@ INPUT: "{feature-description}"
           MINIMIZE dependencies. Only add a dependency if the step literally cannot start without the other's output.
           File overlap is NOT a reason for a dependency — worktrees handle that automatically.
         - "files_to_modify": list of files the step will touch
+        - "test_file": path to the acceptance test file for this step (from distill/)
+        - "scenario_name": name of the acceptance scenario this step implements
+
+        DISTILL LINKAGE: If docs/feature/{feature-id}/distill/ exists, you MUST populate
+        test_file and scenario_name fields from the distilled acceptance tests.
+        Each step maps to one acceptance scenario (1 Step = 1 Scenario = 1 TDD Cycle).
 
         Also fill roadmap-level fields:
         - "short_description": the feature NAME
@@ -240,6 +274,14 @@ INPUT: "{feature-description}"
                  python -m en.cli.team_state transition ROADMAP --step {step-id} --status review
                → Lead spawns reviewer lazily (see Reviewer Spawning Protocol below)
              - Reviewer approves:
+               → Lead runs wiring smoke check before completing:
+                 Verify every new function defined in production files has at least one
+                 call site in production code (not just tests).
+                 Flag "function X defined but only called from tests" → message crafter to fix.
+               → Lead runs acceptance test gate:
+                 Run the feature's acceptance tests (tests/acceptance/{feature-id}/).
+                 If any acceptance test fails, message crafter to fix before completing.
+                 Do NOT skip or defer failing tests. This applies to EVERY step, not just the final one.
                → Lead runs complete-step (marks approved + merges worktree if used):
                  python -m en.cli.team_state complete-step ROADMAP --step {step-id} \
                    --outcome approved --feedback "Approved: meets quality standards"
@@ -489,6 +531,7 @@ After roadmap creation, before reviewer:
 3. Identical patterns: flag 3+ steps with same AC structure (batch them)
 4. Validation-only: flag steps with no files_to_modify
 5. Step ID format: flag non-matching `^\d{2}-\d{2}$`
+6. DISTILL linkage: if docs/feature/{feature-id}/distill/ exists, flag steps missing test_file/scenario_name
 
 HIGH findings → return to architect for one revision.
 

@@ -11,8 +11,14 @@ echo "Installing en: framework"
 echo ""
 
 # Transform project-relative paths to global ~/.claude/ paths
+# Uses negative lookbehind to avoid double-transforming already-global paths
 globalize() {
   sed \
+    -e 's|~/.claude/skills/en/|skills/|g' \
+    -e 's|~/.claude/commands/en/|commands/|g' \
+    -e 's|~/.claude/agents/en/en-|agents/en-|g' \
+    -e 's|\$HOME/.claude/lib/python|src/|g' \
+    | sed \
     -e 's|skills/|~/.claude/skills/en/|g' \
     -e 's|PYTHONPATH=src/|PYTHONPATH=$HOME/.claude/lib/python|g' \
     -e 's|commands/|~/.claude/commands/en/|g' \

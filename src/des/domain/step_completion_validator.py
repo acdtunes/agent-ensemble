@@ -21,6 +21,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from des.domain.value_objects import PhaseOutcome, PhaseStatus
+
 
 if TYPE_CHECKING:
     from des.domain.phase_event import PhaseEvent
@@ -188,7 +190,7 @@ class StepCompletionValidator:
         outcome = event.outcome
 
         # Rule 2 & 3: Validate EXECUTED phases
-        if status == "EXECUTED":
+        if status == PhaseStatus.EXECUTED:
             self._validate_executed_phase(
                 phase,
                 outcome,
@@ -197,7 +199,7 @@ class StepCompletionValidator:
             )
 
         # Rule 4 & 5: Validate SKIPPED phases
-        elif status == "SKIPPED":
+        elif status == PhaseStatus.SKIPPED:
             self._validate_skipped_phase(
                 phase,
                 outcome,
@@ -221,13 +223,13 @@ class StepCompletionValidator:
     ) -> None:
         """Validate an EXECUTED phase's outcome."""
         # Rule 2: Outcome must be PASS or FAIL
-        if outcome not in ("PASS", "FAIL"):
+        if outcome not in (PhaseOutcome.PASS, PhaseOutcome.FAIL):
             incomplete_phases.append(phase)
             error_messages.append(
                 f"{phase}: Invalid outcome '{outcome}' (must be PASS or FAIL)"
             )
         # Rule 3: Terminal phases must PASS
-        elif phase in self._schema.terminal_phases and outcome != "PASS":
+        elif phase in self._schema.terminal_phases and outcome != PhaseOutcome.PASS:
             incomplete_phases.append(phase)
             error_messages.append(
                 f"{phase}: Terminal phase must have outcome PASS (not FAIL)"

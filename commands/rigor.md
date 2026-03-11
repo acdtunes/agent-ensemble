@@ -1,5 +1,5 @@
 ---
-description: "Selects a quality-vs-token-consumption profile (lean, standard, thorough, exhaustive, custom, inherit) and persists it to .en/des-config.json. Use when tuning how much rigor wave commands apply."
+description: "Selects a quality-vs-token-consumption profile (lean, standard, thorough, exhaustive, custom, inherit) and persists it globally (~/.en/global-config.json) or per-project (.en/des-config.json). Use when tuning how much rigor wave commands apply."
 disable-model-invocation: true
 argument-hint: '[profile] - Optional: lean, standard, thorough, exhaustive, custom, inherit. Omit for interactive selection.'
 ---
@@ -10,7 +10,7 @@ argument-hint: '[profile] - Optional: lean, standard, thorough, exhaustive, cust
 
 ## Overview
 
-Interactive command to select a quality-vs-token-consumption profile. Persists choice to `.en/des-config.json` under the `rigor` key. All wave commands read this config to adjust agent models, review policy, TDD phases, and mutation testing.
+Interactive command to select a quality-vs-token-consumption profile. Persists choice to either `~/.en/global-config.json` (global scope) or `.en/des-config.json` (project scope) under the `rigor` key. All wave commands read this config to adjust agent models, review policy, TDD phases, and mutation testing.
 
 You (the main Claude instance) run this directly. No subagent delegation.
 
@@ -45,6 +45,22 @@ If JSON is invalid -> backup as `.en/des-config.json.bak`, reset config to `{}`,
 Display current profile (from `config.rigor.profile`) or "none set" if absent.
 
 Brief explanation: "Rigor profiles control how much quality infrastructure nWave applies per wave: agent models, review depth, TDD phases, mutation testing. Higher rigor = better guarantees, higher token cost."
+
+#### Step 1.5: Scope Selection
+
+Display the current project rigor (from `.en/des-config.json`) and current global rigor (from `~/.en/global-config.json`, if it exists).
+
+Ask via AskUserQuestion:
+```
+Where do you want to save this configuration?
+```
+Options:
+1. Globally (~/.en/global-config.json) — applies to all projects without their own rigor
+2. This project only (.en/des-config.json) — overrides global for this project
+
+Store the user's choice as `{scope}` and the corresponding file path as `{target_file}`:
+- If global: `{target_file}` = `~/.en/global-config.json`
+- If project: `{target_file}` = `.en/des-config.json`
 
 #### Step 2: Comparison Table
 
@@ -185,9 +201,10 @@ Ask user to confirm via AskUserQuestion:
 
 #### Step 6: Save to Config
 
-1. Read `.en/des-config.json`
-2. Parse JSON (handle corruption as in Step 1)
-3. Set `config["rigor"]` to the full profile object:
+1. If `{scope}` is global AND the directory `~/.en/` does not exist, create it with `parents=True`
+2. Read `{target_file}` (handle missing file or corrupt JSON: start with `{}`)
+3. Parse JSON
+4. Set `config["rigor"]` to the full profile object:
    ```json
    {
      "profile": "{selected}",
@@ -200,7 +217,7 @@ Ask user to confirm via AskUserQuestion:
      "refactor_pass": true/false
    }
    ```
-4. Write back, preserving all other top-level keys (audit_logging_enabled, skill_tracking, etc.)
+5. Write back to `{target_file}`, preserving all other top-level keys (audit_logging_enabled, skill_tracking, update_check, etc.)
 
 #### Step 7: Summary
 
@@ -220,7 +237,7 @@ Rigor profile saved: {name}
   | refactor_pass         | {value}                                           |
   +-----------------------+---------------------------------------------------+
 
-  Config: .en/des-config.json
+  Config: {target_file} ({scope})
   All wave commands will use these settings.
 ```
 
@@ -233,6 +250,10 @@ If argument is not one of: lean, standard, thorough, exhaustive, custom, inherit
 If argument is `custom` -> redirect to Mode 3 (Custom Builder).
 
 Read `.en/des-config.json`. If missing -> same error as Mode 1 Step 1.
+
+#### Step 1.5: Scope Selection
+
+Same as Mode 1 Step 1.5. Ask scope question, store `{scope}` and `{target_file}`.
 
 #### Step 2: Show Diff
 
@@ -268,7 +289,7 @@ Ask user to confirm via AskUserQuestion:
 
 #### Step 4: Save + Summary
 
-Same as Mode 1 Steps 6 and 7.
+Same as Mode 1 Steps 6 and 7. Uses `{target_file}` from Step 1.5.
 
 ### Mode 3: Custom Builder (`/en:rigor custom` or selected from interactive)
 
@@ -277,6 +298,10 @@ Build a profile setting by setting. Each question uses AskUserQuestion with sens
 #### Step 1: Config Check
 
 Same as Mode 1 Step 1 (read config, handle missing/corrupt).
+
+#### Step 1.5: Scope Selection
+
+Same as Mode 1 Step 1.5. Ask scope question, store `{scope}` and `{target_file}`.
 
 #### Step 2: Agent Model
 
@@ -370,7 +395,7 @@ Ask to confirm via AskUserQuestion:
 
 #### Step 9: Save + Summary
 
-Same as Mode 1 Steps 6 and 7. Save with `"profile": "custom"`.
+Same as Mode 1 Steps 6 and 7. Uses `{target_file}` from Step 1.5. Save with `"profile": "custom"`.
 
 ## Error Handling
 
@@ -384,10 +409,12 @@ Same as Mode 1 Steps 6 and 7. Save with `"profile": "custom"`.
 ## Success Criteria
 
 - [ ] Current profile displayed (or "none set")
+- [ ] Scope question asked (global vs project) in all 3 modes
 - [ ] Comparison table shown with all 5 profiles
 - [ ] User selected and confirmed a profile
-- [ ] Config written to `.en/des-config.json` (read-modify-write, other keys preserved)
-- [ ] Summary of all resolved settings displayed
+- [ ] Config written to `{target_file}` (read-modify-write, other keys preserved)
+- [ ] `~/.en/` directory auto-created with `parents=True` on first global save
+- [ ] Summary of all resolved settings displayed (including scope and target file path)
 
 ## Examples
 

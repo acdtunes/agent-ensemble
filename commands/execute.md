@@ -69,13 +69,23 @@ Load on-demand per phase as specified in your Skill Loading Strategy table.
 # TDD_PHASES
 Execute in order:
 0. PREPARE - Load context, verify prerequisites
-1. RED_ACCEPTANCE - Activate acceptance test
+1. RED_ACCEPTANCE - Activate or write acceptance test (PRIMARY TBU DEFENSE)
    If TASK_CONTEXT includes test_file: locate it, remove @skip/@ignore/@pending/xit/.skip/[Ignore] marker
    from the target scenario, run it — must fail for business logic reason (not import/syntax error).
    If no test_file in TASK_CONTEXT: write a new failing acceptance test from acceptance_criteria.
-2. RED_UNIT - Write failing unit test
+   PORT-TO-PORT PRINCIPLE: The acceptance test exercises the scenario through
+   the driving port (application service, orchestrator, CLI handler, API controller),
+   not a decomposed helper or internal class. A correctly-written port-to-port test
+   makes TBU structurally impossible — if a new function were missing or unwired,
+   THIS test stays RED. That is the entire point: GREEN is unreachable without wiring.
+   Litmus test: "If I delete the call-site that wires the new code, does this test fail?"
+   If no → the test is at the wrong level. Fix it before proceeding.
+2. RED_UNIT - Write failing unit test (or integration test for adapter/infrastructure
+   code — adapters use real infrastructure, never mocked unit tests)
 3. GREEN - Minimal code to pass tests
    After GREEN: run FULL test suite. If all pass, proceed to COMMIT immediately.
+   Smell test: if any new function is only called from test code, your acceptance
+   test is at the wrong abstraction level — go back to RED_ACCEPTANCE and fix it.
    Never move to new task or stop without committing green code.
 4. COMMIT - Stage and commit with conventional message
    Include git trailer: `Step-ID: {step-id}` (required for DES verification)

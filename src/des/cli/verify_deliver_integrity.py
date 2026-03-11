@@ -22,7 +22,7 @@ from pathlib import Path
 from des.domain.deliver_integrity_verifier import DeliverIntegrityVerifier
 from des.domain.roadmap_schema import get_roadmap_schema
 from des.domain.roadmap_validator import RoadmapValidator
-from des.domain.tdd_schema import get_tdd_schema
+from des.domain.tdd_schema import TDDSchemaLoader
 
 
 def _extract_step_ids(roadmap: dict) -> list[str]:
@@ -109,7 +109,7 @@ def main() -> int:
     step_ids = _extract_step_ids(roadmap)
     entries = _parse_execution_log(exec_log)
 
-    schema = get_tdd_schema()
+    schema = TDDSchemaLoader().load()
     verifier = DeliverIntegrityVerifier(required_phases=list(schema.tdd_phases))
     result = verifier.verify(step_ids, entries)
 

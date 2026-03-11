@@ -31,6 +31,7 @@ from pathlib import Path
 
 from des.domain.stale_detection_result import StaleDetectionResult
 from des.domain.stale_execution import StaleExecution
+from des.domain.value_objects import PhaseStatus
 
 
 class StaleExecutionDetector:
@@ -140,7 +141,7 @@ class StaleExecutionDetector:
         step_data = json.loads(step_file.read_text())
 
         # Only check IN_PROGRESS steps
-        if step_data.get("state", {}).get("status") != "IN_PROGRESS":
+        if step_data.get("state", {}).get("status") != PhaseStatus.IN_PROGRESS:
             return None
 
         # Check for tdd_cycle field
@@ -152,7 +153,7 @@ class StaleExecutionDetector:
         phase_execution_log = tdd_cycle.get("phase_execution_log", [])
 
         for phase in phase_execution_log:
-            if phase.get("status") == "IN_PROGRESS":
+            if phase.get("status") == PhaseStatus.IN_PROGRESS:
                 started_at = phase.get("started_at")
                 if not started_at:
                     # Skip phases missing started_at timestamp

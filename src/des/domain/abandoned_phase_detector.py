@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from des.domain.value_objects import PhaseStatus
+
 
 @dataclass
 class PhaseAbandonmentCheck:
@@ -78,7 +80,7 @@ class AbandonedPhaseDetector:
             return False
 
         status = phase.get("status", "")
-        return status in ("IN_PROGRESS", "NOT_EXECUTED")
+        return status in (PhaseStatus.IN_PROGRESS, PhaseStatus.NOT_EXECUTED)
 
     def is_abandoned_by_stalled_turn_count(
         self,
@@ -201,7 +203,7 @@ class AbandonedPhaseDetector:
         status = phase.get("status", "")
         turn_count = phase.get("turn_count", 0)
 
-        return status == "IN_PROGRESS" and turn_count == 0
+        return status == PhaseStatus.IN_PROGRESS and turn_count == 0
 
     def _parse_timestamp(self, timestamp_str: str | None) -> datetime | None:
         """

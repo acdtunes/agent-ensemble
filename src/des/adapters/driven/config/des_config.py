@@ -4,6 +4,9 @@ DES Configuration Adapter - Driven Port Implementation.
 Loads configuration from .nwave/des-config.json and provides access to settings.
 Falls back to safe defaults (audit logging ON) when file is missing or invalid.
 
+Rigor cascade: project config -> global config -> standard defaults.
+When a project has a "rigor" key, the entire global rigor block is ignored.
+
 Hexagonal Architecture:
 - DRIVEN ADAPTER: Implements configuration port (driven by business logic)
 - ON BY DEFAULT: Audit logging enabled unless explicitly disabled in config
@@ -20,41 +23,64 @@ class DESConfig:
     Configuration loader for DES settings.
 
     Loads configuration from .nwave/des-config.json with on-by-default audit logging.
-    Does NOT auto-create config files.
+    Supports global configuration via ~/.nwave/global-config.json for cross-project
+    rigor preferences. Does NOT auto-create config files.
+
+    Rigor cascade: project rigor -> global rigor -> standard defaults.
     """
+
+    _DEFAULT_GLOBAL_CONFIG_PATH = Path.home() / ".nwave" / "global-config.json"
 
     def __init__(
         self,
         config_path: Path | None = None,
         cwd: Path | None = None,
+        *,
+        global_config_path: Path | None = None,
     ):
         """
         Initialize DESConfig.
 
         Args:
-            config_path: Optional explicit path to config file
+            config_path: Optional explicit path to project config file
             cwd: Optional working directory (defaults to Path.cwd());
                  used to resolve .nwave/des-config.json when config_path is None
+            global_config_path: Optional explicit path to global config file
+                (keyword-only; defaults to ~/.nwave/global-config.json)
         """
         if config_path is None:
             effective_cwd = cwd or Path.cwd()
             config_path = effective_cwd / ".nwave" / "des-config.json"
 
         self._config_path = config_path
-        self._config_data = self._load_configuration()
+        self._config_data = self._load_json_file(self._config_path)
 
-    def _load_configuration(self) -> dict[str, Any]:
+        effective_global_path = (
+            global_config_path
+            if global_config_path is not None
+            else self._DEFAULT_GLOBAL_CONFIG_PATH
+        )
+        self._global_config_data = self._load_json_file(effective_global_path)
+
+    @staticmethod
+    def _load_json_file(path: Path) -> dict[str, Any]:
         """
-        Load configuration from JSON file.
+        Load configuration from a JSON file.
+
+        Returns empty dict when the file is missing, corrupt, or unreadable.
+        Pure function: no side effects beyond filesystem read.
+
+        Args:
+            path: Path to the JSON file to load
 
         Returns:
             Configuration dictionary, empty dict if loading fails
         """
-        if not self._config_path.exists():
+        if not path.exists():
             return {}
 
         try:
-            return json.loads(self._config_path.read_text(encoding="utf-8"))
+            return json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             return {}
 
@@ -100,8 +126,14 @@ class DESConfig:
         return self._config_data.get("audit_logging_enabled", True)
 
     def _rigor(self) -> dict:
-        """Return rigor sub-config dict, defaulting to empty dict."""
-        return self._config_data.get("rigor", {})
+        """Return rigor sub-config via cascade: project -> global -> empty dict.
+
+        When the project config contains a "rigor" key (even if empty),
+        the entire global rigor block is ignored -- full block override.
+        """
+        if "rigor" in self._config_data:
+            return self._config_data["rigor"]
+        return self._global_config_data.get("rigor", {})
 
     def _update_check(self) -> dict:
         """Return update_check sub-config dict, defaulting to empty dict."""

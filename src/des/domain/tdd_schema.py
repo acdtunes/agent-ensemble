@@ -250,23 +250,18 @@ class TDDSchemaLoader:
         self._cached_schema = None
 
 
-# Module-level singleton for convenience
+# --- Deprecated global convenience functions ---
+# These exist only for backward compatibility with test code.
+# Production code should use TDDSchemaLoader().load() directly
+# or accept TDDSchema via constructor injection.
 _global_loader: TDDSchemaLoader | None = None
 
 
 def get_tdd_schema() -> TDDSchema:
     """Get the TDD schema using the global loader singleton.
 
-    Convenience function for accessing schema without managing loader instances.
-    Uses module-level caching for efficiency.
-
-    Returns:
-        TDDSchema: The loaded TDD schema
-
-    Example:
-        >>> schema = get_tdd_schema()
-        >>> print(schema.tdd_phases)
-        ('PREPARE', 'RED_ACCEPTANCE', 'RED_UNIT', 'GREEN', 'COMMIT')
+    .. deprecated::
+        Use ``TDDSchemaLoader().load()`` or accept ``TDDSchema`` via constructor.
     """
     global _global_loader
     if _global_loader is None:
@@ -277,10 +272,8 @@ def get_tdd_schema() -> TDDSchema:
 def get_tdd_schema_loader() -> TDDSchemaLoader:
     """Get the global TDDSchemaLoader instance.
 
-    Useful when you need access to the loader itself (e.g., for cache control).
-
-    Returns:
-        TDDSchemaLoader: The global loader instance
+    .. deprecated::
+        Create your own ``TDDSchemaLoader()`` instance instead.
     """
     global _global_loader
     if _global_loader is None:
@@ -291,7 +284,8 @@ def get_tdd_schema_loader() -> TDDSchemaLoader:
 def reset_global_schema_loader() -> None:
     """Reset the global schema loader.
 
-    Useful in tests to ensure clean state between test cases.
+    .. deprecated::
+        Only needed when using the deprecated global functions.
     """
     global _global_loader
     _global_loader = None

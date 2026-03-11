@@ -28,7 +28,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from des.domain.tdd_schema import get_tdd_schema
+from des.domain.tdd_schema import TDDSchemaLoader
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -90,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    schema = get_tdd_schema()
+    schema = TDDSchemaLoader().load()
 
     # Validate phase name against schema
     if args.phase not in schema.tdd_phases:

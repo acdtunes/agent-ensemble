@@ -25,9 +25,18 @@ Note: REVIEW moved to deliver-level Phase 4 (Adversarial Review via /nw:review)
 Note: REFACTOR moved to deliver-level Phase 3 (Complete Refactoring L1-L4 via /nw:refactor)
 """
 
+from __future__ import annotations
+
 import re
 import time
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from des.domain.value_objects import PhaseStatus
+
+
+if TYPE_CHECKING:
+    from des.domain.tdd_schema import TDDSchema
 
 
 @dataclass
@@ -141,11 +150,17 @@ class TDDPhaseValidator:
     Note: REFACTOR moved to deliver-level Phase 3 (Complete Refactoring L1-L4)
     """
 
-    def __init__(self):
-        """Initialize validator with schema loader."""
-        from des.domain.tdd_schema import get_tdd_schema
+    def __init__(self, schema: TDDSchema | None = None):
+        """Initialize validator with TDD schema.
 
-        self._schema = get_tdd_schema()
+        Args:
+            schema: TDDSchema instance. If None, loads from default path.
+        """
+        if schema is None:
+            from des.domain.tdd_schema import TDDSchemaLoader
+
+            schema = TDDSchemaLoader().load()
+        self._schema = schema
         self.MANDATORY_PHASES = self._schema.tdd_phases
 
     def validate(self, prompt: str) -> list[str]:
@@ -260,11 +275,17 @@ class ExecutionLogValidator:
     to ensure phase execution logs are complete and consistent.
     """
 
-    def __init__(self):
-        """Initialize validator with schema loader."""
-        from des.domain.tdd_schema import get_tdd_schema
+    def __init__(self, schema: TDDSchema | None = None):
+        """Initialize validator with TDD schema.
 
-        self._schema = get_tdd_schema()
+        Args:
+            schema: TDDSchema instance. If None, loads from default path.
+        """
+        if schema is None:
+            from des.domain.tdd_schema import TDDSchemaLoader
+
+            schema = TDDSchemaLoader().load()
+        self._schema = schema
 
     def validate(
         self,
@@ -334,14 +355,14 @@ class ExecutionLogValidator:
             status = phase.get("status")
 
             # Check 1: Detect IN_PROGRESS (abandoned state)
-            if status == "IN_PROGRESS":
+            if status == PhaseStatus.IN_PROGRESS:
                 errors.append(
                     f"INCOMPLETE: Phase {phase_name} left in IN_PROGRESS state - "
                     f"task may have been abandoned"
                 )
 
             # Check 2: EXECUTED must have outcome
-            elif status == "EXECUTED":
+            elif status == PhaseStatus.EXECUTED:
                 if "outcome" not in phase or phase.get("outcome") is None:
                     errors.append(
                         f"ERROR: Phase {phase_name} EXECUTED but missing outcome field. "
@@ -349,7 +370,7 @@ class ExecutionLogValidator:
                     )
 
             # Check 3: SKIPPED must have blocked_by
-            elif status == "SKIPPED":
+            elif status == PhaseStatus.SKIPPED:
                 if "blocked_by" not in phase or not phase.get("blocked_by"):
                     errors.append(
                         f"ERROR: Phase {phase_name} SKIPPED but missing blocked_by reason. "
@@ -357,7 +378,7 @@ class ExecutionLogValidator:
                     )
 
             # Check 4: Reject NOT_EXECUTED
-            elif status == "NOT_EXECUTED":
+            elif status == PhaseStatus.NOT_EXECUTED:
                 errors.append(
                     f"ERROR: Phase {phase_name} NOT_EXECUTED. "
                     f"Cannot mark task complete with unexecuted phases"

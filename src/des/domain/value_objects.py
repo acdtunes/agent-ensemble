@@ -40,6 +40,31 @@ class PhaseOutcome(str, Enum):
     FAIL = "FAIL"
 
 
+class PhaseName(str, Enum):
+    """Valid TDD phase names across all schema versions."""
+
+    # v4.0 (5-phase streamlined)
+    PREPARE = "PREPARE"
+    RED_ACCEPTANCE = "RED_ACCEPTANCE"
+    RED_UNIT = "RED_UNIT"
+    GREEN = "GREEN"
+    COMMIT = "COMMIT"
+    # v3.0 additions (7-phase consolidated)
+    REVIEW = "REVIEW"
+    REFACTOR_CONTINUOUS = "REFACTOR_CONTINUOUS"
+    # v2.0 additions (8-phase optimized)
+    REFACTOR_L4 = "REFACTOR_L4"
+    # v1.0 additions (14-phase full)
+    GREEN_UNIT = "GREEN_UNIT"
+    CHECK_ACCEPTANCE = "CHECK_ACCEPTANCE"
+    GREEN_ACCEPTANCE = "GREEN_ACCEPTANCE"
+    REFACTOR_L1 = "REFACTOR_L1"
+    REFACTOR_L2 = "REFACTOR_L2"
+    REFACTOR_L3 = "REFACTOR_L3"
+    POST_REFACTOR_REVIEW = "POST_REFACTOR_REVIEW"
+    FINAL_VALIDATE = "FINAL_VALIDATE"
+
+
 class ValidationStatus(str, Enum):
     """Valid validation result statuses."""
 

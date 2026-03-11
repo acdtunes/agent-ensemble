@@ -18,6 +18,8 @@ DOMAIN LANGUAGE:
 
 from typing import Any
 
+from des.domain.value_objects import PhaseStatus
+
 
 class SilentCompletionDetector:
     """
@@ -62,7 +64,8 @@ class SilentCompletionDetector:
 
         # Check if all phases are NOT_EXECUTED (no phase updates were recorded)
         all_phases_untouched = all(
-            phase.get("status") == "NOT_EXECUTED" for phase in phase_execution_log
+            phase.get("status") == PhaseStatus.NOT_EXECUTED
+            for phase in phase_execution_log
         )
 
         return all_phases_untouched
@@ -91,7 +94,7 @@ class SilentCompletionDetector:
             outcome = phase.get("outcome")
 
             # EXECUTED status requires non-empty outcome
-            if status == "EXECUTED" and not outcome:
+            if status == PhaseStatus.EXECUTED and not outcome:
                 phase_name = phase.get("phase_name", "UNKNOWN")
                 missing.append(phase_name)
 
@@ -121,14 +124,14 @@ class SilentCompletionDetector:
             outcome = phase.get("outcome", "")
             phase_name = phase.get("phase_name", "UNKNOWN")
 
-            if not outcome or status == "NOT_EXECUTED":
+            if not outcome or status == PhaseStatus.NOT_EXECUTED:
                 continue
 
             # Check for contradictions between status and outcome
             outcome_lower = outcome.lower()
 
             # Status says EXECUTED but outcome describes failure/error
-            if status == "EXECUTED":
+            if status == PhaseStatus.EXECUTED:
                 failure_indicators = [
                     "failed",
                     "error",
